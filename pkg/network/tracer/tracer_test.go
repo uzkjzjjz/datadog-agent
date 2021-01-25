@@ -1219,14 +1219,14 @@ func removeConnection(t *testing.T, tr *Tracer, c *network.ConnectionStats) {
 	tuple := []*ConnTuple{
 		{
 			pid:      _Ctype_uint(c.Pid),
-			saddr_l:  _Ctype_ulonglong(nativeEndian.Uint32(c.Source.Bytes())),
-			daddr_l:  _Ctype_ulonglong(nativeEndian.Uint32(c.Dest.Bytes())),
 			sport:    _Ctype_ushort(c.SPort),
 			dport:    _Ctype_ushort(c.DPort),
 			netns:    _Ctype_uint(c.NetNS),
 			metadata: 1, // TCP/IPv4
 		},
 	}
+	tuple[0].saddr[3] = _Ctype_uint(nativeEndian.Uint32(c.Source.Bytes()))
+	tuple[0].daddr[3] = _Ctype_uint(nativeEndian.Uint32(c.Dest.Bytes()))
 
 	tr.removeEntries(mp, tcpMp, tuple)
 }

@@ -56,6 +56,10 @@
 # define __bpf_htonl(x)			__builtin_bswap32(x)
 # define __bpf_constant_ntohl(x)	___bpf_swab32(x)
 # define __bpf_constant_htonl(x)	___bpf_swab32(x)
+# define __bpf_be32_to_cpu(x)       __builtin_bswap32(x)
+# define __bpf_cpu_to_be32(x)       __builtin_bswap32(x)
+# define __bpf_constant_be32_to_cpu(x)  ___bpf_swab32(x)
+# define __bpf_constant_cpu_to_be32(x)  ___bpf_swab32(x)
 # define __bpf_ntohll(x)			__builtin_bswap64(x)
 # define __bpf_htonll(x)			__builtin_bswap64(x)
 # define __bpf_constant_ntohll(x)	___bpf_swab64(x)
@@ -73,6 +77,10 @@
 # define __bpf_htonl(x)			(x)
 # define __bpf_constant_ntohl(x)	(x)
 # define __bpf_constant_htonl(x)	(x)
+# define __bpf_be32_to_cpu(x)       (x)
+# define __bpf_cpu_to_be32(x)       (x)
+# define __bpf_constant_be32_to_cpu(x)  (x)
+# define __bpf_constant_cpu_to_be32(x)  (x)
 # define __bpf_ntohll(x)			(x)
 # define __bpf_htonll(x)			(x)
 # define __bpf_constant_ntohll(x)	(x)
@@ -97,6 +105,12 @@
 #define bpf_ntohl(x)				\
 	(__builtin_constant_p(x) ?		\
 	 __bpf_constant_ntohl(x) : __bpf_ntohl(x))
+#define bpf_cpu_to_be32(x)			\
+	(__builtin_constant_p(x) ?		\
+	 __bpf_constant_cpu_to_be32(x) : __bpf_cpu_to_be32(x))
+#define bpf_be32_to_cpu(x)			\
+	(__builtin_constant_p(x) ?		\
+	 __bpf_constant_be32_to_cpu(x) : __bpf_be32_to_cpu(x))
 #define bpf_htonll(x)				\
 	(__builtin_constant_p(x) ?		\
 	 __bpf_constant_htonll(x) : __bpf_htonll(x))

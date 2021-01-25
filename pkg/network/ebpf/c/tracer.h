@@ -27,10 +27,12 @@ typedef enum {
 
 typedef struct {
     /* Using the type unsigned __int128 generates an error in the ebpf verifier */
-    __u64 saddr_h;
-    __u64 saddr_l;
-    __u64 daddr_h;
-    __u64 daddr_l;
+    __be32 saddr[4];
+#define saddr4  saddr[3]
+#define saddr6  saddr
+    __be32 daddr[4];
+#define daddr4  daddr[3]
+#define daddr6  daddr
     __u16 sport;
     __u16 dport;
     __u32 netns;

@@ -13,6 +13,7 @@ import (
 )
 
 /*
+#include <string.h>
 #include "../ebpf/c/tracer.h"
 #include "../ebpf/c/tcp_states.h"
 */
@@ -26,10 +27,8 @@ tcp_stats_t tcp_stats;
 type TCPConn C.tcp_conn_t
 
 /* conn_tuple_t
-__u64 saddr_h;
-__u64 saddr_l;
-__u64 daddr_h;
-__u64 daddr_l;
+__be32 saddr[4];
+__be32 daddr[4];
 __u16 sport;
 __u16 dport;
 __u32 netns;
@@ -59,10 +58,8 @@ type portBindingTuple C.port_binding_t
 func (t *ConnTuple) copy() *ConnTuple {
 	return &ConnTuple{
 		pid:      t.pid,
-		saddr_h:  t.saddr_h,
-		saddr_l:  t.saddr_l,
-		daddr_h:  t.daddr_h,
-		daddr_l:  t.daddr_l,
+		saddr:    t.saddr,
+		daddr:    t.daddr,
 		sport:    t.sport,
 		dport:    t.dport,
 		netns:    t.netns,
@@ -95,17 +92,13 @@ func connTupleFromConn(conn net.Conn, pid uint32) (*ConnTuple, error) {
 	if sbytes := shost.To4(); sbytes != nil {
 		dbytes := dhost.To4()
 		ct.metadata |= C.CONN_V4
-		ct.saddr_h = 0
-		ct.saddr_l = C.__u64(nativeEndian.Uint32(sbytes))
-		ct.daddr_h = 0
-		ct.daddr_l = C.__u64(nativeEndian.Uint32(dbytes))
+		C.memcpy(unsafe.Pointer(&ct.saddr[3]), unsafe.Pointer(&sbytes[0]), C.size_t(len(sbytes)))
+		C.memcpy(unsafe.Pointer(&ct.daddr[3]), unsafe.Pointer(&dbytes[0]), C.size_t(len(dbytes)))
 	} else if sbytes := shost.To16(); sbytes != nil {
 		dbytes := dhost.To16()
 		ct.metadata |= C.CONN_V6
-		ct.saddr_h = C.__u64(nativeEndian.Uint64(sbytes[:8]))
-		ct.saddr_l = C.__u64(nativeEndian.Uint64(sbytes[8:]))
-		ct.daddr_h = C.__u64(nativeEndian.Uint64(dbytes[:8]))
-		ct.daddr_l = C.__u64(nativeEndian.Uint64(dbytes[8:]))
+		C.memcpy(unsafe.Pointer(&ct.saddr[0]), unsafe.Pointer(&sbytes[0]), C.size_t(len(sbytes)))
+		C.memcpy(unsafe.Pointer(&ct.daddr[0]), unsafe.Pointer(&dbytes[0]), C.size_t(len(dbytes)))
 	} else {
 		return nil, fmt.Errorf("invalid source/dest address")
 	}
@@ -131,16 +124,12 @@ func newConnTuple(pid int, netns uint64, saddr, daddr util.Address, sport, dport
 	dbytes := daddr.Bytes()
 	if len(sbytes) == 4 {
 		ct.metadata |= C.CONN_V4
-		ct.saddr_h = 0
-		ct.saddr_l = C.__u64(nativeEndian.Uint32(sbytes))
-		ct.daddr_h = 0
-		ct.daddr_l = C.__u64(nativeEndian.Uint32(dbytes))
+		C.memcpy(unsafe.Pointer(&ct.saddr[3]), unsafe.Pointer(&sbytes[0]), C.size_t(len(sbytes)))
+		C.memcpy(unsafe.Pointer(&ct.daddr[3]), unsafe.Pointer(&dbytes[0]), C.size_t(len(dbytes)))
 	} else if len(sbytes) == 16 {
 		ct.metadata |= C.CONN_V6
-		ct.saddr_h = C.__u64(nativeEndian.Uint64(sbytes[:8]))
-		ct.saddr_l = C.__u64(nativeEndian.Uint64(sbytes[8:]))
-		ct.daddr_h = C.__u64(nativeEndian.Uint64(dbytes[:8]))
-		ct.daddr_l = C.__u64(nativeEndian.Uint64(dbytes[8:]))
+		C.memcpy(unsafe.Pointer(&ct.saddr[0]), unsafe.Pointer(&sbytes[0]), C.size_t(len(sbytes)))
+		C.memcpy(unsafe.Pointer(&ct.daddr[0]), unsafe.Pointer(&dbytes[0]), C.size_t(len(dbytes)))
 	} else {
 		return nil
 	}
@@ -169,9 +158,9 @@ func (t *ConnTuple) isIPv4() bool {
 
 func (t *ConnTuple) SourceAddress() util.Address {
 	if t.isIPv4() {
-		return util.V4Address(uint32(t.saddr_l))
+		return util.V4Address(uint32(t.saddr[3]))
 	}
-	return util.V6Address(uint64(t.saddr_l), uint64(t.saddr_h))
+	return util.V6AddressFromBytes((*[16]byte)(unsafe.Pointer(&t.saddr))[:net.IPv6len])
 }
 
 // SourceEndpoint returns the source address in the ip:port format (for example, "192.0.2.1:25", "[2001:db8::1]:80")
@@ -185,9 +174,9 @@ func (t *ConnTuple) SourcePort() uint16 {
 
 func (t *ConnTuple) DestAddress() util.Address {
 	if t.isIPv4() {
-		return util.V4Address(uint32(t.daddr_l))
+		return util.V4Address(uint32(t.daddr[3]))
 	}
-	return util.V6Address(uint64(t.daddr_l), uint64(t.daddr_h))
+	return util.V6AddressFromBytes((*[16]byte)(unsafe.Pointer(&t.daddr))[:net.IPv6len])
 }
 
 // DestEndpoint returns the destination address in the ip:port format (for example, "192.0.2.1:25", "[2001:db8::1]:80")
@@ -277,11 +266,11 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 
 	var source, dest util.Address
 	if family == network.AFINET {
-		source = util.V4Address(uint32(t.saddr_l))
-		dest = util.V4Address(uint32(t.daddr_l))
+		source = util.V4Address(uint32(t.saddr[3]))
+		dest = util.V4Address(uint32(t.daddr[3]))
 	} else {
-		source = util.V6Address(uint64(t.saddr_l), uint64(t.saddr_h))
-		dest = util.V6Address(uint64(t.daddr_l), uint64(t.daddr_h))
+		source = util.V6AddressFromBytes((*[16]byte)(unsafe.Pointer(&t.saddr))[:net.IPv6len])
+		dest = util.V6AddressFromBytes((*[16]byte)(unsafe.Pointer(&t.daddr))[:net.IPv6len])
 	}
 
 	return network.ConnectionStats{

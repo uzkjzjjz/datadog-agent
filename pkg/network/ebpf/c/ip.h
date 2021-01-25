@@ -8,19 +8,15 @@
 #include <uapi/linux/tcp.h>
 #include <uapi/linux/udp.h>
 
-static __always_inline void read_ipv6_skb(struct __sk_buff* skb, __u64 off, __u64* addr_l, __u64* addr_h) {
-    *addr_h |= (__u64)load_word(skb, off) << 32;
-    *addr_h |= (__u64)load_word(skb, off + 4);
-    *addr_h = bpf_ntohll(*addr_h);
-
-    *addr_l |= (__u64)load_word(skb, off + 8) << 32;
-    *addr_l |= (__u64)load_word(skb, off + 12);
-    *addr_l = bpf_ntohll(*addr_l);
+static __always_inline void read_ipv6_skb(struct __sk_buff* skb, __u64 off, __be32* addr) {
+    addr[0] = bpf_htonl(load_word(skb, off));
+    addr[1] = bpf_htonl(load_word(skb, off + 4));
+    addr[2] = bpf_htonl(load_word(skb, off + 8));
+    addr[3] = bpf_htonl(load_word(skb, off + 12));
 }
 
-static __always_inline void read_ipv4_skb(struct __sk_buff* skb, __u64 off, __u64* addr) {
-    *addr = load_word(skb, off);
-    *addr = bpf_ntohll(*addr) >> 32;
+static __always_inline void read_ipv4_skb(struct __sk_buff* skb, __u64 off, __be32* addr) {
+    *addr = bpf_htonl(load_word(skb, off));
 }
 
 static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff* skb, skb_info_t* info) {
@@ -33,15 +29,15 @@ static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff* skb, skb_info
     case ETH_P_IP:
         l4_proto = load_byte(skb, info->data_off + offsetof(struct iphdr, protocol));
         info->tup.metadata |= CONN_V4;
-        read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, saddr), &info->tup.saddr_l);
-        read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, daddr), &info->tup.daddr_l);
+        read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, saddr), &info->tup.saddr4);
+        read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, daddr), &info->tup.daddr4);
         info->data_off += sizeof(struct iphdr); // TODO: this assumes there are no IP options
         break;
     case ETH_P_IPV6:
         l4_proto = load_byte(skb, info->data_off + offsetof(struct ipv6hdr, nexthdr));
         info->tup.metadata |= CONN_V6;
-        read_ipv6_skb(skb, info->data_off + offsetof(struct ipv6hdr, saddr), &info->tup.saddr_l, &info->tup.saddr_h);
-        read_ipv6_skb(skb, info->data_off + offsetof(struct ipv6hdr, daddr), &info->tup.daddr_l, &info->tup.daddr_h);
+        read_ipv6_skb(skb, info->data_off + offsetof(struct ipv6hdr, saddr), info->tup.saddr6);
+        read_ipv6_skb(skb, info->data_off + offsetof(struct ipv6hdr, daddr), info->tup.daddr6);
         info->data_off += sizeof(struct ipv6hdr);
         break;
     default:
@@ -77,13 +73,10 @@ static __always_inline void flip_tuple(conn_tuple_t* t) {
     t->sport = t->dport;
     t->dport = tmp_port;
 
-    __u64 tmp_ip_part = t->saddr_l;
-    t->saddr_l = t->daddr_l;
-    t->daddr_l = tmp_ip_part;
-
-    tmp_ip_part = t->saddr_h;
-    t->saddr_h = t->daddr_h;
-    t->daddr_h = tmp_ip_part;
+    __be32 tmp_ip_part[4] = {};
+    __builtin_memcpy(tmp_ip_part, t->saddr, sizeof(tmp_ip_part));
+    __builtin_memcpy(t->saddr, t->daddr, sizeof(t->saddr));
+    __builtin_memcpy(t->daddr, tmp_ip_part, sizeof(t->daddr));
 }
 
 #endif
