@@ -9,8 +9,7 @@ type ProbeName string
 
 const (
 	// TCPv4DestroySock traces the tcp_v4_destroy_sock system call (called for both ipv4 and ipv6)
-	TCPv4DestroySock       ProbeName = "kprobe/tcp_v4_destroy_sock"
-	TCPv4DestroySockReturn ProbeName = "kretprobe/tcp_v4_destroy_sock"
+	TCPv4DestroySock ProbeName = "kprobe/tcp_v4_destroy_sock"
 
 	// TCPv6Connect traces the v6 connect() system call
 	TCPv6Connect ProbeName = "kprobe/tcp_v6_connect"
@@ -39,9 +38,9 @@ const (
 	// TCPCleanupRBuf traces the tcp_cleanup_rbuf() system call
 	TCPCleanupRBuf ProbeName = "kprobe/tcp_cleanup_rbuf"
 	// TCPClose traces the tcp_close() system call
-	//TCPClose ProbeName = "kprobe/tcp_close"
+	TCPClose ProbeName = "kprobe/tcp_close"
 	// TCPCloseReturn traces the return of tcp_close() system call
-	//TCPCloseReturn ProbeName = "kretprobe/tcp_close"
+	TCPCloseReturn ProbeName = "kretprobe/tcp_close"
 
 	// We use the following two probes for UDP sends
 	IPMakeSkb        ProbeName = "kprobe/ip_make_skb"
