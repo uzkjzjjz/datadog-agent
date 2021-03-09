@@ -342,8 +342,16 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 			// We received either the connections either out of order, or it's the same one we've already seen.
 			// Lets skip it for now.
 			if prev.LastUpdateEpoch >= conn.LastUpdateEpoch {
+				log.Debugf("unordered connection for client %s! prev(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s, current(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s",
+					clientID,
+					prev.LastUpdatedBy, time.Duration(prev.LastUpdateEpoch), time.Duration(prev.CreatedEpoch), prev.BatchID, prev.BatchSlot, prev.CPU, prev.Merged, prev,
+					src, time.Duration(conn.LastUpdateEpoch), time.Duration(conn.CreatedEpoch), conn.BatchID, conn.BatchSlot, conn.CPU, conn.Merged, conn)
 				ns.telemetry.unorderedConns++
 				continue
+				log.Debugf("merging connections for client %s! prev(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s, current(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s",
+					clientID,
+					prev.LastUpdatedBy, time.Duration(prev.LastUpdateEpoch), time.Duration(prev.CreatedEpoch), prev.BatchID, prev.BatchSlot, prev.CPU, prev.Merged, prev,
+					src, time.Duration(conn.LastUpdateEpoch), time.Duration(conn.CreatedEpoch), conn.BatchID, conn.BatchSlot, conn.CPU, conn.Merged, conn)
 			}
 
 			prev.MonotonicSentBytes += conn.MonotonicSentBytes

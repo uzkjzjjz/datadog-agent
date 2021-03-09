@@ -252,9 +252,10 @@ func BeautifyKey(key string) string {
 // ConnectionSummary returns a string summarizing a connection
 func ConnectionSummary(c *ConnectionStats, names map[util.Address][]string) string {
 	str := fmt.Sprintf(
-		"[%s] [PID: %d] [%v:%d ⇄ %v:%d] (%s) %s sent (+%s), %s received (+%s)",
+		"[%s] [PID: %d] [NS: %d] [%v:%d ⇄ %v:%d] (%s) %s sent (+%s), %s received (+%s)",
 		c.Type,
 		c.Pid,
+		c.NetNS,
 		printAddress(c.Source, names[c.Source]),
 		c.SPort,
 		printAddress(c.Dest, names[c.Dest]),
