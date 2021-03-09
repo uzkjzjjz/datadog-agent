@@ -46,8 +46,6 @@ func NewPerfBatchManager(batchMap *ebpf.Map, numCPUs int) (*PerfBatchManager, er
 
 	state := make([]percpuState, numCPUs)
 	for cpu := 0; cpu < numCPUs; cpu++ {
-		b := new(batch)
-		batchMap.Put(unsafe.Pointer(&cpu), unsafe.Pointer(b))
 		state[cpu] = percpuState{
 			processed: make(map[uint64]batchState),
 		}
