@@ -336,7 +336,7 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 		return
 	}
 
-	for _, client := range ns.clients {
+	for clientID, client := range ns.clients {
 		// If we've seen this closed connection already, lets combine the two
 		if prev, ok := client.closedConnections[string(key)]; ok {
 			// We received either the connections either out of order, or it's the same one we've already seen.
@@ -348,6 +348,7 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 					src, time.Duration(conn.LastUpdateEpoch), time.Duration(conn.CreatedEpoch), conn.BatchID, conn.BatchSlot, conn.CPU, conn.Merged, conn)
 				ns.telemetry.unorderedConns++
 				continue
+			} else {
 				log.Debugf("merging connections for client %s! prev(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s, current(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s",
 					clientID,
 					prev.LastUpdatedBy, time.Duration(prev.LastUpdateEpoch), time.Duration(prev.CreatedEpoch), prev.BatchID, prev.BatchSlot, prev.CPU, prev.Merged, prev,
