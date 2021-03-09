@@ -72,7 +72,7 @@ func (p *PerfBatchManager) Extract(b *batch, cpu int) []network.ConnectionStats 
 	}
 
 	buffer := make([]network.ConnectionStats, 0, ConnCloseBatchSize-start)
-	conns := p.extractBatchInto(buffer, b, start, ConnCloseBatchSize)
+	conns := p.extractBatchInto(buffer, b, start, ConnCloseBatchSize, cpu)
 	delete(cpuState.processed, batchId)
 
 	return conns
@@ -104,7 +104,7 @@ func (p *PerfBatchManager) GetIdleConns() []network.ConnectionStats {
 			start = bState.offset
 		}
 
-		idle = p.extractBatchInto(idle, b, start, batchLen)
+		idle = p.extractBatchInto(idle, b, start, batchLen, cpu)
 		// update timestamp regardless since this partial batch still exists
 		cpuState.processed[batchId] = batchState{offset: batchLen, updated: time.Now()}
 	}
@@ -125,7 +125,7 @@ type batchState struct {
 
 // ExtractBatchInto extract network.ConnectionStats objects from the given `batch` into the supplied `buffer`.
 // The `start` (inclusive) and `end` (exclusive) arguments represent the offsets of the connections we're interested in.
-func (p *PerfBatchManager) extractBatchInto(buffer []network.ConnectionStats, b *batch, start, end uint16) []network.ConnectionStats {
+func (p *PerfBatchManager) extractBatchInto(buffer []network.ConnectionStats, b *batch, start, end uint16, cpu int) []network.ConnectionStats {
 	if start >= end || end > ConnCloseBatchSize {
 		return nil
 	}
@@ -138,7 +138,11 @@ func (p *PerfBatchManager) extractBatchInto(buffer []network.ConnectionStats, b 
 		cst := ConnStatsWithTimestamp(ct.conn_stats)
 		tst := TCPStats(ct.tcp_stats)
 
-		buffer = append(buffer, connStats(&tup, &cst, &tst))
+		cs := connStats(&tup, &cst, &tst)
+		cs.BatchID = uint64(b.id)
+		cs.BatchSlot = uint8(i)
+		cs.CPU = cpu
+		buffer = append(buffer, cs)
 		current += C.sizeof_conn_t
 	}
 

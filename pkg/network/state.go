@@ -354,6 +354,11 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 			// Also update the timestamp
 			prev.LastUpdateEpoch = conn.LastUpdateEpoch
 			prev.LastUpdatedBy = src
+			prev.BatchID = conn.BatchID
+			prev.BatchSlot = conn.BatchSlot
+			prev.CPU = conn.CPU
+			prev.Merged = true
+
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
 			ns.telemetry.closedConnDropped++

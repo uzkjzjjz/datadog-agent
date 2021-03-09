@@ -121,6 +121,10 @@ type ConnectionStats struct {
 	LastUpdateEpoch uint64
 	LastUpdatedBy   ClosedConnectionEventSource
 	CreatedEpoch    uint64
+	BatchID         uint64
+	BatchSlot       uint8
+	CPU             int
+	Merged          bool
 
 	MonotonicRetransmits uint32
 	LastRetransmits      uint32
