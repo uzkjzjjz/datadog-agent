@@ -33,6 +33,8 @@ static __always_inline void update_conn_stats(conn_tuple_t* t, size_t sent_bytes
     // initialize-if-no-exist the connection stat, and load it
     conn_stats_ts_t empty = {};
     __builtin_memset(&empty, 0, sizeof(conn_stats_ts_t));
+    empty.created = ts;
+
     bpf_map_update_elem(&conn_stats, t, &empty, BPF_NOEXIST);
     val = bpf_map_lookup_elem(&conn_stats, t);
 
@@ -110,6 +112,7 @@ static __always_inline int handle_retransmit(struct sock* sk, int segs) {
     if (!read_conn_tuple(&t, sk, zero, CONN_TYPE_TCP)) {
         return 0;
     }
+    log_debug("handle_retransmit: sport: %u, dport: %u\n", t.sport, t.dport, segs);
 
     tcp_stats_t stats = { .retransmits = segs, .rtt = 0, .rtt_var = 0 };
     update_tcp_stats(&t, stats);

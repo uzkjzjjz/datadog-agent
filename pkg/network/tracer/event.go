@@ -256,6 +256,7 @@ __u64 sent_bytes;
 __u64 recv_bytes;
 __u64 timestamp;
 __u32 flags;
+__u64 created;
 __u8  direction;
 */
 type ConnStatsWithTimestamp C.conn_stats_ts_t
@@ -310,6 +311,7 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 		MonotonicSentBytes: uint64(s.sent_bytes),
 		MonotonicRecvBytes: uint64(s.recv_bytes),
 		LastUpdateEpoch:    uint64(s.timestamp),
+		CreatedEpoch:       uint64(s.created),
 	}
 
 	if connType(metadata) == network.TCP {

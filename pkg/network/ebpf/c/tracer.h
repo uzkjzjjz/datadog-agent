@@ -20,6 +20,7 @@ typedef struct {
     __u64 recv_bytes;
     __u64 timestamp;
     __u32 flags;
+    __u64 created;
     __u8  direction;
 } conn_stats_ts_t;
 
