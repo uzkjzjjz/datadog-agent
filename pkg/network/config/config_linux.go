@@ -25,10 +25,11 @@ func (c *Config) EnabledProbes(runtimeTracer bool) (map[probes.ProbeName]struct{
 			enabled[probes.TCPSendMsg] = struct{}{}
 		}
 		enabled[probes.TCPCleanupRBuf] = struct{}{}
-		enabled[probes.TCPClose] = struct{}{}
-		enabled[probes.TCPCloseReturn] = struct{}{}
+		//enabled[probes.TCPClose] = struct{}{}
+		//enabled[probes.TCPCloseReturn] = struct{}{}
 		enabled[probes.InetCskAcceptReturn] = struct{}{}
 		enabled[probes.TCPv4DestroySock] = struct{}{}
+		enabled[probes.TCPv4DestroySockReturn] = struct{}{}
 		enabled[probes.TCPSetState] = struct{}{}
 
 		if !runtimeTracer && kv < kernel.VersionCode(4, 7, 0) {
