@@ -511,6 +511,9 @@ func TestTCPRetransmitSharedSocket(t *testing.T) {
 	require.NoError(t, err)
 	defer tr.Stop()
 
+	// do initial get and ignore results, just like process-agent
+	_ = getConnections(t, tr)
+
 	// Create TCP Server that simply "drains" connection until receiving an EOF
 	server := NewTCPServer(func(c net.Conn) {
 		io.Copy(ioutil.Discard, c)
@@ -545,7 +548,8 @@ func TestTCPRetransmitSharedSocket(t *testing.T) {
 	// Fetch all connections matching source and target address
 	allConnections := getConnections(t, tr)
 	conns := searchConnections(allConnections, byAddress(c.LocalAddr(), c.RemoteAddr()))
-	require.Len(t, conns, numProcesses)
+	// +1 here because there is also the connection we create in this test
+	require.Len(t, conns, numProcesses+1)
 
 	totalSent := 0
 	for _, c := range conns {
