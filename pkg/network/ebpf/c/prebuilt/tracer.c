@@ -208,7 +208,7 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
         if (t->daddr_l == 0) bpf_probe_read(&t->daddr_l, sizeof(u32), ((char*)skp) + offset_daddr());
 
         if (!t->saddr_l || !t->daddr_l) {
-            log_debug("ERR(read_conn_tuple.v4): src or dst addr not set src=%d, dst=%d\n", t->saddr_l, t->daddr_l);
+            log_debug("ERR(read_conn_tuple.v4): src or dst addr not set src=%x, dst=%x\n", t->saddr_l, t->daddr_l);
             return 0;
         }
     } else if (is_ipv6_enabled() && check_family(skp, AF_INET6)) {
@@ -220,13 +220,13 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
         // We can only pass 4 args to bpf_trace_printk
         // so split those 2 statements to be able to log everything
         if (!(t->saddr_h || t->saddr_l)) {
-            log_debug("ERR(read_conn_tuple.v6): src addr not set: type=%d, saddr_l=%d, saddr_h=%d\n",
+            log_debug("ERR(read_conn_tuple.v6): src addr not set: type=%d, saddr_l=%x, saddr_h=%x\n",
                       type, t->saddr_l, t->saddr_h);
             return 0;
         }
 
         if (!(t->daddr_h || t->daddr_l)) {
-            log_debug("ERR(read_conn_tuple.v6): dst addr not set: type=%d, daddr_l=%d, daddr_h=%d\n",
+            log_debug("ERR(read_conn_tuple.v6): dst addr not set: type=%d, daddr_l=%x, daddr_h=%x\n",
                       type, t->daddr_l, t->daddr_h);
             return 0;
         }
@@ -253,7 +253,7 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
     }
 
     if (t->sport == 0 || t->dport == 0) {
-        log_debug("ERR(read_conn_tuple.v4): src/dst port not set: src:%d, dst:%d\n", t->sport, t->dport);
+        log_debug("ERR(read_conn_tuple.v4): src/dst port not set: src:%u, dst:%u\n", t->sport, t->dport);
         return 0;
     }
 
@@ -335,7 +335,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
         return 0;
     }
     u64 pid_tgid = bpf_get_current_pid_tgid();
-    log_debug("kprobe/tcp_cleanup_rbuf: pid_tgid: %d, copied: %d\n", pid_tgid, copied);
+    log_debug("kprobe/tcp_cleanup_rbuf: tgid: %u, pid: %u, copied: %d\n", pid_tgid >> 32, pid_tgid & 0xFFFFFFFF, copied);
 
     conn_tuple_t t = {};
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
@@ -576,7 +576,7 @@ SEC("kprobe/tcp_retransmit_skb")
 int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     int segs = (int)PT_REGS_PARM3(ctx);
-    log_debug("kprobe/tcp_retransmit\n");
+    log_debug("kprobe/tcp_retransmit: segs=%d\n", segs);
 
     return handle_retransmit(sk, segs);
 }
@@ -674,7 +674,7 @@ int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
     }
 
     conn_tuple_t tup = {};
-     u64 pid_tgid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
     int valid_tuple = read_conn_tuple(&tup, sk, pid_tgid, CONN_TYPE_UDP);
 
     __u16 lport = 0;
