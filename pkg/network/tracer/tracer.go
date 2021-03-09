@@ -164,6 +164,12 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		maxHTTPInFlightEntries = config.MaxTrackedConnections
 	}
 
+	cpuCount, err := kernel.PossibleCPUs()
+	if err != nil {
+		log.Warnf("unable to determine maximum number of CPUs, using 256: %s", err)
+		cpuCount = 256
+	}
+
 	mgrOptions := manager.Options{
 		// Extend RLIMIT_MEMLOCK (8) size
 		// On some systems, the default for RLIMIT_MEMLOCK may be as low as 64 bytes.
@@ -181,6 +187,7 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 			string(probes.PortBindingsMap):    {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			string(probes.HttpInFlightMap):    {Type: ebpf.Hash, MaxEntries: uint32(maxHTTPInFlightEntries), EditorFlag: manager.EditMaxEntries},
+			string(probes.ConnCloseBatchMap):  {Type: ebpf.Array, MaxEntries: uint32(cpuCount), EditorFlag: manager.EditMaxEntries},
 		},
 	}
 
@@ -498,9 +505,8 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 		return nil, nil, fmt.Errorf("unable to find perf map %s", probes.ConnCloseEventMap)
 	}
 
-	connCloseEventMap, _ := t.getMap(probes.ConnCloseEventMap)
 	connCloseMap, _ := t.getMap(probes.ConnCloseBatchMap)
-	numCPUs := int(connCloseEventMap.ABI().MaxEntries)
+	numCPUs := int(connCloseMap.ABI().MaxEntries)
 	batchManager, err := NewPerfBatchManager(connCloseMap, numCPUs)
 	if err != nil {
 		return nil, nil, err

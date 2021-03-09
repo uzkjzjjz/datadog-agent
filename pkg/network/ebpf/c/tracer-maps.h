@@ -51,10 +51,10 @@ struct bpf_map_def SEC("maps/conn_close_event") conn_close_event = {
  * some of the Kernels we support (4.4 ~ 4.6)
  */
 struct bpf_map_def SEC("maps/conn_close_batch") conn_close_batch = {
-    .type = BPF_MAP_TYPE_HASH,
+    .type = BPF_MAP_TYPE_ARRAY,
     .key_size = sizeof(__u32),
     .value_size = sizeof(batch_t),
-    .max_entries = 1024,
+    .max_entries = 0,
     .pinning = 0,
     .namespace = "",
 };

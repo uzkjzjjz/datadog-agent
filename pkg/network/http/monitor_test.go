@@ -133,6 +133,12 @@ func eBPFSetup(t *testing.T) (*manager.Manager, *ddebpf.PerfHandler) {
 		return nil, nil
 	}
 
+	cpuCount, err := kernel.PossibleCPUs()
+	if err != nil {
+		t.Logf("unable to determine maximum number of CPUs, using 256: %s", err)
+		cpuCount = 256
+	}
+
 	httpPerfHandler := ddebpf.NewPerfHandler(10)
 	mgr := netebpf.NewManager(ddebpf.NewPerfHandler(1), httpPerfHandler, false)
 	mgrOptions := manager.Options{
@@ -144,6 +150,7 @@ func eBPFSetup(t *testing.T) (*manager.Manager, *ddebpf.PerfHandler) {
 			string(probes.TcpStatsMap):        {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 			string(probes.PortBindingsMap):    {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
+			string(probes.ConnCloseBatchMap):  {Type: ebpf.Array, MaxEntries: uint32(cpuCount), EditorFlag: manager.EditMaxEntries},
 		},
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,

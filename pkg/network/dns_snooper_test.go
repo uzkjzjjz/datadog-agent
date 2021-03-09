@@ -45,6 +45,12 @@ func getSnooper(
 		return nil, nil
 	}
 
+	cpuCount, err := kernel.PossibleCPUs()
+	if err != nil {
+		t.Logf("unable to determine maximum number of CPUs, using 256: %s", err)
+		cpuCount = 256
+	}
+
 	mgr := netebpf.NewManager(ddebpf.NewPerfHandler(1), ddebpf.NewPerfHandler(1), false)
 	mgrOptions := manager.Options{
 		MapSpecEditors: map[string]manager.MapSpecEditor{
@@ -54,6 +60,7 @@ func getSnooper(
 			string(probes.PortBindingsMap):    {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 			string(probes.HttpInFlightMap):    {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
+			string(probes.ConnCloseBatchMap):  {Type: ebpf.Array, MaxEntries: uint32(cpuCount), EditorFlag: manager.EditMaxEntries},
 		},
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
