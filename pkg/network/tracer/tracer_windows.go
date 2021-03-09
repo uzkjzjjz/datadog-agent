@@ -158,7 +158,7 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 	closedConnStats := t.connStatsClosed.Connections()
 
 	for _, connStat := range closedConnStats {
-		t.state.StoreClosedConnection(&connStat)
+		t.state.StoreClosedConnection(&connStat, network.Driver)
 	}
 
 	// check for expired clients in the state

@@ -26,6 +26,29 @@ const (
 	ConnectionByteKeyMaxLen = 41
 )
 
+type ClosedConnectionEventSource int
+
+const (
+	Unknown ClosedConnectionEventSource = iota
+	PerfEvent
+	BatchFlush
+	Driver
+)
+
+func (s ClosedConnectionEventSource) String() string {
+	switch s {
+	case Unknown:
+		return "unknown"
+	case PerfEvent:
+		return "perf_event"
+	case BatchFlush:
+		return "batch_flush"
+	case Driver:
+		return "driver"
+	}
+	return ""
+}
+
 // State takes care of handling the logic for:
 // - closed connections
 // - sent and received bytes per connection
@@ -40,7 +63,7 @@ type State interface {
 	) []ConnectionStats
 
 	// StoreClosedConnection stores a new closed connection
-	StoreClosedConnection(conn *ConnectionStats)
+	StoreClosedConnection(conn *ConnectionStats, src ClosedConnectionEventSource)
 
 	// RemoveClient stops tracking stateful data for a given client
 	RemoveClient(clientID string)
@@ -303,7 +326,7 @@ func getConnsByKey(conns []ConnectionStats, buf []byte) map[string]*ConnectionSt
 }
 
 // StoreClosedConnection stores the given connection for every client
-func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
+func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedConnectionEventSource) {
 	ns.Lock()
 	defer ns.Unlock()
 
@@ -330,11 +353,13 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 			prev.MonotonicTCPClosed += conn.MonotonicTCPClosed
 			// Also update the timestamp
 			prev.LastUpdateEpoch = conn.LastUpdateEpoch
+			prev.LastUpdatedBy = src
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
 			ns.telemetry.closedConnDropped++
 			continue
 		} else {
+			conn.LastUpdatedBy = src
 			client.closedConnections[string(key)] = *conn
 		}
 	}
