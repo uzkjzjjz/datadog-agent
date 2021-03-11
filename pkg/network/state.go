@@ -313,7 +313,7 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 		return
 	}
 
-	for clientID, client := range ns.clients {
+	for _, client := range ns.clients {
 		// If we've seen this closed connection already, lets combine the two
 		if prev, ok := client.closedConnections[string(key)]; ok {
 			// We received either the connections either out of order, or it's the same one we've already seen.
@@ -330,10 +330,6 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 			prev.MonotonicTCPClosed += conn.MonotonicTCPClosed
 			// Also update the timestamp
 			prev.LastUpdateEpoch = conn.LastUpdateEpoch
-			prev.BatchID = conn.BatchID
-			prev.BatchSlot = conn.BatchSlot
-			prev.CPU = conn.CPU
-			prev.Merged = true
 
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
