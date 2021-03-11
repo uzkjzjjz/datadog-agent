@@ -18,9 +18,9 @@ typedef enum {
 typedef struct {
     __u64 sent_bytes;
     __u64 recv_bytes;
-    __u64 timestamp;
-    __u32 flags;
     __u64 created;
+    __u64 updated;
+    __u32 flags;
     __u8  direction;
 } conn_stats_ts_t;
 

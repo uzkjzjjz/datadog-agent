@@ -254,9 +254,9 @@ func (t *ConnTuple) String() string {
 /* conn_stats_ts_t
 __u64 sent_bytes;
 __u64 recv_bytes;
-__u64 timestamp;
-__u32 flags;
 __u64 created;
+__u64 updated;
+__u32 flags;
 __u8  direction;
 */
 type ConnStatsWithTimestamp C.conn_stats_ts_t
@@ -310,8 +310,8 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 		DPort:              uint16(t.dport),
 		MonotonicSentBytes: uint64(s.sent_bytes),
 		MonotonicRecvBytes: uint64(s.recv_bytes),
-		LastUpdateEpoch:    uint64(s.timestamp),
 		CreatedEpoch:       uint64(s.created),
+		LastUpdateEpoch:    uint64(s.updated),
 	}
 
 	if connType(metadata) == network.TCP {
