@@ -530,7 +530,7 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 				batch := toBatch(batchData.Data)
 				conns := t.batchManager.Extract(batch, batchData.CPU)
 				for _, c := range conns {
-					t.storeClosedConn(&c, network.PerfEvent)
+					t.storeClosedConn(&c)
 				}
 			case lostCount, ok := <-perf.LostChannel:
 				if !ok {
@@ -543,7 +543,7 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 				}
 				idleConns := t.batchManager.GetIdleConns()
 				for _, c := range idleConns {
-					t.storeClosedConn(&c, network.BatchFlush)
+					t.storeClosedConn(&c)
 				}
 				close(done)
 			case <-ticker.C:
@@ -573,7 +573,7 @@ func (t *Tracer) shouldSkipConnection(conn *network.ConnectionStats) bool {
 	return false
 }
 
-func (t *Tracer) storeClosedConn(cs *network.ConnectionStats, src network.ClosedConnectionEventSource) {
+func (t *Tracer) storeClosedConn(cs *network.ConnectionStats) {
 	t.connVia(cs)
 
 	if t.shouldSkipConnection(cs) {
@@ -583,7 +583,7 @@ func (t *Tracer) storeClosedConn(cs *network.ConnectionStats, src network.Closed
 
 	atomic.AddInt64(&t.closedConns, 1)
 	cs.IPTranslation = t.conntracker.GetTranslationForConn(*cs)
-	t.state.StoreClosedConnection(cs, src)
+	t.state.StoreClosedConnection(cs)
 	if cs.IPTranslation != nil {
 		t.conntracker.DeleteTranslation(*cs)
 	}

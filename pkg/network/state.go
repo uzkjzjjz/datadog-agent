@@ -26,29 +26,6 @@ const (
 	ConnectionByteKeyMaxLen = 41
 )
 
-type ClosedConnectionEventSource int
-
-const (
-	Unknown ClosedConnectionEventSource = iota
-	PerfEvent
-	BatchFlush
-	Driver
-)
-
-func (s ClosedConnectionEventSource) String() string {
-	switch s {
-	case Unknown:
-		return "unknown"
-	case PerfEvent:
-		return "perf_event"
-	case BatchFlush:
-		return "batch_flush"
-	case Driver:
-		return "driver"
-	}
-	return ""
-}
-
 // State takes care of handling the logic for:
 // - closed connections
 // - sent and received bytes per connection
@@ -63,7 +40,7 @@ type State interface {
 	) []ConnectionStats
 
 	// StoreClosedConnection stores a new closed connection
-	StoreClosedConnection(conn *ConnectionStats, src ClosedConnectionEventSource)
+	StoreClosedConnection(conn *ConnectionStats)
 
 	// RemoveClient stops tracking stateful data for a given client
 	RemoveClient(clientID string)
@@ -326,7 +303,7 @@ func getConnsByKey(conns []ConnectionStats, buf []byte) map[string]*ConnectionSt
 }
 
 // StoreClosedConnection stores the given connection for every client
-func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedConnectionEventSource) {
+func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 	ns.Lock()
 	defer ns.Unlock()
 
@@ -342,17 +319,8 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 			// We received either the connections either out of order, or it's the same one we've already seen.
 			// Lets skip it for now.
 			if prev.LastUpdateEpoch >= conn.LastUpdateEpoch {
-				log.Debugf("unordered connection for client %s! prev(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s, current(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s",
-					clientID,
-					prev.LastUpdatedBy, time.Duration(prev.LastUpdateEpoch), time.Duration(prev.CreatedEpoch), prev.BatchID, prev.BatchSlot, prev.CPU, prev.Merged, prev,
-					src, time.Duration(conn.LastUpdateEpoch), time.Duration(conn.CreatedEpoch), conn.BatchID, conn.BatchSlot, conn.CPU, conn.Merged, conn)
 				ns.telemetry.unorderedConns++
 				continue
-			} else {
-				log.Debugf("merging connections for client %s! prev(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s, current(%s,updated=%s,created=%s,batch_id=%d,slot=%d,cpu=%d,merged=%t): %s",
-					clientID,
-					prev.LastUpdatedBy, time.Duration(prev.LastUpdateEpoch), time.Duration(prev.CreatedEpoch), prev.BatchID, prev.BatchSlot, prev.CPU, prev.Merged, prev,
-					src, time.Duration(conn.LastUpdateEpoch), time.Duration(conn.CreatedEpoch), conn.BatchID, conn.BatchSlot, conn.CPU, conn.Merged, conn)
 			}
 
 			prev.MonotonicSentBytes += conn.MonotonicSentBytes
@@ -362,7 +330,6 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 			prev.MonotonicTCPClosed += conn.MonotonicTCPClosed
 			// Also update the timestamp
 			prev.LastUpdateEpoch = conn.LastUpdateEpoch
-			prev.LastUpdatedBy = src
 			prev.BatchID = conn.BatchID
 			prev.BatchSlot = conn.BatchSlot
 			prev.CPU = conn.CPU
@@ -373,7 +340,6 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats, src ClosedC
 			ns.telemetry.closedConnDropped++
 			continue
 		} else {
-			conn.LastUpdatedBy = src
 			client.closedConnections[string(key)] = *conn
 		}
 	}
