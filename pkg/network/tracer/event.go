@@ -141,10 +141,6 @@ func toConnTupleFromConnectionStats(ct *ConnTuple, stats *network.ConnectionStat
 	return toConnTuple(ct, int(stats.Pid), stats.NetNS, stats.Source, stats.Dest, stats.SPort, stats.DPort, stats.Type)
 }
 
-func connTupleFromConnectionStats(stats *network.ConnectionStats) *ConnTuple {
-	return newConnTuple(int(stats.Pid), stats.NetNS, stats.Source, stats.Dest, stats.SPort, stats.DPort, stats.Type)
-}
-
 func newConnTuple(pid int, netns uint32, saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) *ConnTuple {
 	ct := &ConnTuple{}
 	if err := toConnTuple(ct, pid, netns, saddr, daddr, sport, dport, proto); err != nil {

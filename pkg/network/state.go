@@ -59,7 +59,7 @@ type State interface {
 }
 
 type telemetry struct {
-	unorderedConns     int64
+	duplicateConns     int64
 	closedConnDropped  int64
 	connDropped        int64
 	statsResets        int64
@@ -316,10 +316,9 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 	for _, client := range ns.clients {
 		// If we've seen this closed connection already, lets combine the two
 		if prev, ok := client.closedConnections[string(key)]; ok {
-			// We received either the connections either out of order, or it's the same one we've already seen.
-			// Lets skip it for now.
-			if prev.LastUpdateEpoch >= conn.LastUpdateEpoch {
-				ns.telemetry.unorderedConns++
+			if prev.CreatedEpoch == conn.CreatedEpoch {
+				log.Debugf("duplicate closed event for same connection created at %d: %s", prev.CreatedEpoch, prev)
+				ns.telemetry.duplicateConns++
 				continue
 			}
 
@@ -328,8 +327,10 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 			prev.MonotonicRetransmits += conn.MonotonicRetransmits
 			prev.MonotonicTCPEstablished += conn.MonotonicTCPEstablished
 			prev.MonotonicTCPClosed += conn.MonotonicTCPClosed
-			// Also update the timestamp
-			prev.LastUpdateEpoch = conn.LastUpdateEpoch
+
+			if conn.LastUpdateEpoch > prev.LastUpdateEpoch {
+				prev.LastUpdateEpoch = conn.LastUpdateEpoch
+			}
 
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
@@ -591,9 +592,9 @@ func (ns *networkState) RemoveConnections(keys []string) {
 	}
 
 	// Flush log line if any metric is non zero
-	if ns.telemetry.unorderedConns > 0 || ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
+	if ns.telemetry.duplicateConns > 0 || ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
 		s := "state telemetry: "
-		s += " [%d unordered conns]"
+		s += " [%d duplicate conns]"
 		s += " [%d stats stats_resets]"
 		s += " [%d connections dropped due to stats]"
 		s += " [%d closed connections dropped]"
@@ -602,7 +603,7 @@ func (ns *networkState) RemoveConnections(keys []string) {
 		s += " [%d DNS pid collisions]"
 		s += " [%d time sync collisions]"
 		log.Warnf(s,
-			ns.telemetry.unorderedConns,
+			ns.telemetry.duplicateConns,
 			ns.telemetry.statsResets,
 			ns.telemetry.connDropped,
 			ns.telemetry.closedConnDropped,
@@ -633,7 +634,7 @@ func (ns *networkState) GetStats() map[string]interface{} {
 		"clients": clientInfo,
 		"telemetry": map[string]int64{
 			"stats_resets":         ns.telemetry.statsResets,
-			"unordered_conns":      ns.telemetry.unorderedConns,
+			"duplicate_conns":      ns.telemetry.duplicateConns,
 			"closed_conn_dropped":  ns.telemetry.closedConnDropped,
 			"conn_dropped":         ns.telemetry.connDropped,
 			"time_sync_collisions": ns.telemetry.timeSyncCollisions,
