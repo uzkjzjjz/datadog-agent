@@ -86,7 +86,7 @@ func TestTracerExpvar(t *testing.T) {
 		},
 		"state": {
 			"StatsResets",
-			"UnorderedConns",
+			"DuplicateConns",
 			"ClosedConnDropped",
 			"ConnDropped",
 			"TimeSyncCollisions",
@@ -511,9 +511,6 @@ func TestTCPRetransmitSharedSocket(t *testing.T) {
 	require.NoError(t, err)
 	defer tr.Stop()
 
-	// do initial get and ignore results, just like process-agent
-	_ = getConnections(t, tr)
-
 	// Create TCP Server that simply "drains" connection until receiving an EOF
 	server := NewTCPServer(func(c net.Conn) {
 		io.Copy(ioutil.Discard, c)
@@ -549,7 +546,7 @@ func TestTCPRetransmitSharedSocket(t *testing.T) {
 	allConnections := getConnections(t, tr)
 	conns := searchConnections(allConnections, byAddress(c.LocalAddr(), c.RemoteAddr()))
 	// +1 here because there is also the connection we create in this test
-	require.Len(t, conns, numProcesses+1)
+	require.Len(t, conns, numProcesses)
 
 	totalSent := 0
 	for _, c := range conns {
@@ -996,17 +993,17 @@ func TestIsExpired(t *testing.T) {
 		expected   bool
 	}{
 		{
-			ConnStatsWithTimestamp{timestamp: 101},
+			ConnStatsWithTimestamp{updated: 101},
 			100,
 			false,
 		},
 		{
-			ConnStatsWithTimestamp{timestamp: 100},
+			ConnStatsWithTimestamp{updated: 100},
 			101,
 			false,
 		},
 		{
-			ConnStatsWithTimestamp{timestamp: 100},
+			ConnStatsWithTimestamp{updated: 100},
 			101 + timeout,
 			true,
 		},

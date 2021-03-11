@@ -270,7 +270,7 @@ __u32 tcp_sent_miscounts;
 type kernelTelemetry C.telemetry_t
 
 func (cs *ConnStatsWithTimestamp) isExpired(latestTime uint64, timeout uint64) bool {
-	return latestTime > timeout+uint64(cs.timestamp)
+	return latestTime > timeout+uint64(cs.updated)
 }
 
 func (cs *ConnStatsWithTimestamp) isAssured() bool {

@@ -94,12 +94,11 @@ func TestReadInitialTCPState(t *testing.T) {
 
 func TestReadInitialUDPState(t *testing.T) {
 	err := exec.Command("testdata/setup_netns.sh").Run()
-	require.NoError(t, err, "setup_netns.sh failed")
-
 	defer func() {
 		err := exec.Command("testdata/teardown_netns.sh").Run()
 		assert.NoError(t, err, "failed to teardown netns")
 	}()
+	require.NoError(t, err, "setup_netns.sh failed")
 
 	l, err := net.ListenUDP("udp", &net.UDPAddr{})
 	require.NoError(t, err)

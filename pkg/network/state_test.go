@@ -477,7 +477,7 @@ func TestSameKeyEdgeCases(t *testing.T) {
 
 		// We expect:
 		// c0: Nothing
-		// c1: Monotonic: 8 bytes, Last seenL 8 bytes
+		// c1: Monotonic: 8 bytes, Last seen 8 bytes
 
 		state := newDefaultState()
 
@@ -489,6 +489,7 @@ func TestSameKeyEdgeCases(t *testing.T) {
 		state.StoreClosedConnection(&conn)
 
 		conn2 := conn
+		conn2.CreatedEpoch++
 		conn2.MonotonicSentBytes = 5
 		conn2.LastUpdateEpoch++
 		// Store the connection another time
@@ -1037,6 +1038,7 @@ func TestDoubleCloseOnTwoClients(t *testing.T) {
 
 	// Store the closed connection twice
 	state.StoreClosedConnection(&conn)
+	conn.CreatedEpoch++
 	conn.LastUpdateEpoch++
 	state.StoreClosedConnection(&conn)
 
@@ -1122,12 +1124,15 @@ func TestAggregateClosedConnectionsTimestamp(t *testing.T) {
 	assert.Len(t, state.Connections(client, latestEpochTime(), nil, nil, nil), 0)
 
 	conn.LastUpdateEpoch = latestEpochTime()
+	conn.CreatedEpoch = conn.LastUpdateEpoch
 	state.StoreClosedConnection(&conn)
 
 	conn.LastUpdateEpoch = latestEpochTime()
+	conn.CreatedEpoch = conn.LastUpdateEpoch
 	state.StoreClosedConnection(&conn)
 
 	conn.LastUpdateEpoch = latestEpochTime()
+	conn.CreatedEpoch = conn.LastUpdateEpoch
 	state.StoreClosedConnection(&conn)
 
 	// Make sure the connections we get has the latest timestamp
