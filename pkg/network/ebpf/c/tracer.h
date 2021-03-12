@@ -19,9 +19,9 @@ typedef struct {
     __u64 sent_bytes;
     __u64 recv_bytes;
     __u64 timestamp;
-    __u32 flags;
+    __u8 flags;
     __u8  direction;
-} conn_stats_ts_t;
+} conn_stats_ts_t; // 40 bytes
 
 // Connection flags
 typedef enum {
@@ -56,7 +56,7 @@ typedef struct {
     // First bit indicates if the connection is TCP (1) or UDP (0)
     // Second bit indicates if the connection is V6 (1) or V4 (0)
     __u32 metadata; // This is that big because it seems that we atleast need a 32-bit aligned struct
-} conn_tuple_t;
+} conn_tuple_t; // 48 bytes
 
 typedef struct {
     __u32 retransmits;
@@ -65,7 +65,7 @@ typedef struct {
 
     // Bit mask containing all TCP state transitions tracked by our tracer
     __u16 state_transitions;
-} tcp_stats_t;
+} tcp_stats_t; // 16 bytes
 
 // Full data for a tcp connection
 typedef struct {
@@ -163,24 +163,6 @@ typedef struct {
     __u32 cpu;
     __u64 batch_idx;
 } http_batch_notification_t;
-
-// Must match the number of conn_t objects embedded in the batch_t struct
-#ifndef CONN_CLOSED_BATCH_SIZE
-#define CONN_CLOSED_BATCH_SIZE 5
-#endif
-
-// This struct is meant to be used as a container for batching
-// writes to the perf buffer. Ideally we should have an array of tcp_conn_t objects
-// but apparently eBPF verifier doesn't allow arbitrary index access during runtime.
-typedef struct {
-    conn_t c0;
-    conn_t c1;
-    conn_t c2;
-    conn_t c3;
-    conn_t c4;
-    __u16 len;
-    __u64 id;
-} batch_t;
 
 // Telemetry names
 typedef struct {

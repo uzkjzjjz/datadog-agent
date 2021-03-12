@@ -34,12 +34,11 @@ func NewOffsetManager() *manager.Manager {
 	}
 }
 
-func NewManager(closedHandler, httpHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Manager {
+func NewManager(httpHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Manager {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: string(probes.ConnMap)},
 			{Name: string(probes.TcpStatsMap)},
-			{Name: string(probes.ConnCloseBatchMap)},
 			{Name: "udp_recv_sock"},
 			{Name: string(probes.PortBindingsMap)},
 			{Name: string(probes.UdpPortBindingsMap)},
@@ -50,15 +49,6 @@ func NewManager(closedHandler, httpHandler *ebpf.PerfHandler, runtimeTracer bool
 			{Name: string(probes.HttpBatchStateMap)},
 		},
 		PerfMaps: []*manager.PerfMap{
-			{
-				Map: manager.Map{Name: string(probes.ConnCloseEventMap)},
-				PerfMapOptions: manager.PerfMapOptions{
-					PerfRingBufferSize: 8 * os.Getpagesize(),
-					Watermark:          1,
-					DataHandler:        closedHandler.DataHandler,
-					LostHandler:        closedHandler.LostHandler,
-				},
-			},
 			{
 				Map: manager.Map{Name: string(probes.HttpNotificationsMap)},
 				PerfMapOptions: manager.PerfMapOptions{
@@ -75,7 +65,6 @@ func NewManager(closedHandler, httpHandler *ebpf.PerfHandler, runtimeTracer bool
 			{Section: string(probes.TCPSendMsgReturn), KProbeMaxActive: maxActive},
 			{Section: string(probes.TCPCleanupRBuf)},
 			{Section: string(probes.TCPClose)},
-			{Section: string(probes.TCPCloseReturn), KProbeMaxActive: maxActive},
 			{Section: string(probes.TCPSetState)},
 			{Section: string(probes.IPMakeSkb)},
 			{Section: string(probes.IP6MakeSkb)},
@@ -86,7 +75,6 @@ func NewManager(closedHandler, httpHandler *ebpf.PerfHandler, runtimeTracer bool
 			{Section: string(probes.InetCskAcceptReturn), KProbeMaxActive: maxActive},
 			{Section: string(probes.TCPv4DestroySock)},
 			{Section: string(probes.UDPDestroySock)},
-			{Section: string(probes.UDPDestroySockReturn), KProbeMaxActive: maxActive},
 			{Section: string(probes.InetBind)},
 			{Section: string(probes.Inet6Bind)},
 			{Section: string(probes.InetBindRet), KProbeMaxActive: maxActive},

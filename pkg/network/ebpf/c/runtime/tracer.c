@@ -227,13 +227,7 @@ int kprobe__tcp_close(struct pt_regs* ctx) {
     }
     log_debug("kprobe/tcp_close: netns: %u, sport: %u, dport: %u\n", t.netns, t.sport, t.dport);
 
-    cleanup_conn(&t);
-    return 0;
-}
-
-SEC("kretprobe/tcp_close")
-int kretprobe__tcp_close(struct pt_regs* ctx) {
-    flush_conn_close_if_full(ctx);
+    cleanup_conn(ctx, &t);
     return 0;
 }
 
@@ -521,7 +515,7 @@ int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
 
     __u16 lport = 0;
     if (valid_tuple) {
-        cleanup_conn(&tup);
+        cleanup_conn(ctx, &tup);
         lport = tup.sport;
     } else {
         lport = read_sport(skp);
@@ -542,12 +536,6 @@ int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
 
     log_debug("kprobe/udp_destroy_sock: port %d marked as closed\n", lport);
 
-    return 0;
-}
-
-SEC("kretprobe/udp_destroy_sock")
-int kretprobe__udp_destroy_sock(struct pt_regs * ctx) {
-    flush_conn_close_if_full(ctx);
     return 0;
 }
 
