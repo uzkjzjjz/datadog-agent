@@ -89,7 +89,7 @@ func (c *ConnectionsCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.
 
 	connTel := c.diffTelemetry(conns.ConnTelemetry)
 
-	log.Debugf("collected connections in %s", time.Since(start))
+	log.Debugf("collected %d connections in %s", len(conns.Conns), time.Since(start))
 	return batchConnections(cfg, groupID, c.enrichConnections(conns.Conns), conns.Dns, c.networkID, connTel, conns.CompilationTelemetryByAsset, conns.Domains), nil
 }
 

@@ -27,23 +27,19 @@ static __always_inline void cleanup_conn(conn_tuple_t* tup) {
     if (is_tcp) {
         conn.tup.pid = 0;
         tst = bpf_map_lookup_elem(&tcp_stats, &(conn.tup));
-        bpf_map_delete_elem(&tcp_stats, &(conn.tup));
-        conn.tup.pid = tup->pid;
-
         if (tst) {
             conn.tcp_stats = *tst;
         }
-
+        bpf_map_delete_elem(&tcp_stats, &(conn.tup));
+        conn.tup.pid = tup->pid;
         conn.tcp_stats.state_transitions |= (1 << TCP_CLOSE);
     }
 
     cst = bpf_map_lookup_elem(&conn_stats, &(conn.tup));
-    // Delete this connection from our stats map
-    bpf_map_delete_elem(&conn_stats, &(conn.tup));
-
     if (cst) {
         conn.conn_stats = *cst;
     }
+    bpf_map_delete_elem(&conn_stats, &(conn.tup));
     conn.conn_stats.timestamp = bpf_ktime_get_ns();
 
     // Batch TCP closed connections before generating a perf event
@@ -100,6 +96,9 @@ static __always_inline void flush_conn_close_if_full(struct pt_regs * ctx) {
         batch_ptr->len = 0;
         batch_ptr->id++;
         bpf_perf_event_output(ctx, &conn_close_event, cpu, &batch_copy, sizeof(batch_copy));
+//        if (ret < 0) {
+//            increment_telemetry_count(perf_ring_error);
+//        }
     }
 }
 

@@ -71,10 +71,13 @@ type Tracer struct {
 	runtimeTracer bool
 
 	// Telemetry
-	perfReceived  int64
-	perfLost      int64
-	skippedConns  int64
-	pidCollisions int64
+	perfReceived            int64
+	perfLost                int64
+	perfQueued              int64
+	closedConnPerfReceived  int64
+	closedConnFlushReceived int64
+	skippedConns            int64
+	pidCollisions           int64
 	// Will track the count of expired TCP connections
 	// We are manually expiring TCP connections because it seems that we are losing some of the TCP close events
 	// For now we are only tracking the `tcp_close` probe but we should also track the `tcp_set_state` probe when
@@ -520,10 +523,12 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 					return
 				}
 				atomic.AddInt64(&t.perfReceived, 1)
+				atomic.SwapInt64(&t.perfQueued, int64(len(perf.DataChannel)))
 
 				batch := toBatch(batchData.Data)
 				conns := t.batchManager.Extract(batch, batchData.CPU)
 				for _, c := range conns {
+					atomic.AddInt64(&t.closedConnPerfReceived, 1)
 					t.storeClosedConn(&c)
 				}
 			case lostCount, ok := <-perf.LostChannel:
@@ -537,11 +542,15 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 				}
 				idleConns := t.batchManager.GetIdleConns()
 				for _, c := range idleConns {
+					atomic.AddInt64(&t.closedConnFlushReceived, 1)
 					t.storeClosedConn(&c)
 				}
 				close(done)
 			case <-ticker.C:
 				recv := atomic.SwapInt64(&t.perfReceived, 0)
+				_ = atomic.SwapInt64(&t.perfQueued, 0)
+				_ = atomic.SwapInt64(&t.closedConnPerfReceived, 0)
+				_ = atomic.SwapInt64(&t.closedConnFlushReceived, 0)
 				lost := atomic.SwapInt64(&t.perfLost, 0)
 				skip := atomic.SwapInt64(&t.skippedConns, 0)
 				tcpExpired := atomic.SwapInt64(&t.expiredTCPConns, 0)
@@ -618,6 +627,7 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 
 	conns := t.state.Connections(clientID, latestTime, latestConns, t.reverseDNS.GetDNSStats(), t.httpMonitor.GetHTTPStats())
 	names := t.reverseDNS.Resolve(conns)
+
 	ctm := t.getConnTelemetry(len(latestConns))
 	rctm := t.getRuntimeCompilationTelemetry()
 
@@ -850,6 +860,13 @@ func (t *Tracer) getEbpfTelemetry() map[string]int64 {
 		"missed_udp_close":    int64(telemetry.missed_udp_close),
 		"udp_sends_processed": int64(telemetry.udp_sends_processed),
 		"udp_sends_missed":    int64(telemetry.udp_sends_missed),
+		"tcp_established":     int64(telemetry.tcp_established),
+		"tcp_closed":          int64(telemetry.tcp_closed),
+		"tuple_read_err":      int64(telemetry.tuple_read_err),
+		"tcp_sent_bytes":      int64(telemetry.tcp_sent_bytes),
+		"tcp_recv_bytes":      int64(telemetry.tcp_recv_bytes),
+		//"perf_ring_error":     int64(telemetry.perf_ring_error),
+		"conn_stats_created": int64(telemetry.conn_stats_created),
 	}
 }
 
@@ -913,12 +930,18 @@ func (t *Tracer) GetStats() (map[string]interface{}, error) {
 	lost := atomic.LoadInt64(&t.perfLost)
 	received := atomic.LoadInt64(&t.perfReceived)
 	skipped := atomic.LoadInt64(&t.skippedConns)
+	queued := atomic.LoadInt64(&t.perfQueued)
 	expiredTCP := atomic.LoadInt64(&t.expiredTCPConns)
 	pidCollisions := atomic.LoadInt64(&t.pidCollisions)
+	connPerfReceived := atomic.LoadInt64(&t.closedConnPerfReceived)
+	connFlushReceived := atomic.LoadInt64(&t.closedConnFlushReceived)
 
 	tracerStats := map[string]int64{
 		"closed_conn_polling_lost":     lost,
 		"closed_conn_polling_received": received,
+		"closed_conn_polling_queued":   queued,
+		"closed_conn_perf_received":    connPerfReceived,
+		"closed_conn_flush_received":   connFlushReceived,
 		"conn_valid_skipped":           skipped, // Skipped connections (e.g. Local DNS requests)
 		"expired_tcp_conns":            expiredTCP,
 		"pid_collisions":               pidCollisions,

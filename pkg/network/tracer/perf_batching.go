@@ -11,6 +11,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+
 	"github.com/DataDog/datadog-agent/pkg/network"
 
 	"github.com/DataDog/ebpf"
@@ -43,6 +45,8 @@ func NewPerfBatchManager(batchMap *ebpf.Map, numCPUs int) (*PerfBatchManager, er
 	if batchMap == nil {
 		return nil, fmt.Errorf("batchMap is nil")
 	}
+
+	log.Debugf("creating perf batch manager for %d cpus", numCPUs)
 
 	state := make([]percpuState, numCPUs)
 	for cpu := 0; cpu < numCPUs; cpu++ {

@@ -208,6 +208,9 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
         if (t->daddr_l == 0) bpf_probe_read(&t->daddr_l, sizeof(u32), ((char*)skp) + offset_daddr());
 
         if (!t->saddr_l || !t->daddr_l) {
+            if (type == CONN_TYPE_TCP) {
+                increment_telemetry_count(tuple_read_err);
+            }
             log_debug("ERR(read_conn_tuple.v4): src or dst addr not set src=%d, dst=%d\n", t->saddr_l, t->daddr_l);
             return 0;
         }
@@ -220,12 +223,18 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
         // We can only pass 4 args to bpf_trace_printk
         // so split those 2 statements to be able to log everything
         if (!(t->saddr_h || t->saddr_l)) {
+            if (type == CONN_TYPE_TCP) {
+                increment_telemetry_count(tuple_read_err);
+            }
             log_debug("ERR(read_conn_tuple.v6): src addr not set: type=%d, saddr_l=%d, saddr_h=%d\n",
                       type, t->saddr_l, t->saddr_h);
             return 0;
         }
 
         if (!(t->daddr_h || t->daddr_l)) {
+            if (type == CONN_TYPE_TCP) {
+                increment_telemetry_count(tuple_read_err);
+            }
             log_debug("ERR(read_conn_tuple.v6): dst addr not set: type=%d, daddr_l=%d, daddr_h=%d\n",
                       type, t->daddr_l, t->daddr_h);
             return 0;
@@ -253,6 +262,9 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
     }
 
     if (t->sport == 0 || t->dport == 0) {
+        if (type == CONN_TYPE_TCP) {
+            increment_telemetry_count(tuple_read_err);
+        }
         log_debug("ERR(read_conn_tuple.v4): src/dst port not set: src:%d, dst:%d\n", t->sport, t->dport);
         return 0;
     }
@@ -290,6 +302,9 @@ int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
     }
 
     handle_tcp_stats(&t, sk);
+    if (t.dport == 8080) {
+        increment_telemetry_amount(tcp_sent_bytes, size);
+    }
     return handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN);
 }
 
@@ -342,6 +357,9 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
         return 0;
     }
 
+    if (t.dport == 8080) {
+        increment_telemetry_amount(tcp_recv_bytes, copied);
+    }
     return handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN);
 }
 
@@ -360,6 +378,7 @@ int kprobe__tcp_close(struct pt_regs* ctx) {
     log_debug("kprobe/tcp_close: netns: %u, sport: %u, dport: %u\n", t.netns, t.sport, t.dport);
 
     cleanup_conn(&t);
+    increment_telemetry_count(tcp_closed);
     return 0;
 }
 
@@ -485,7 +504,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
         t.dport = ntohs(t.dport);
     }
 
-    log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
+    log_debug("kprobe/ip_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
     handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN);
     increment_telemetry_count(udp_send_processed);
 
@@ -607,6 +626,7 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
 
     tcp_stats_t stats = { .state_transitions = (1 << state) };
     update_tcp_stats(&t, stats);
+    increment_telemetry_count(tcp_established);
 
     return 0;
 }
@@ -641,12 +661,6 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
 SEC("kprobe/tcp_v4_destroy_sock")
 int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-
-    if (sk == NULL) {
-        log_debug("ERR(tcp_v4_destroy_sock): socket is null \n");
-        return 0;
-    }
-
     __u16 lport = read_sport(sk);
     if (lport == 0) {
         log_debug("ERR(tcp_v4_destroy_sock): lport is 0 \n");
@@ -656,10 +670,7 @@ int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
     port_binding_t t = {};
     t.netns = get_netns_from_sock(sk);
     t.port = lport;
-    __u8* val = bpf_map_lookup_elem(&port_bindings, &t);
-    if (val != NULL) {
-        bpf_map_delete_elem(&port_bindings, &t);
-    }
+    bpf_map_delete_elem(&port_bindings, &t);
 
     log_debug("kprobe/tcp_v4_destroy_sock: net ns: %u, lport: %u\n", t.netns, t.port);
     return 0;
@@ -668,11 +679,6 @@ int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
 SEC("kprobe/udp_destroy_sock")
 int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-    if (sk == NULL) {
-        log_debug("ERR(udp_destroy_sock): socket is null \n");
-        return 0;
-    }
-
     conn_tuple_t tup = {};
      u64 pid_tgid = bpf_get_current_pid_tgid();
     int valid_tuple = read_conn_tuple(&tup, sk, pid_tgid, CONN_TYPE_UDP);

@@ -2,6 +2,7 @@ package network
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/http"
@@ -59,13 +60,29 @@ type State interface {
 }
 
 type telemetry struct {
-	closedConnDropped  int64
-	connDropped        int64
-	statsResets        int64
-	timeSyncCollisions int64
-	dnsStatsDropped    int64
-	httpStatsDropped   int64
-	dnsPidCollisions   int64
+	ignoredActiveConn         int64
+	closedConnDropped         int64
+	connDropped               int64
+	statsResets               int64
+	timeSyncCollisions        int64
+	dnsStatsDropped           int64
+	httpStatsDropped          int64
+	dnsPidCollisions          int64
+	monotonicTCPEstablished   int64
+	lastTCPEstablished        int64
+	monotonicTCPSentBytes     int64
+	lastTCPSentBytes          int64
+	monotonicTCPReceivedBytes int64
+	lastTCPReceivedBytes      int64
+
+	monotonicClosedTCPSentBytes     int64
+	lastClosedTCPSentBytes          int64
+	monotonicClosedTCPReceivedBytes int64
+	lastClosedTCPReceivedBytes      int64
+	connLength                      int64
+	closedSentBytes                 int64
+	closedRecvBytes                 int64
+	zeroByteConns                   int64
 }
 
 type stats struct {
@@ -179,6 +196,19 @@ func (ns *networkState) Connections(
 		return conns
 	}
 
+	var mClosedTCPSent, lClosedTCPSent uint64 = 0, 0
+	var mClosedTCPRecv, lClosedTCPRecv uint64 = 0, 0
+	for _, c := range ns.clients[id].closedConnections {
+		if c.DPort == 8080 {
+			if c.Type == TCP {
+				mClosedTCPSent += c.MonotonicSentBytes
+				lClosedTCPSent += c.LastSentBytes
+				mClosedTCPRecv += c.MonotonicRecvBytes
+				lClosedTCPRecv += c.LastRecvBytes
+			}
+		}
+	}
+
 	// Update all connections with relevant up-to-date stats for client
 	conns := ns.mergeConnections(id, connsByKey)
 
@@ -204,6 +234,38 @@ func (ns *networkState) Connections(
 		ns.storeHTTPStats(httpStats)
 	}
 	ns.addHTTPStats(id, conns)
+
+	var mEstablished, lEstablished uint32 = 0, 0
+	var mTCPSent, lTCPSent uint64 = 0, 0
+	var mTCPRecv, lTCPRecv uint64 = 0, 0
+	var connLen int64 = 0
+	for _, c := range conns {
+		if c.DPort == 8080 {
+			mEstablished += c.MonotonicTCPEstablished
+			lEstablished += c.LastTCPEstablished
+
+			if c.Type == TCP {
+				mTCPSent += c.MonotonicSentBytes
+				lTCPSent += c.LastSentBytes
+				mTCPRecv += c.MonotonicRecvBytes
+				lTCPRecv += c.LastRecvBytes
+				connLen++
+			}
+		}
+	}
+	atomic.SwapInt64(&ns.telemetry.monotonicTCPEstablished, int64(mEstablished))
+	atomic.SwapInt64(&ns.telemetry.lastTCPEstablished, int64(lEstablished))
+	atomic.SwapInt64(&ns.telemetry.monotonicTCPSentBytes, int64(mTCPSent))
+	atomic.SwapInt64(&ns.telemetry.lastTCPSentBytes, int64(lTCPSent))
+	atomic.SwapInt64(&ns.telemetry.monotonicTCPReceivedBytes, int64(mTCPRecv))
+	atomic.SwapInt64(&ns.telemetry.lastTCPReceivedBytes, int64(lTCPRecv))
+
+	atomic.SwapInt64(&ns.telemetry.monotonicClosedTCPSentBytes, int64(mClosedTCPSent))
+	atomic.SwapInt64(&ns.telemetry.lastClosedTCPSentBytes, int64(lClosedTCPSent))
+	atomic.SwapInt64(&ns.telemetry.monotonicClosedTCPReceivedBytes, int64(mClosedTCPRecv))
+	atomic.SwapInt64(&ns.telemetry.lastClosedTCPReceivedBytes, int64(lClosedTCPRecv))
+
+	atomic.SwapInt64(&ns.telemetry.connLength, connLen)
 
 	return conns
 }
@@ -306,6 +368,14 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 	ns.Lock()
 	defer ns.Unlock()
 
+	if conn.DPort == 8080 {
+		atomic.AddInt64(&ns.telemetry.closedSentBytes, int64(conn.MonotonicSentBytes))
+		atomic.AddInt64(&ns.telemetry.closedRecvBytes, int64(conn.MonotonicRecvBytes))
+		if conn.MonotonicSentBytes+conn.MonotonicRecvBytes == 0 {
+			atomic.AddInt64(&ns.telemetry.zeroByteConns, 1)
+		}
+	}
+
 	key, err := conn.ByteKey(ns.buf)
 	if err != nil {
 		log.Warnf("failed to create byte key: %s", err)
@@ -321,8 +391,10 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 			prev.MonotonicRetransmits += conn.MonotonicRetransmits
 			prev.MonotonicTCPEstablished += conn.MonotonicTCPEstablished
 			prev.MonotonicTCPClosed += conn.MonotonicTCPClosed
-			// Also update the timestamp
-			prev.LastUpdateEpoch = conn.LastUpdateEpoch
+			// Also update the timestamp, if newer
+			if conn.LastUpdateEpoch > prev.LastUpdateEpoch {
+				prev.LastUpdateEpoch = conn.LastUpdateEpoch
+			}
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
 			ns.telemetry.closedConnDropped++
@@ -426,6 +498,7 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 		if activeConn, ok := active[key]; ok {
 			// If closed conn is newer it means that the active connection is outdated, let's ignore it
 			if closedConn.LastUpdateEpoch > activeConn.LastUpdateEpoch {
+				ns.telemetry.ignoredActiveConn++
 				ns.updateConnWithStats(client, key, &closedConn)
 			} else if closedConn.LastUpdateEpoch < activeConn.LastUpdateEpoch {
 				// Else if the active conn is newer, it likely means that it became active again
@@ -488,8 +561,8 @@ func (ns *networkState) updateConnWithStatWithActiveConn(client *client, key str
 		closed.LastSentBytes = closed.MonotonicSentBytes - st.totalSent
 		closed.LastRecvBytes = closed.MonotonicRecvBytes - st.totalRecv
 		closed.LastRetransmits = closed.MonotonicRetransmits - st.totalRetransmits
-		closed.LastTCPEstablished = closed.LastTCPEstablished - st.totalTCPEstablished
-		closed.LastTCPClosed = closed.LastTCPClosed - st.totalTCPClosed
+		closed.LastTCPEstablished = closed.MonotonicTCPEstablished - st.totalTCPEstablished
+		closed.LastTCPClosed = closed.MonotonicTCPClosed - st.totalTCPClosed
 
 		// Update stats object with latest values
 		st.totalSent = active.MonotonicSentBytes
@@ -622,13 +695,28 @@ func (ns *networkState) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"clients": clientInfo,
 		"telemetry": map[string]int64{
-			"stats_resets":         ns.telemetry.statsResets,
-			"closed_conn_dropped":  ns.telemetry.closedConnDropped,
-			"conn_dropped":         ns.telemetry.connDropped,
-			"time_sync_collisions": ns.telemetry.timeSyncCollisions,
-			"dns_stats_dropped":    ns.telemetry.dnsStatsDropped,
-			"http_stats_dropped":   ns.telemetry.httpStatsDropped,
-			"dns_pid_collisions":   ns.telemetry.dnsPidCollisions,
+			"stats_resets":                    ns.telemetry.statsResets,
+			"closed_conn_dropped":             ns.telemetry.closedConnDropped,
+			"conn_dropped":                    ns.telemetry.connDropped,
+			"time_sync_collisions":            ns.telemetry.timeSyncCollisions,
+			"dns_stats_dropped":               ns.telemetry.dnsStatsDropped,
+			"http_stats_dropped":              ns.telemetry.httpStatsDropped,
+			"dns_pid_collisions":              ns.telemetry.dnsPidCollisions,
+			"ignored_active_conn":             ns.telemetry.ignoredActiveConn,
+			"monotonic_tcp_established":       ns.telemetry.monotonicTCPEstablished,
+			"last_tcp_established":            ns.telemetry.lastTCPEstablished,
+			"monotonic_tcp_sent_bytes":        ns.telemetry.monotonicTCPSentBytes,
+			"last_tcp_sent_bytes":             ns.telemetry.lastTCPSentBytes,
+			"monotonic_tcp_recv_bytes":        ns.telemetry.monotonicTCPReceivedBytes,
+			"last_tcp_recv_bytes":             ns.telemetry.lastTCPReceivedBytes,
+			"monotonic_closed_tcp_sent_bytes": ns.telemetry.monotonicClosedTCPSentBytes,
+			"last_closed_tcp_sent_bytes":      ns.telemetry.lastClosedTCPSentBytes,
+			"monotonic_closed_tcp_recv_bytes": ns.telemetry.monotonicClosedTCPReceivedBytes,
+			"last_closed_tcp_recv_bytes":      ns.telemetry.lastClosedTCPReceivedBytes,
+			"conn_length":                     ns.telemetry.connLength,
+			"closed_sent_bytes":               ns.telemetry.closedSentBytes,
+			"closed_recv_bytes":               ns.telemetry.closedRecvBytes,
+			"zero_byte_conns":                 ns.telemetry.zeroByteConns,
 		},
 		"current_time":       time.Now().Unix(),
 		"latest_bpf_time_ns": ns.latestTimeEpoch,

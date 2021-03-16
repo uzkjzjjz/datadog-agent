@@ -189,6 +189,13 @@ typedef struct {
     __u64 missed_udp_close;
     __u64 udp_sends_processed;
     __u64 udp_sends_missed;
+    __u64 tcp_established;
+    __u64 tcp_closed;
+    __u64 tuple_read_err;
+    __u64 tcp_sent_bytes;
+    __u64 tcp_recv_bytes;
+//    __u64 perf_ring_error;
+    __u64 conn_stats_created;
 } telemetry_t;
 
 #define PORT_LISTENING 1

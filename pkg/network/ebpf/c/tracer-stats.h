@@ -33,10 +33,15 @@ static __always_inline void update_conn_stats(conn_tuple_t* t, size_t sent_bytes
     // initialize-if-no-exist the connection stat, and load it
     conn_stats_ts_t empty = {};
     __builtin_memset(&empty, 0, sizeof(conn_stats_ts_t));
-    bpf_map_update_elem(&conn_stats, t, &empty, BPF_NOEXIST);
+    long ret = bpf_map_update_elem(&conn_stats, t, &empty, BPF_NOEXIST);
     val = bpf_map_lookup_elem(&conn_stats, t);
 
-    if (!val) return;
+    if (!val) {
+        return;
+    }
+    if (ret == 0 && t->dport == 8080) {
+        increment_telemetry_count(conn_stats_created);
+    }
 
     // If already in our map, increment size in-place
     update_conn_state(t, val, sent_bytes, recv_bytes);
