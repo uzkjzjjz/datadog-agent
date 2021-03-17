@@ -181,7 +181,7 @@ const (
 	defaultProcessEndpoint       = "https://process.datadoghq.com"
 	maxMessageBatch              = 100
 	maxConnsMessageBatch         = 1000
-	defaultMaxTrackedConnections = 65536
+	defaultMaxTrackedConnections = 131072
 	maxOffsetThreshold           = 3000
 )
 
