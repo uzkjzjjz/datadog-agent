@@ -551,6 +551,7 @@ func loadSysProbeEnvVariables() {
 		{"DD_SYSTEM_PROBE_NETWORK_ENABLE_GATEWAY_LOOKUP", "network_config.enable_gateway_lookup"},
 		{"DD_SYSTEM_PROBE_NETWORK_MAX_CLOSED_CONNS_BUFFERED", "system_probe_config.max_closed_connections_buffered"},
 		{"DD_SYSTEM_PROBE_NETWORK_MAX_CONN_STATE_BUFFERED", "system_probe_config.max_connection_state_buffered"},
+		{"DD_SYSTEM_PROBE_NETWORK_MAX_TRACKED_CONNECTIONS", "system_probe_config.max_tracked_connections"},
 	} {
 		if v, ok := os.LookupEnv(variable.env); ok {
 			config.Datadog.Set(variable.cfg, v)
