@@ -58,8 +58,10 @@ static __always_inline void __add_to_batch(struct pt_regs * ctx, struct bpf_map_
     u64 index = cpu_batch->offset + cpu_batch->len;
     bpf_map_update_elem(obj_map, &index, obj, BPF_ANY);
     cpu_batch->len++;
+    log_debug("adding conn to batch: cpu=%u, offset=%u, new_len=%u\n", cpu, index, cpu_batch->len);
 
     if (cpu_batch->len == batch_size) {
+        log_debug("sending batch notification: cpu=%u, offset=%u, len=%u\n", cpu, cpu_batch->offset, batch_size);
         batch_notification_t note;
         __builtin_memset(&note, 0, sizeof(batch_notification_t));
         note.offset = cpu_batch->offset;
