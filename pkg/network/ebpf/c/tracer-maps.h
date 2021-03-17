@@ -33,32 +33,6 @@ struct bpf_map_def SEC("maps/tcp_stats") tcp_stats = {
     .namespace = "",
 };
 
-/* Will hold the tcp/udp close events
- * The keys are the cpu number and the values a perf file descriptor for a perf event
- */
-struct bpf_map_def SEC("maps/conn_close_event") conn_close_event = {
-    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-    .key_size = sizeof(__u32),
-    .value_size = sizeof(__u32),
-    .max_entries = 0, // This will get overridden at runtime
-    .pinning = 0,
-    .namespace = "",
-};
-
-/* We use this map as a container for batching closed tcp/udp connections
- * The key represents the CPU core. Ideally we should use a BPF_MAP_TYPE_PERCPU_HASH map
- * or BPF_MAP_TYPE_PERCPU_ARRAY, but they are not available in
- * some of the Kernels we support (4.4 ~ 4.6)
- */
-struct bpf_map_def SEC("maps/conn_close_batch") conn_close_batch = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(__u32),
-    .value_size = sizeof(batch_t),
-    .max_entries = 1024,
-    .pinning = 0,
-    .namespace = "",
-};
-
 /* This map is used to match the kprobe & kretprobe of udp_recvmsg */
 /* This is a key/value store with the keys being a pid
  * and the values being a udp_recv_sock_t

@@ -26,7 +26,6 @@ func (c *Config) EnabledProbes(runtimeTracer bool) (map[probes.ProbeName]struct{
 		}
 		enabled[probes.TCPCleanupRBuf] = struct{}{}
 		enabled[probes.TCPClose] = struct{}{}
-		enabled[probes.TCPCloseReturn] = struct{}{}
 		enabled[probes.InetCskAcceptReturn] = struct{}{}
 		enabled[probes.TCPv4DestroySock] = struct{}{}
 		enabled[probes.TCPSetState] = struct{}{}
@@ -45,7 +44,6 @@ func (c *Config) EnabledProbes(runtimeTracer bool) (map[probes.ProbeName]struct{
 	if c.CollectUDPConns {
 		enabled[probes.UDPRecvMsgReturn] = struct{}{}
 		enabled[probes.UDPDestroySock] = struct{}{}
-		enabled[probes.UDPDestroySockReturn] = struct{}{}
 		enabled[probes.IPMakeSkb] = struct{}{}
 		enabled[probes.InetBind] = struct{}{}
 		enabled[probes.InetBindRet] = struct{}{}

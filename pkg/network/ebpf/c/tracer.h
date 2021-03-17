@@ -164,24 +164,6 @@ typedef struct {
     __u64 batch_idx;
 } http_batch_notification_t;
 
-// Must match the number of conn_t objects embedded in the batch_t struct
-#ifndef CONN_CLOSED_BATCH_SIZE
-#define CONN_CLOSED_BATCH_SIZE 5
-#endif
-
-// This struct is meant to be used as a container for batching
-// writes to the perf buffer. Ideally we should have an array of tcp_conn_t objects
-// but apparently eBPF verifier doesn't allow arbitrary index access during runtime.
-typedef struct {
-    conn_t c0;
-    conn_t c1;
-    conn_t c2;
-    conn_t c3;
-    conn_t c4;
-    __u16 len;
-    __u64 id;
-} batch_t;
-
 // Telemetry names
 typedef struct {
     __u64 tcp_sent_miscounts;

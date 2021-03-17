@@ -41,7 +41,7 @@ var (
 	expvarTypes     = []string{"conntrack", "state", "tracer", "ebpf", "kprobes", "dns", "http", "compiler"}
 )
 
-const defaultUDPConnTimeoutNanoSeconds uint64 = uint64(time.Duration(120) * time.Second)
+const defaultUDPConnTimeoutNanoSeconds = uint64(120 * time.Second)
 
 func init() {
 	expvarEndpoints = make(map[string]*expvar.Map, len(expvarTypes))
@@ -51,21 +51,14 @@ func init() {
 }
 
 type Tracer struct {
-	m *manager.Manager
+	m            *manager.Manager
+	config       *config.Config
+	state        network.State
+	conntracker  netlink.Conntracker
+	reverseDNS   network.ReverseDNS
+	httpMonitor  *http.Monitor
+	batchManager *Batcher
 
-	config *config.Config
-
-	state network.State
-
-	conntracker netlink.Conntracker
-
-	reverseDNS network.ReverseDNS
-
-	httpMonitor *http.Monitor
-
-	perfMap       *manager.PerfMap
-	perfHandler   *ddebpf.PerfHandler
-	batchManager  *PerfBatchManager
 	flushIdle     chan chan struct{}
 	stop          chan struct{}
 	runtimeTracer bool
@@ -222,9 +215,9 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 	if config.ClosedChannelSize > 0 {
 		closedChannelSize = config.ClosedChannelSize
 	}
-	perfHandlerTCP := ddebpf.NewPerfHandler(closedChannelSize)
 	perfHandlerHTTP := ddebpf.NewPerfHandler(closedChannelSize)
-	m := netebpf.NewManager(perfHandlerTCP, perfHandlerHTTP, runtimeTracer)
+
+	m := netebpf.NewManager(perfHandlerHTTP, runtimeTracer)
 
 	if gwLookupEnabled(config) && runtimeTracer {
 		enabledProbes[probes.IPRouteOutputFlow] = struct{}{}
@@ -248,6 +241,17 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 				},
 			})
 	}
+
+	connBatcher, err := NewBatcher(Conn{}, "conn_t", defaultClosedChannelSize, 5, 128)
+	if err != nil {
+		return nil, err
+	}
+
+	err = connBatcher.Attach(m, &mgrOptions)
+	if err != nil {
+		return nil, err
+	}
+
 	err = m.InitWithOptions(buf, mgrOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init ebpf manager: %v", err)
@@ -291,7 +295,6 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		conntracker:                conntracker,
 		sourceExcludes:             network.ParseConnectionFilters(config.ExcludedSourceConnections),
 		destExcludes:               network.ParseConnectionFilters(config.ExcludedDestinationConnections),
-		perfHandler:                perfHandlerTCP,
 		flushIdle:                  make(chan chan struct{}),
 		stop:                       make(chan struct{}),
 		buf:                        make([]byte, network.ConnectionByteKeyMaxLen),
@@ -299,9 +302,10 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		sysctlUDPConnTimeout:       sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout", time.Minute),
 		sysctlUDPConnStreamTimeout: sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout_stream", time.Minute),
 		gwLookup:                   newGatewayLookup(config, runtimeTracer, m),
+		batchManager:               connBatcher,
 	}
 
-	tr.perfMap, tr.batchManager, err = tr.initPerfPolling(perfHandlerTCP)
+	err = tr.initPerfPolling()
 	if err != nil {
 		return nil, fmt.Errorf("could not start polling bpf events: %s", err)
 	}
@@ -493,22 +497,9 @@ func (t *Tracer) populateExpvarStats() error {
 }
 
 // initPerfPolling starts the listening on perf buffer events to grab closed connections
-func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *PerfBatchManager, error) {
-	pm, found := t.m.GetPerfMap(string(probes.ConnCloseEventMap))
-	if !found {
-		return nil, nil, fmt.Errorf("unable to find perf map %s", probes.ConnCloseEventMap)
-	}
-
-	connCloseEventMap, _ := t.getMap(probes.ConnCloseEventMap)
-	connCloseMap, _ := t.getMap(probes.ConnCloseBatchMap)
-	numCPUs := int(connCloseEventMap.ABI().MaxEntries)
-	batchManager, err := NewPerfBatchManager(connCloseMap, numCPUs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := pm.Start(); err != nil {
-		return nil, nil, fmt.Errorf("error starting perf map: %s", err)
+func (t *Tracer) initPerfPolling() error {
+	if err := t.batchManager.Start(); err != nil {
+		return fmt.Errorf("error starting perf map: %s", err)
 	}
 
 	go func() {
@@ -516,30 +507,29 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 		ticker := time.NewTicker(5 * time.Minute)
 		for {
 			select {
-			case batchData, ok := <-perf.DataChannel:
+			case connObj, ok := <-t.batchManager.Objects():
 				if !ok {
 					return
 				}
 				atomic.AddInt64(&t.perfReceived, 1)
 
-				batch := toBatch(batchData.Data)
-				conns := t.batchManager.Extract(batch, batchData.CPU)
-				for _, c := range conns {
-					t.storeClosedConn(&c)
+				ct, valid := connObj.(*Conn)
+				if !valid {
+					continue
 				}
-			case lostCount, ok := <-perf.LostChannel:
-				if !ok {
-					return
-				}
-				atomic.AddInt64(&t.perfLost, int64(lostCount))
+
+				tup := ConnTuple(ct.tup)
+				cst := ConnStatsWithTimestamp(ct.conn_stats)
+				tst := TCPStats(ct.tcp_stats)
+
+				connStats := connStats(&tup, &cst, &tst)
+				t.storeClosedConn(&connStats)
 			case done, ok := <-t.flushIdle:
 				if !ok {
 					return
 				}
-				idleConns := t.batchManager.GetIdleConns()
-				for _, c := range idleConns {
-					t.storeClosedConn(&c)
-				}
+				// atomic.AddInt64(&t.closedConnFlushReceived, 1)
+				// TODO
 				close(done)
 			case <-ticker.C:
 				recv := atomic.SwapInt64(&t.perfReceived, 0)
@@ -553,7 +543,7 @@ func (t *Tracer) initPerfPolling(perf *ddebpf.PerfHandler) (*manager.PerfMap, *P
 		}
 	}()
 
-	return pm, batchManager, nil
+	return nil
 }
 
 // shouldSkipConnection returns whether or not the tracer should ignore a given connection:
@@ -588,8 +578,7 @@ func (t *Tracer) Stop() {
 	close(t.stop)
 	t.reverseDNS.Close()
 	_ = t.m.Stop(manager.CleanAll)
-	_ = t.perfMap.Stop(manager.CleanAll)
-	t.perfHandler.Stop()
+	t.batchManager.Stop()
 	t.httpMonitor.Stop()
 	close(t.flushIdle)
 	t.conntracker.Close()
@@ -708,7 +697,9 @@ func (t *Tracer) getConnections(active []network.ConnectionStats) ([]network.Con
 	}
 
 	cachedConntrack := newCachedConntrack(t.config.ProcRoot, netlink.NewConntrack, 128)
-	defer cachedConntrack.Close()
+	defer func() {
+		_ = cachedConntrack.Close()
+	}()
 
 	// Iterate through all key-value pairs in map
 	key, stats := &ConnTuple{}, &ConnStatsWithTimestamp{}

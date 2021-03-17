@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"unsafe"
 
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
@@ -37,17 +36,6 @@ __u32 pid;
 __u32 metadata;
 */
 type ConnTuple C.conn_tuple_t
-
-/* batch_t
-conn_t c0;
-conn_t c1;
-conn_t c2;
-conn_t c3;
-conn_t c4;
-__u16 pos;
-__u16 cpu;
-*/
-type batch C.batch_t
 
 /* port_binding_t
 __u32 pid;
@@ -277,11 +265,7 @@ func (cs *ConnStatsWithTimestamp) isExpired(latestTime uint64, timeout uint64) b
 }
 
 func (cs *ConnStatsWithTimestamp) isAssured() bool {
-	return uint(cs.flags)&C.CONN_ASSURED > 0
-}
-
-func toBatch(data []byte) *batch {
-	return (*batch)(unsafe.Pointer(&data[0]))
+	return uint32(cs.flags)&C.CONN_ASSURED > 0
 }
 
 func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) network.ConnectionStats {
