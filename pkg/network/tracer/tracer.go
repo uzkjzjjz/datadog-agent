@@ -861,8 +861,9 @@ func (t *Tracer) getEbpfTelemetry() map[string]int64 {
 		"tuple_read_err":      int64(telemetry.tuple_read_err),
 		"tcp_sent_bytes":      int64(telemetry.tcp_sent_bytes),
 		"tcp_recv_bytes":      int64(telemetry.tcp_recv_bytes),
-		//"perf_ring_error":     int64(telemetry.perf_ring_error),
-		"conn_stats_created": int64(telemetry.conn_stats_created),
+		"missing_conn_stats":  int64(telemetry.missing_conn_stats),
+		"conn_stats_created":  int64(telemetry.conn_stats_created),
+		"conn_stats_exists":   int64(telemetry.conn_stats_exists),
 	}
 }
 

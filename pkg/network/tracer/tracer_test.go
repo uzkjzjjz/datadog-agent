@@ -148,8 +148,6 @@ func TestTracerExpvar(t *testing.T) {
 			"PIp6MakeSkbMisses",
 			"RInetCskAcceptHits",
 			"RInetCskAcceptMisses",
-			"RTcpCloseHits",
-			"RTcpCloseMisses",
 			"RUdpRecvmsgHits",
 			"RUdpRecvmsgMisses",
 			"RTcpSendmsgHits",

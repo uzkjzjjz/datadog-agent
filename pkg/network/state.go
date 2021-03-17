@@ -285,7 +285,7 @@ func (ns *networkState) addDNSStats(id string, conns []ConnectionStats) {
 		}
 
 		if _, alreadySeen := seen[key]; alreadySeen {
-			ns.telemetry.dnsPidCollisions++
+			atomic.AddInt64(&ns.telemetry.dnsPidCollisions, 1)
 			continue
 		}
 
@@ -397,7 +397,7 @@ func (ns *networkState) StoreClosedConnection(conn *ConnectionStats) {
 			}
 			client.closedConnections[string(key)] = prev
 		} else if len(client.closedConnections) >= ns.maxClosedConns {
-			ns.telemetry.closedConnDropped++
+			atomic.AddInt64(&ns.telemetry.closedConnDropped, 1)
 			continue
 		} else {
 			client.closedConnections[string(key)] = *conn
@@ -427,7 +427,7 @@ func (ns *networkState) storeDNSStats(stats map[DNSKey]map[string]DNSStats) {
 				}
 				client.dnsStats[key] = prevByDomain
 			} else if len(client.dnsStats) >= ns.maxDNSStats {
-				ns.telemetry.dnsStatsDropped++
+				atomic.AddInt64(&ns.telemetry.dnsStatsDropped, 1)
 				continue
 			} else {
 				client.dnsStats[key] = statsByDomain
@@ -444,7 +444,7 @@ func (ns *networkState) storeHTTPStats(stats map[http.Key]map[string]http.Reques
 			if prevStatsByPath, ok := client.httpStatsDelta[key]; ok {
 				client.httpStatsDelta[key] = combineHTTPStats(prevStatsByPath, statsByPath)
 			} else if len(client.httpStatsDelta) >= ns.maxHTTPStats {
-				ns.telemetry.httpStatsDropped++
+				atomic.AddInt64(&ns.telemetry.httpStatsDropped, 1)
 				continue
 			} else {
 				client.httpStatsDelta[key] = statsByPath
@@ -498,7 +498,7 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 		if activeConn, ok := active[key]; ok {
 			// If closed conn is newer it means that the active connection is outdated, let's ignore it
 			if closedConn.LastUpdateEpoch > activeConn.LastUpdateEpoch {
-				ns.telemetry.ignoredActiveConn++
+				atomic.AddInt64(&ns.telemetry.ignoredActiveConn, 1)
 				ns.updateConnWithStats(client, key, &closedConn)
 			} else if closedConn.LastUpdateEpoch < activeConn.LastUpdateEpoch {
 				// Else if the active conn is newer, it likely means that it became active again
@@ -524,7 +524,7 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 				// XXX: For now we assume that the closed connection is the more recent one but this is not guaranteed
 				// To fix this we should have a way to uniquely identify a connection
 				// (using the startTimestamp or a monotonic counter)
-				ns.telemetry.timeSyncCollisions++
+				atomic.AddInt64(&ns.telemetry.timeSyncCollisions, 1)
 				log.Tracef("Time collision for connections: closed:%+v, active:%+v", closedConn, *activeConn)
 				ns.updateConnWithStats(client, key, &closedConn)
 			}
@@ -608,7 +608,7 @@ func (ns *networkState) updateConnWithStats(client *client, key string, c *Conne
 // handleStatsUnderflow checks if we are going to have an underflow when computing last stats and if it's the case it resets the stats to avoid it
 func (ns *networkState) handleStatsUnderflow(key string, st *stats, c *ConnectionStats) {
 	if c.MonotonicSentBytes < st.totalSent || c.MonotonicRecvBytes < st.totalRecv || c.MonotonicRetransmits < st.totalRetransmits {
-		ns.telemetry.statsResets++
+		atomic.AddInt64(&ns.telemetry.statsResets, 1)
 		log.Debugf("Stats reset triggered for key:%s, stats:%+v, connection:%+v", BeautifyKey(key), *st, *c)
 		st.totalSent = 0
 		st.totalRecv = 0
@@ -620,7 +620,7 @@ func (ns *networkState) handleStatsUnderflow(key string, st *stats, c *Connectio
 func (ns *networkState) createStatsForKey(client *client, key string) {
 	if _, ok := client.stats[key]; !ok {
 		if len(client.stats) >= ns.maxClientStats {
-			ns.telemetry.connDropped++
+			atomic.AddInt64(&ns.telemetry.connDropped, 1)
 			return
 		}
 		client.stats[key] = &stats{}
@@ -656,26 +656,26 @@ func (ns *networkState) RemoveConnections(keys []string) {
 	}
 
 	// Flush log line if any metric is non zero
-	if ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
-		s := "state telemetry: "
-		s += " [%d stats stats_resets]"
-		s += " [%d connections dropped due to stats]"
-		s += " [%d closed connections dropped]"
-		s += " [%d dns stats dropped]"
-		s += " [%d HTTP stats dropped]"
-		s += " [%d DNS pid collisions]"
-		s += " [%d time sync collisions]"
-		log.Warnf(s,
-			ns.telemetry.statsResets,
-			ns.telemetry.connDropped,
-			ns.telemetry.closedConnDropped,
-			ns.telemetry.dnsStatsDropped,
-			ns.telemetry.httpStatsDropped,
-			ns.telemetry.dnsPidCollisions,
-			ns.telemetry.timeSyncCollisions)
-	}
+	//if ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
+	//	s := "state telemetry: "
+	//	s += " [%d stats stats_resets]"
+	//	s += " [%d connections dropped due to stats]"
+	//	s += " [%d closed connections dropped]"
+	//	s += " [%d dns stats dropped]"
+	//	s += " [%d HTTP stats dropped]"
+	//	s += " [%d DNS pid collisions]"
+	//	s += " [%d time sync collisions]"
+	//	log.Warnf(s,
+	//		ns.telemetry.statsResets,
+	//		ns.telemetry.connDropped,
+	//		ns.telemetry.closedConnDropped,
+	//		ns.telemetry.dnsStatsDropped,
+	//		ns.telemetry.httpStatsDropped,
+	//		ns.telemetry.dnsPidCollisions,
+	//		ns.telemetry.timeSyncCollisions)
+	//}
 
-	ns.telemetry = telemetry{}
+	//ns.telemetry = telemetry{}
 }
 
 // GetStats returns a map of statistics about the current network state
@@ -692,35 +692,37 @@ func (ns *networkState) GetStats() map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"clients": clientInfo,
 		"telemetry": map[string]int64{
-			"stats_resets":                    ns.telemetry.statsResets,
-			"closed_conn_dropped":             ns.telemetry.closedConnDropped,
-			"conn_dropped":                    ns.telemetry.connDropped,
-			"time_sync_collisions":            ns.telemetry.timeSyncCollisions,
-			"dns_stats_dropped":               ns.telemetry.dnsStatsDropped,
-			"http_stats_dropped":              ns.telemetry.httpStatsDropped,
-			"dns_pid_collisions":              ns.telemetry.dnsPidCollisions,
-			"ignored_active_conn":             ns.telemetry.ignoredActiveConn,
-			"monotonic_tcp_established":       ns.telemetry.monotonicTCPEstablished,
-			"last_tcp_established":            ns.telemetry.lastTCPEstablished,
-			"monotonic_tcp_sent_bytes":        ns.telemetry.monotonicTCPSentBytes,
-			"last_tcp_sent_bytes":             ns.telemetry.lastTCPSentBytes,
-			"monotonic_tcp_recv_bytes":        ns.telemetry.monotonicTCPReceivedBytes,
-			"last_tcp_recv_bytes":             ns.telemetry.lastTCPReceivedBytes,
-			"monotonic_closed_tcp_sent_bytes": ns.telemetry.monotonicClosedTCPSentBytes,
-			"last_closed_tcp_sent_bytes":      ns.telemetry.lastClosedTCPSentBytes,
-			"monotonic_closed_tcp_recv_bytes": ns.telemetry.monotonicClosedTCPReceivedBytes,
-			"last_closed_tcp_recv_bytes":      ns.telemetry.lastClosedTCPReceivedBytes,
-			"conn_length":                     ns.telemetry.connLength,
-			"closed_sent_bytes":               ns.telemetry.closedSentBytes,
-			"closed_recv_bytes":               ns.telemetry.closedRecvBytes,
-			"zero_byte_conns":                 ns.telemetry.zeroByteConns,
+			"stats_resets":                    atomic.SwapInt64(&ns.telemetry.statsResets, 0),
+			"closed_conn_dropped":             atomic.SwapInt64(&ns.telemetry.closedConnDropped, 0),
+			"conn_dropped":                    atomic.SwapInt64(&ns.telemetry.connDropped, 0),
+			"time_sync_collisions":            atomic.SwapInt64(&ns.telemetry.timeSyncCollisions, 0),
+			"dns_stats_dropped":               atomic.SwapInt64(&ns.telemetry.dnsStatsDropped, 0),
+			"http_stats_dropped":              atomic.SwapInt64(&ns.telemetry.httpStatsDropped, 0),
+			"dns_pid_collisions":              atomic.SwapInt64(&ns.telemetry.dnsPidCollisions, 0),
+			"ignored_active_conn":             atomic.SwapInt64(&ns.telemetry.ignoredActiveConn, 0),
+			"monotonic_tcp_established":       atomic.SwapInt64(&ns.telemetry.monotonicTCPEstablished, 0),
+			"last_tcp_established":            atomic.SwapInt64(&ns.telemetry.lastTCPEstablished, 0),
+			"monotonic_tcp_sent_bytes":        atomic.SwapInt64(&ns.telemetry.monotonicTCPSentBytes, 0),
+			"last_tcp_sent_bytes":             atomic.SwapInt64(&ns.telemetry.lastTCPSentBytes, 0),
+			"monotonic_tcp_recv_bytes":        atomic.SwapInt64(&ns.telemetry.monotonicTCPReceivedBytes, 0),
+			"last_tcp_recv_bytes":             atomic.SwapInt64(&ns.telemetry.lastTCPReceivedBytes, 0),
+			"monotonic_closed_tcp_sent_bytes": atomic.SwapInt64(&ns.telemetry.monotonicClosedTCPSentBytes, 0),
+			"last_closed_tcp_sent_bytes":      atomic.SwapInt64(&ns.telemetry.lastClosedTCPSentBytes, 0),
+			"monotonic_closed_tcp_recv_bytes": atomic.SwapInt64(&ns.telemetry.monotonicClosedTCPReceivedBytes, 0),
+			"last_closed_tcp_recv_bytes":      atomic.SwapInt64(&ns.telemetry.lastClosedTCPReceivedBytes, 0),
+			"conn_length":                     atomic.SwapInt64(&ns.telemetry.connLength, 0),
+			"closed_sent_bytes":               atomic.SwapInt64(&ns.telemetry.closedSentBytes, 0),
+			"closed_recv_bytes":               atomic.SwapInt64(&ns.telemetry.closedRecvBytes, 0),
+			"zero_byte_conns":                 atomic.SwapInt64(&ns.telemetry.zeroByteConns, 0),
 		},
 		"current_time":       time.Now().Unix(),
 		"latest_bpf_time_ns": ns.latestTimeEpoch,
 	}
+
+	return stats
 }
 
 // DumpState returns the entirety of the network state in memory at the moment for a particular clientID, for debugging

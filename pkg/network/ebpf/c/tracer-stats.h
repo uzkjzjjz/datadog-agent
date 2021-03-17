@@ -37,10 +37,15 @@ static __always_inline void update_conn_stats(conn_tuple_t* t, size_t sent_bytes
     val = bpf_map_lookup_elem(&conn_stats, t);
 
     if (!val) {
+        increment_telemetry_count(missing_conn_stats);
         return;
     }
-    if (ret == 0 && t->dport == 8080) {
-        increment_telemetry_count(conn_stats_created);
+    if (t->dport == 8080) {
+        if (ret == 0) {
+            increment_telemetry_count(conn_stats_created);
+        } else if (ret == -EEXIST) {
+            increment_telemetry_count(conn_stats_exists);
+        }
     }
 
     // If already in our map, increment size in-place

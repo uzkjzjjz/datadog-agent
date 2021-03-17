@@ -19,8 +19,9 @@ enum telemetry_counter {
     tuple_read_err,
     tcp_sent_bytes,
     tcp_recv_bytes,
-//    perf_ring_error,
     conn_stats_created,
+    missing_conn_stats,
+    conn_stats_exists,
 };
 
 static __always_inline void increment_telemetry_amount(enum telemetry_counter counter_name, size_t amount) {
@@ -66,11 +67,14 @@ static __always_inline void increment_telemetry_amount(enum telemetry_counter co
     case tcp_recv_bytes:
         __sync_fetch_and_add(&val->tcp_recv_bytes, amount);
         break;
-//    case perf_ring_error:
-//        __sync_fetch_and_add(&val->perf_ring_error, amount);
-//        break;
+    case missing_conn_stats:
+        __sync_fetch_and_add(&val->missing_conn_stats, amount);
+        break;
     case conn_stats_created:
         __sync_fetch_and_add(&val->conn_stats_created, amount);
+        break;
+    case conn_stats_exists:
+        __sync_fetch_and_add(&val->conn_stats_exists, amount);
         break;
     }
 }
