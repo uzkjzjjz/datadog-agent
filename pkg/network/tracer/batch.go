@@ -2,12 +2,15 @@ package tracer
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"reflect"
+	"sync"
 	"unsafe"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/ebpf"
 	"github.com/DataDog/ebpf/manager"
 )
@@ -37,12 +40,19 @@ type Batcher struct {
 	objMap    *ebpf.Map
 	offsetMap *ebpf.Map
 	perfMap   *manager.PerfMap
+
+	lock sync.Mutex
 }
 
 func NewBatcher(outType interface{}, cTypeName string, channelSize int, batchSize uint32, batchesPerCPU uint32) (*Batcher, error) {
 	cpus, err := kernel.PossibleCPUs()
 	if err != nil {
 		return nil, err
+	}
+
+	offsets := make(map[int]uint64, cpus)
+	for c := 0; c < cpus; c++ {
+		offsets[c] = math.MaxUint64
 	}
 
 	return &Batcher{
@@ -53,7 +63,7 @@ func NewBatcher(outType interface{}, cTypeName string, channelSize int, batchSiz
 		cpuCount:      cpus,
 		objChan:       make(chan interface{}),
 		handler:       ddebpf.NewPerfHandler(channelSize),
-		lastOffset:    make(map[int]uint64, cpus),
+		lastOffset:    offsets,
 	}, nil
 }
 
@@ -111,7 +121,6 @@ func (b *Batcher) Start() error {
 		if err := b.offsetMap.Put(unsafe.Pointer(&cpu), unsafe.Pointer(cb)); err != nil {
 			return err
 		}
-		b.lastOffset[cpu] = cb.offset
 	}
 
 	err = b.perfMap.Start()
@@ -124,6 +133,33 @@ func (b *Batcher) Start() error {
 	return nil
 }
 
+func (b *Batcher) Objects() <-chan interface{} {
+	return b.objChan
+}
+
+func (b *Batcher) PendingObjects() []interface{} {
+	var objs []interface{}
+	cb := new(batchCpu)
+	for cpu := 0; cpu < b.cpuCount; cpu++ {
+		if err := b.offsetMap.Lookup(unsafe.Pointer(&cpu), unsafe.Pointer(cb)); err != nil {
+			log.Errorf("[%s] error reading offset map for cpu %d: %s", b.cName, cpu, err)
+			continue
+		}
+		//log.Debugf("[%s] reading pending objects for cpu %d, offset %d, len %d", b.cName, cpu, cb.offset, cb.len)
+		if cb.len > 0 {
+			objs = append(objs, b.readBatch(cb.offset, cb.len, cpu)...)
+		}
+	}
+	//log.Debugf("[%s] read %d pending objects", b.cName, len(objs))
+	return objs
+}
+
+func (b *Batcher) Stop() {
+	_ = b.perfMap.Stop(manager.CleanAll)
+	b.handler.Stop()
+	b.m = nil
+}
+
 func (b *Batcher) reader() {
 	for {
 		select {
@@ -132,50 +168,68 @@ func (b *Batcher) reader() {
 				return
 			}
 			note := toBatchNotification(batchData.Data)
-			if note.offset != b.expectedOffset(batchData.CPU) {
+			ex := b.expectedOffset(batchData.CPU)
+			if note.offset != ex {
+				// TODO this should be guarded by the mutex
 				// skipped one or more objects?!
 				// TODO read skipped batches
+				// this can happen if we read pending objects from a batch
+				//log.Warnf("[%s] notification offset %d does not match expected offset %d for cpu %d", b.cName, note.offset, ex, batchData.CPU)
 			}
 
-			b.readBatch(note.offset, note.len, batchData.CPU)
-		case _, ok := <-b.handler.LostChannel:
+			objs := b.readBatch(note.offset, note.len, batchData.CPU)
+			for _, o := range objs {
+				b.objChan <- o
+			}
+		case lostCount, ok := <-b.handler.LostChannel:
 			if !ok {
 				return
 			}
-
-			// TODO
+			log.Warnf("[%s] lost %d batch notification(s)", b.cName, lostCount)
 		}
 	}
 }
 
-func (b *Batcher) readBatch(offset uint64, len uint8, cpu int) {
-	for i := offset; i < offset+uint64(len); i++ {
+func (b *Batcher) readBatch(offset uint64, len uint8, cpu int) []interface{} {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	//log.Tracef("[%s] readBatch cpu=%d offset=%d len=%d lastOffset=%d", b.cName, cpu, offset, len, b.lastOffset[cpu])
+	start := offset
+	end := offset + uint64(len)
+	if b.lastOffset[cpu] >= offset && b.lastOffset[cpu] < end {
+		start = b.lastOffset[cpu] + 1
+	}
+	objs := make([]interface{}, 0, end-start)
+
+	//log.Debugf("[%s] start=%d end=%d", b.cName, start, end)
+	for i := start; i < end; i++ {
 		o := reflect.New(b.typ)
 		err := b.objMap.Lookup(unsafe.Pointer(&i), unsafe.Pointer(o.Pointer()))
 		if err != nil {
-			// TODO log?
+			log.Warnf("[%s] unable to find batched object at offset %d: %s", b.cName, i, err)
 			continue
 		}
 		b.lastOffset[cpu] = i
-		b.objChan <- o
+		objs = append(objs, o.Interface())
+		if err := b.objMap.Delete(unsafe.Pointer(&i)); err != nil {
+			log.Warnf("[%s] unable to delete batched object at offset %d: %s", b.cName, i, err)
+		}
 	}
+	return objs
 }
 
+// expectedOffset returns what the next offset should be for a specific CPU based on previous batch reading
 func (b *Batcher) expectedOffset(cpu int) uint64 {
 	off := b.lastOffset[cpu]
-	// (cpu*per_cpu) + ((cpu_batch->offset + batch_size) % per_cpu);
 	perCPU := uint64(b.batchesPerCPU) * uint64(b.batchSize)
+
+	// nothing read yet, so return initial offset
+	if off == math.MaxUint64 {
+		return uint64(cpu) * perCPU
+	}
+	// (cpu*per_cpu) + ((cpu_batch->offset + batch_size) % per_cpu);
 	return (uint64(cpu) * perCPU) + ((off + 1) % perCPU)
-}
-
-func (b *Batcher) Objects() <-chan interface{} {
-	return b.objChan
-}
-
-func (b *Batcher) Stop() {
-	_ = b.perfMap.Stop(manager.CleanAll)
-	b.handler.Stop()
-	b.m = nil
 }
 
 func (b *Batcher) perfMapName() string {

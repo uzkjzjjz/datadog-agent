@@ -515,24 +515,16 @@ func (t *Tracer) initPerfPolling() error {
 				}
 				atomic.AddInt64(&t.perfReceived, 1)
 				atomic.AddInt64(&t.closedConnPerfReceived, 1)
-
-				ct, valid := connObj.(*Conn)
-				if !valid {
-					continue
-				}
-
-				tup := ConnTuple(ct.tup)
-				cst := ConnStatsWithTimestamp(ct.conn_stats)
-				tst := TCPStats(ct.tcp_stats)
-
-				connStats := connStats(&tup, &cst, &tst)
-				t.storeClosedConn(&connStats)
+				t.readConnection(connObj)
 			case done, ok := <-t.flushIdle:
 				if !ok {
 					return
 				}
-				// atomic.AddInt64(&t.closedConnFlushReceived, 1)
-				// TODO
+				objs := t.batchManager.PendingObjects()
+				for _, connObj := range objs {
+					atomic.AddInt64(&t.closedConnFlushReceived, 1)
+					t.readConnection(connObj)
+				}
 				close(done)
 			case <-ticker.C:
 				recv := atomic.SwapInt64(&t.perfReceived, 0)
@@ -550,6 +542,21 @@ func (t *Tracer) initPerfPolling() error {
 	}()
 
 	return nil
+}
+
+func (t *Tracer) readConnection(connObj interface{}) {
+	ct, valid := connObj.(*Conn)
+	if !valid {
+		log.Warnf("connection object not able to be cast to `Conn`. type: %T", connObj)
+		return
+	}
+
+	tup := ConnTuple(ct.tup)
+	cst := ConnStatsWithTimestamp(ct.conn_stats)
+	tst := TCPStats(ct.tcp_stats)
+
+	connStats := connStats(&tup, &cst, &tst)
+	t.storeClosedConn(&connStats)
 }
 
 // shouldSkipConnection returns whether or not the tracer should ignore a given connection:
