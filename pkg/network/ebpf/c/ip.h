@@ -35,7 +35,9 @@ static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff *skb, skb_info
         info->tup.metadata |= CONN_V4;
         read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, saddr), &info->tup.saddr_l);
         read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, daddr), &info->tup.daddr_l);
-        info->data_off += sizeof(struct iphdr); // TODO: this assumes there are no IP options
+        // ihl field is header length in words, convert to bytes. Field is second 4 bits of first byte.
+        u8 iphdrLen = (load_byte(skb, info->data_off) & IPHDR_LEN) * 4;
+        info->data_off += iphdrLen;
         break;
     case ETH_P_IPV6:
         l4_proto = load_byte(skb, info->data_off + offsetof(struct ipv6hdr, nexthdr));
@@ -61,8 +63,13 @@ static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff *skb, skb_info
         info->tup.dport = load_half(skb, info->data_off + offsetof(struct tcphdr, dest));
 
         info->tcp_flags = load_byte(skb, info->data_off + TCP_FLAGS_OFFSET);
-        // TODO: Improve readability and explain the bit twiddling below
-        info->data_off += ((load_byte(skb, info->data_off + offsetof(struct tcphdr, ack_seq) + 4) & 0xF0) >> 4) * 4;
+        // data offset is next field after acknowledgment number (ack_seq)
+        u32 doffOffset = offsetof(struct tcphdr, ack_seq) + sizeof_field(struct tcphdr, ack_seq);
+        u8 doffByte = load_byte(skb, info->data_off + doffOffset);
+        // data offset field is count of 32bit words and only the first 4 bits of the byte
+        u8 doffWords = (doffByte & TCPHDR_DATA_OFFSET) >> 4;
+        // convert word count to bytes
+        info->data_off += doffWords * 4;
         break;
     default:
         return 0;
