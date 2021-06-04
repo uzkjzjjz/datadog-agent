@@ -1814,12 +1814,12 @@ func TestUnconnectedUDPSendIPv6(t *testing.T) {
 	require.NoError(t, err)
 	defer tr.Stop()
 
-	linkLocal, err := getIPv6LinkLocalAddress()
+	local6, err := net.ResolveUDPAddr("udp6", "[::1]:0")
 	require.NoError(t, err)
 
 	remotePort := rand.Int()%5000 + 15000
-	remoteAddr := &net.UDPAddr{IP: net.ParseIP(interfaceLocalMulticastIPv6), Port: remotePort}
-	conn, err := net.ListenUDP("udp6", linkLocal)
+	remoteAddr := &net.UDPAddr{IP: net.ParseIP("::1"), Port: remotePort}
+	conn, err := net.ListenUDP("udp6", local6)
 	require.NoError(t, err)
 	defer conn.Close()
 	message := []byte("payload")
