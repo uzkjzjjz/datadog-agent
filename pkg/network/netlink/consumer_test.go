@@ -13,6 +13,9 @@ import (
 )
 
 func TestConsumerKeepsRunningAfterCircuitBreakerTrip(t *testing.T) {
+	defer nettestutil.RunCommands(t, []string{"iptables -D INPUT -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"}, true)
+	nettestutil.RunCommands(t, []string{"iptables -I INPUT 1 -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"}, false)
+
 	c := NewConsumer("/proc", 1, false)
 	require.NotNil(t, c)
 	exited := make(chan struct{})
@@ -50,12 +53,13 @@ func TestConsumerKeepsRunningAfterCircuitBreakerTrip(t *testing.T) {
 	// `tickInterval` seconds (3s currently) for
 	// the circuit breaker to detect the over-limit
 	// rate of updates
-	for i := 0; i < 16; i++ {
+	delay := 250 * time.Millisecond
+	for i := int64(0); i <= int64(tickInterval/delay); i++ {
 		conn, err := net.Dial("tcp", l.Addr().String())
 		require.NoError(t, err)
 		defer conn.Close()
 
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(delay)
 	}
 
 	// on pre 3.15 kernels, the receive loop
