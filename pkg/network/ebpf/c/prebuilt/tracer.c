@@ -283,27 +283,16 @@ static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, u6
     return read_conn_tuple_partial(t, skp, pid_tgid, type);
 }
 
-static __always_inline void handle_tcp_stats(conn_tuple_t* t, struct sock* sk) {
+static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* sk) {
     u32 rtt = 0;
     u32 rtt_var = 0;
     bpf_probe_read(&rtt, sizeof(rtt), ((char*)sk) + offset_rtt());
     bpf_probe_read(&rtt_var, sizeof(rtt_var), ((char*)sk) + offset_rtt_var());
-
-    tcp_stats_t stats = { .retransmits = 0, .rtt = rtt, .rtt_var = rtt_var };
-    update_tcp_stats(t, stats);
-}
-static __always_inline void get_tcp_segment_counts(struct sock* skp, __u32* packets_in, __u32* packets_out) {
-    // counting segments/packets not currently supported on prebuilt
-    // to implement, would need to do the offset-guess on the following
-    // fields in the tcp_sk: packets_in & packets_out (respectively)
-    *packets_in = 0;
-    *packets_out = 0;
+    update_rtt(ts, rtt, rtt_var);
 }
 
 SEC("kprobe/tcp_sendmsg")
 int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
-    __u32 packets_in = 0;
-    __u32 packets_out = 0;
     struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
     size_t size = (size_t)PT_REGS_PARM3(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -314,16 +303,24 @@ int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
         return 0;
     }
 
-    handle_tcp_stats(&t, skp);
-    get_tcp_segment_counts(skp, &packets_in, &packets_out);
-    return handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    tcp_stats_t *ts = get_tcp_stats(&t);
+    if (ts == NULL) {
+        return 0;
+    }
+    update_rtt_from_sock(ts, skp);
+
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_sent_bytes(&t, cs, size);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
+    return 0;
 }
 
 SEC("kprobe/tcp_sendmsg/pre_4_1_0")
 int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
-    __u32 packets_in = 0;
-    __u32 packets_out = 0;
-
     struct sock* sk = (struct sock*)PT_REGS_PARM2(ctx);
     size_t size = (size_t)PT_REGS_PARM4(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -334,14 +331,24 @@ int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
         return 0;
     }
 
-    handle_tcp_stats(&t, sk);
-    get_tcp_segment_counts(sk, &packets_in, &packets_out);
-    return handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    tcp_stats_t *ts = get_tcp_stats(&t);
+    if (ts == NULL) {
+        return 0;
+    }
+    update_rtt_from_sock(ts, sk);
+
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_sent_bytes(&t, cs, size);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
+    return 0;
 }
 
 SEC("kprobe/tcp_cleanup_rbuf")
 int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
-
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     int copied = (int)PT_REGS_PARM2(ctx);
     if (copied < 0) {
@@ -354,8 +361,14 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-
-    return handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN, 0, 0, PACKET_COUNT_NONE);
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_recv_bytes(&t, cs, copied);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
+    return 0;
 }
 
 SEC("kprobe/tcp_close")
@@ -432,7 +445,13 @@ static __always_inline int handle_ip6_skb(struct sock* sk, size_t size, struct f
     }
 
     log_debug("kprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
-    handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 0, 0, PACKET_COUNT_NONE);
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_sent_bytes(&t, cs, size);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
     increment_telemetry_count(udp_send_processed);
 
     return 0;
@@ -500,11 +519,14 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
 
     log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
 
-    // segment count is not currently enabled on prebuilt.
-    // to enable, change PACKET_COUNT_NONE => PACKET_COUNT_INCREMENT
-    handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_NONE);
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_sent_bytes(&t, cs, size);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
     increment_telemetry_count(udp_send_processed);
-
     return 0;
 }
 
@@ -597,10 +619,14 @@ int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
     }
 
     log_debug("kretprobe/udp_recvmsg: pid_tgid: %d, return: %d\n", pid_tgid, copied);
-    // segment count is not currently enabled on prebuilt.
-    // to enable, change PACKET_COUNT_NONE => PACKET_COUNT_INCREMENT
-    handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN, 0, 1, PACKET_COUNT_NONE);
 
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    add_recv_bytes(&t, cs, copied);
+    infer_direction(&t, cs);
+    update_timestamp(cs);
     return 0;
 }
 
@@ -636,10 +662,11 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-
-    tcp_stats_t stats = { .state_transitions = (1 << state) };
-    update_tcp_stats(&t, stats);
-
+    tcp_stats_t *stats = get_tcp_stats(&t);
+    if (stats == NULL) {
+        return 0;
+    }
+    update_state_transitions(stats, (1 << state));
     return 0;
 }
 
@@ -657,8 +684,18 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-    handle_tcp_stats(&t, sk);
-    handle_message(&t, 0, 0, CONN_DIRECTION_INCOMING, 0, 0, PACKET_COUNT_NONE);
+    tcp_stats_t *ts = get_tcp_stats(&t);
+    if (ts == NULL) {
+        return 0;
+    }
+    update_rtt_from_sock(ts, sk);
+
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    set_direction(cs, CONN_DIRECTION_INCOMING);
+    update_timestamp(cs);
 
     port_binding_t pb = {};
     //pb.netns = t.netns;
@@ -835,6 +872,12 @@ int kretprobe__inet6_bind(struct pt_regs* ctx) {
 }
 
 //endregion
+
+    print_ip(skb_info.tup.daddr_h, skb_info.tup.daddr_l, skb_info.tup.dport, skb_info.tup.metadata);
+    log_debug("dir=%d\n", dir);
+
+    return 0;
+}
 
 // This function is meant to be used as a BPF_PROG_TYPE_SOCKET_FILTER.
 // When attached to a RAW_SOCKET, this code filters out everything but DNS traffic.

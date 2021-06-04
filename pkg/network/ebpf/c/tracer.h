@@ -48,10 +48,12 @@ typedef enum
     // Connection type
     CONN_TYPE_UDP = 0,
     CONN_TYPE_TCP = 1,
+    CONN_TYPE_MASK = 1,
 
     // Connection family
     CONN_V4 = 0 << 1,
     CONN_V6 = 1 << 1,
+    CONN_FAMILY_MASK = 1 << 1,
 } metadata_mask_t;
 
 typedef struct {
