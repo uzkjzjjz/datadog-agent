@@ -27,7 +27,6 @@ import (
 	filterpkg "github.com/DataDog/datadog-agent/pkg/network/filter"
 	"github.com/DataDog/datadog-agent/pkg/network/http"
 	"github.com/DataDog/datadog-agent/pkg/network/netlink"
-	"github.com/DataDog/datadog-agent/pkg/process/procutil"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -734,7 +733,7 @@ func (t *Tracer) removeEntries(mp, tcpMp *ebpf.Map, entries []*ConnTuple) {
 		}
 
 		// We have to remove the PID to remove the element from the TCP Map since we don't use the pid there
-		entries[i].pid = 0
+		//entries[i].pid = 0
 		// We can ignore the error for this map since it will not always contain the entry
 		_ = tcpMp.Delete(unsafe.Pointer(entries[i]))
 	}
@@ -753,8 +752,8 @@ func (t *Tracer) getTCPStats(mp *ebpf.Map, tuple *ConnTuple, seen map[ConnTuple]
 	}
 
 	// The PID isn't used as a key in the stats map, we will temporarily set it to 0 here and reset it when we're done
-	pid := tuple.pid
-	tuple.pid = 0
+	//pid := tuple.pid
+	//tuple.pid = 0
 
 	_ = mp.Lookup(unsafe.Pointer(tuple), unsafe.Pointer(stats))
 
@@ -766,7 +765,7 @@ func (t *Tracer) getTCPStats(mp *ebpf.Map, tuple *ConnTuple, seen map[ConnTuple]
 		seen[*tuple] = struct{}{}
 	}
 
-	tuple.pid = pid
+	//tuple.pid = pid
 	return stats
 }
 
@@ -924,9 +923,12 @@ func (t *Tracer) connectionExpired(conn *ConnTuple, latestTime uint64, stats *Co
 
 	// skip connection check for udp connections or if
 	// the pid for the connection is dead
-	if conn.isUDP() || !procutil.PidExists(int(conn.Pid())) {
+	if conn.isUDP() {
 		return true
 	}
+	//if !procutil.PidExists(int(conn.Pid())) {
+	//	return true
+	//}
 
 	exists, err := ctr.Exists(conn)
 	if err != nil {

@@ -62,8 +62,6 @@ typedef struct {
     __u64 daddr_l;
     __u16 sport;
     __u16 dport;
-    __u32 netns;
-    __u32 pid;
     // Metadata description:
     // First bit indicates if the connection is TCP (1) or UDP (0)
     // Second bit indicates if the connection is V6 (1) or V4 (0)

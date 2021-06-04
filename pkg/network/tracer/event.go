@@ -74,14 +74,14 @@ type ipRouteDest C.ip_route_dest_t
 
 func (t *ConnTuple) copy() *ConnTuple {
 	return &ConnTuple{
-		pid:      t.pid,
-		saddr_h:  t.saddr_h,
-		saddr_l:  t.saddr_l,
-		daddr_h:  t.daddr_h,
-		daddr_l:  t.daddr_l,
-		sport:    t.sport,
-		dport:    t.dport,
-		netns:    t.netns,
+		//pid:      t.pid,
+		saddr_h: t.saddr_h,
+		saddr_l: t.saddr_l,
+		daddr_h: t.daddr_h,
+		daddr_l: t.daddr_l,
+		sport:   t.sport,
+		dport:   t.dport,
+		//netns:    t.netns,
 		metadata: t.metadata,
 	}
 }
@@ -104,8 +104,8 @@ func connTupleFromConn(conn net.Conn, pid uint32, netns uint32) (*ConnTuple, err
 	dhost, dport := ipPortFromAddr(daddr)
 
 	ct := &ConnTuple{
-		netns: C.__u32(netns),
-		pid:   C.__u32(pid),
+		//netns: C.__u32(netns),
+		//pid:   C.__u32(pid),
 		sport: C.__u16(sport),
 		dport: C.__u16(dport),
 	}
@@ -154,8 +154,8 @@ func newConnTuple(pid int, netns uint32, saddr, daddr util.Address, sport, dport
 }
 
 func toConnTuple(ct *ConnTuple, pid int, netns uint32, saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) error {
-	ct.pid = C.__u32(pid)
-	ct.netns = C.__u32(netns)
+	//ct.pid = C.__u32(pid)
+	//ct.netns = C.__u32(netns)
 	ct.sport = C.__u16(sport)
 	ct.dport = C.__u16(dport)
 	ct.metadata = 0
@@ -230,24 +230,24 @@ func (t *ConnTuple) DestPort() uint16 {
 	return uint16(t.dport)
 }
 
-func (t *ConnTuple) Pid() uint32 {
-	return uint32(t.pid)
-}
+//func (t *ConnTuple) Pid() uint32 {
+//	return uint32(t.pid)
+//}
 
-func (t *ConnTuple) NetNS() uint64 {
-	return uint64(t.netns)
-}
+//func (t *ConnTuple) NetNS() uint64 {
+//	return uint64(t.netns)
+//}
 
 func (t *ConnTuple) String() string {
 	m := uint(t.metadata)
 	return fmt.Sprintf(
-		"[%s%s] [PID: %d] [%s ⇄ %s] (ns: %d)",
+		"[%s%s] [%s ⇄ %s]",
 		connType(m),
 		connFamily(m),
-		uint32(t.pid),
+		//uint32(t.pid),
 		t.SourceEndpoint(),
 		t.DestEndpoint(),
-		uint32(t.netns),
+		//uint32(t.netns),
 	)
 }
 
@@ -301,11 +301,11 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 	}
 
 	stats := network.ConnectionStats{
-		Pid:                  uint32(t.pid),
-		Type:                 connType(metadata),
-		Direction:            connDirection(uint8(s.direction)),
-		Family:               family,
-		NetNS:                uint32(t.netns),
+		//Pid:                  uint32(t.pid),
+		Type:      connType(metadata),
+		Direction: connDirection(uint8(s.direction)),
+		Family:    family,
+		//NetNS:                uint32(t.netns),
 		Source:               source,
 		Dest:                 dest,
 		SPort:                uint16(t.sport),

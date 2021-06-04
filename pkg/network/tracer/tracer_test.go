@@ -198,7 +198,7 @@ func TestTCPSendAndReceive(t *testing.T) {
 	assert.Equal(t, 10*clientMessageSize, int(conn.MonotonicSentBytes))
 	assert.Equal(t, 10*serverMessageSize, int(conn.MonotonicRecvBytes))
 	assert.Equal(t, 0, int(conn.MonotonicRetransmits))
-	assert.Equal(t, os.Getpid(), int(conn.Pid))
+	//assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, addrPort(server.address), int(conn.DPort))
 	assert.Equal(t, network.OUTGOING, conn.Direction)
 	assert.True(t, conn.IntraHost)
@@ -453,7 +453,7 @@ func TestTCPRetransmit(t *testing.T) {
 	assert.LessOrEqual(t, int(conn.MonotonicSentBytes), 100*clientMessageSize)
 	//assert.Equal(t, 100*clientMessageSize, int(conn.MonotonicSentBytes))
 	assert.True(t, int(conn.MonotonicRetransmits) > 0)
-	assert.Equal(t, os.Getpid(), int(conn.Pid))
+	//assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, addrPort(server.address), int(conn.DPort))
 }
 
@@ -1193,12 +1193,12 @@ func removeConnection(t *testing.T, tr *Tracer, c *network.ConnectionStats) {
 
 	tuple := []*ConnTuple{
 		{
-			pid:      _Ctype_uint(c.Pid),
-			saddr_l:  _Ctype_ulonglong(nativeEndian.Uint32(c.Source.Bytes())),
-			daddr_l:  _Ctype_ulonglong(nativeEndian.Uint32(c.Dest.Bytes())),
-			sport:    _Ctype_ushort(c.SPort),
-			dport:    _Ctype_ushort(c.DPort),
-			netns:    _Ctype_uint(c.NetNS),
+			//pid:      _Ctype_uint(c.Pid),
+			saddr_l: _Ctype_ulonglong(nativeEndian.Uint32(c.Source.Bytes())),
+			daddr_l: _Ctype_ulonglong(nativeEndian.Uint32(c.Dest.Bytes())),
+			sport:   _Ctype_ushort(c.SPort),
+			dport:   _Ctype_ushort(c.DPort),
+			//netns:    _Ctype_uint(c.NetNS),
 			metadata: 1, // TCP/IPv4
 		},
 	}
@@ -1590,7 +1590,7 @@ func testDNSStats(t *testing.T, domain string, success int, failure int, timeout
 	require.True(t, ok)
 
 	assert.Equal(t, queryMsg.Len(), int(conn.MonotonicSentBytes))
-	assert.Equal(t, os.Getpid(), int(conn.Pid))
+	//assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, dnsServerAddr.Port, int(conn.DPort))
 
 	// DNS Stats
@@ -2608,6 +2608,7 @@ func TestConnectionNotAssured(t *testing.T) {
 }
 
 func TestSelfConnect(t *testing.T) {
+	t.Skip("test requires PID as part of tuple")
 	// Enable BPF-based system probe
 	cfg := testConfig()
 	cfg.TCPConnTimeout = 3 * time.Second

@@ -52,7 +52,8 @@ func (cache *cachedConntrack) ExistsInRootNS(c *ConnTuple) (bool, error) {
 }
 
 func (cache *cachedConntrack) Exists(c *ConnTuple) (bool, error) {
-	return cache.exists(c, c.NetNS(), int(c.Pid()))
+	//return cache.exists(c, c.NetNS(), int(c.Pid()))
+	return cache.exists(c, 0, 1)
 }
 
 func (cache *cachedConntrack) exists(c *ConnTuple, netns uint64, pid int) (bool, error) {

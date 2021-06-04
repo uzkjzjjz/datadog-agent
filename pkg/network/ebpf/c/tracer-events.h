@@ -23,12 +23,9 @@ static __always_inline void cleanup_conn(conn_tuple_t *tup) {
     bool is_tcp = get_proto(&conn.tup) == CONN_TYPE_TCP;
     bool is_udp = get_proto(&conn.tup) == CONN_TYPE_UDP;
 
-    // TCP stats don't have the PID
     if (is_tcp) {
-        conn.tup.pid = 0;
         tst = bpf_map_lookup_elem(&tcp_stats, &(conn.tup));
         bpf_map_delete_elem(&tcp_stats, &(conn.tup));
-        conn.tup.pid = tup->pid;
 
         if (tst) {
             conn.tcp_stats = *tst;

@@ -194,7 +194,7 @@ func (e *ebpfConntracker) GetTranslationForConn(stats network.ConnectionStats) *
 	if err := toConnTupleFromConnectionStats(src, &stats); err != nil {
 		return nil
 	}
-	src.pid = 0
+	//src.pid = 0
 	log.Tracef("looking up in conntrack: %s", src)
 
 	dst := e.get(src)
@@ -243,7 +243,7 @@ func (e *ebpfConntracker) DeleteTranslation(stats network.ConnectionStats) {
 	if err := toConnTupleFromConnectionStats(key, &stats); err != nil {
 		return
 	}
-	key.pid = 0
+	//key.pid = 0
 
 	dst := e.get(key)
 	e.delete(key)

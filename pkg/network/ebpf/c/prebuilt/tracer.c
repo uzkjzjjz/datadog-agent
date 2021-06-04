@@ -193,12 +193,12 @@ static __always_inline bool check_family(struct sock* sk, u16 expected_family) {
  * are not overwritten. Returns 1 success, 0 otherwise.
  */
 static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock* skp, u64 pid_tgid, metadata_mask_t type) {
-    t->pid = pid_tgid >> 32;
+    //t->pid = pid_tgid >> 32;
     t->metadata = type;
 
     // Retrieve network namespace id first since addresses and ports may not be available for unconnected UDP
     // sends
-    t->netns = get_netns_from_sock(skp);
+    //t->netns = get_netns_from_sock(skp);
 
     // Retrieve addresses
     if (check_family(skp, AF_INET)) {
@@ -370,7 +370,7 @@ int kprobe__tcp_close(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-    log_debug("kprobe/tcp_close: netns: %u, sport: %u, dport: %u\n", t.netns, t.sport, t.dport);
+    log_debug("kprobe/tcp_close: sport: %u, dport: %u\n", t.sport, t.dport);
 
     cleanup_conn(&t);
     return 0;
@@ -661,12 +661,12 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
     handle_message(&t, 0, 0, CONN_DIRECTION_INCOMING, 0, 0, PACKET_COUNT_NONE);
 
     port_binding_t pb = {};
-    pb.netns = t.netns;
+    //pb.netns = t.netns;
     pb.port = t.sport;
     __u8 state = PORT_LISTENING;
     bpf_map_update_elem(&port_bindings, &pb, &state, BPF_NOEXIST);
 
-    log_debug("kretprobe/inet_csk_accept: netns: %u, sport: %u, dport: %u\n", t.netns, t.sport, t.dport);
+    log_debug("kretprobe/inet_csk_accept: sport: %u, dport: %u\n", t.sport, t.dport);
     return 0;
 }
 
@@ -680,7 +680,7 @@ int kprobe__inet_csk_listen_stop(struct pt_regs* ctx) {
     }
 
     port_binding_t t = {};
-    t.netns = get_netns_from_sock(sk);
+    //t.netns = get_netns_from_sock(sk);
     t.port = lport;
     bpf_map_delete_elem(&port_bindings, &t);
 
