@@ -291,10 +291,7 @@ static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* s
     update_rtt(ts, rtt, rtt_var);
 }
 
-SEC("kprobe/tcp_sendmsg")
-int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
-    struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
-    size_t size = (size_t)PT_REGS_PARM3(ctx);
+int handle_tcp_sendmsg(struct sock* skp, size_t size) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     log_debug("kprobe/tcp_sendmsg: pid_tgid: %d, size: %d\n", pid_tgid, size);
 
@@ -302,49 +299,34 @@ int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, skp, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-
     tcp_stats_t *ts = get_tcp_stats(&t);
     if (ts == NULL) {
         return 0;
     }
     update_rtt_from_sock(ts, skp);
 
-    conn_stats_ts_t *cs = get_conn_stats(&t);
-    if (cs == NULL) {
-        return 0;
-    }
-    add_sent_bytes(&t, cs, size);
-    infer_direction(&t, cs);
-    update_timestamp(cs);
+//    conn_stats_ts_t *cs = get_conn_stats(&t);
+//    if (cs == NULL) {
+//        return 0;
+//    }
+//    add_sent_bytes(&t, cs, size);
+//    infer_direction(&t, cs);
+//    update_timestamp(cs);
     return 0;
+}
+
+SEC("kprobe/tcp_sendmsg")
+int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
+    struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
+    size_t size = (size_t)PT_REGS_PARM3(ctx);
+    return handle_tcp_sendmsg(skp, size);
 }
 
 SEC("kprobe/tcp_sendmsg/pre_4_1_0")
 int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
-    struct sock* sk = (struct sock*)PT_REGS_PARM2(ctx);
+    struct sock* skp = (struct sock*)PT_REGS_PARM2(ctx);
     size_t size = (size_t)PT_REGS_PARM4(ctx);
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    log_debug("kprobe/tcp_sendmsg/pre_4_1_0: pid_tgid: %d, size: %d\n", pid_tgid, size);
-
-    conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
-        return 0;
-    }
-
-    tcp_stats_t *ts = get_tcp_stats(&t);
-    if (ts == NULL) {
-        return 0;
-    }
-    update_rtt_from_sock(ts, sk);
-
-    conn_stats_ts_t *cs = get_conn_stats(&t);
-    if (cs == NULL) {
-        return 0;
-    }
-    add_sent_bytes(&t, cs, size);
-    infer_direction(&t, cs);
-    update_timestamp(cs);
-    return 0;
+    return handle_tcp_sendmsg(skp, size);
 }
 
 SEC("kprobe/tcp_cleanup_rbuf")
