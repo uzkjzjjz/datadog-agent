@@ -736,7 +736,6 @@ func TestTCPCollectionDisabled(t *testing.T) {
 func TestUDPSendAndReceive(t *testing.T) {
 	// Enable BPF-based system probe
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
 	defer tr.Stop()
@@ -785,7 +784,6 @@ func TestUDPSendAndReceive(t *testing.T) {
 
 func TestUDPPeekCount(t *testing.T) {
 	config := testConfig()
-	config.BPFDebug = true
 	tr, err := NewTracer(config)
 	if err != nil {
 		t.Fatal(err)
@@ -2265,7 +2263,6 @@ func TestGatewayLookupEnabled(t *testing.T) {
 	cloud = m
 
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	cfg.EnableGatewayLookup = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
@@ -2314,7 +2311,6 @@ func TestGatewayLookupSubnetLookupError(t *testing.T) {
 	cloud = m
 
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	cfg.EnableGatewayLookup = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
@@ -2369,7 +2365,6 @@ func TestGatewayLookupCrossNamespace(t *testing.T) {
 	cloud = m
 
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	cfg.EnableGatewayLookup = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
@@ -2514,9 +2509,7 @@ func TestGatewayLookupCrossNamespace(t *testing.T) {
 }
 
 func TestConnectionAssured(t *testing.T) {
-
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, tr)
@@ -2567,9 +2560,7 @@ func TestConnectionAssured(t *testing.T) {
 }
 
 func TestConnectionNotAssured(t *testing.T) {
-
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, tr)
@@ -2615,7 +2606,6 @@ func TestConnectionNotAssured(t *testing.T) {
 func TestSelfConnect(t *testing.T) {
 	// Enable BPF-based system probe
 	cfg := testConfig()
-	cfg.BPFDebug = true
 	cfg.TCPConnTimeout = 3 * time.Second
 	tr, err := NewTracer(cfg)
 	require.NoError(t, err)
