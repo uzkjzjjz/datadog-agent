@@ -343,7 +343,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }
@@ -426,7 +426,7 @@ static __always_inline int handle_ip6_skb(struct sock* sk, size_t size, struct f
     }
 
     log_debug("kprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }
@@ -500,7 +500,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
 
     log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
 
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }
@@ -601,7 +601,7 @@ int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
 
     log_debug("kretprobe/udp_recvmsg: pid_tgid: %d, return: %d\n", pid_tgid, copied);
 
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }
@@ -671,7 +671,7 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
     }
     update_rtt_from_sock(ts, sk);
 
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }

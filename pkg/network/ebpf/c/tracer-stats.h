@@ -27,12 +27,16 @@ static __always_inline void _update_udp_conn_state(conn_stats_ts_t *cs, size_t s
 }
 
 static __always_inline conn_stats_ts_t *get_conn_stats(conn_tuple_t *t) {
+    return bpf_map_lookup_elem(&conn_stats, t);
+}
+
+static __always_inline conn_stats_ts_t *upsert_conn_stats(conn_tuple_t *t) {
     conn_stats_ts_t empty = {};
     __builtin_memset(&empty, 0, sizeof(conn_stats_ts_t));
     if (bpf_map_update_elem(&conn_stats, t, &empty, BPF_NOEXIST) == -E2BIG) {
         increment_telemetry_count(conn_stats_max_entries_hit);
     }
-    return bpf_map_lookup_elem(&conn_stats, t);
+    return get_conn_stats(t);
 }
 
 static __always_inline void add_sent_bytes(conn_tuple_t *t, conn_stats_ts_t *cs, size_t sent_bytes) {
