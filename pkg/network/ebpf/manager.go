@@ -60,7 +60,7 @@ func NewManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Ma
 		Probes: []*manager.Probe{
 			{Section: string(probes.TCPSendMsg)},
 			{Section: string(probes.TCPCleanupRBuf)},
-			{Section: string(probes.TCPClose)},
+			{Section: string(probes.TCPDestroySock)},
 			{Section: string(probes.TCPCloseReturn), KProbeMaxActive: maxActive},
 			{Section: string(probes.TCPSetState)},
 			{Section: string(probes.IPMakeSkb)},

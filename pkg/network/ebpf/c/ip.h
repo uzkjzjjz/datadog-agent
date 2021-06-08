@@ -27,10 +27,9 @@ static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff *skb, skb_info
     __builtin_memset(info, 0, sizeof(skb_info_t));
     info->data_off = ETH_HLEN;
 
-    __u16 l3_proto = load_half(skb, offsetof(struct ethhdr, h_proto));
     __u8 l4_proto = 0;
-    switch (l3_proto) {
-    case ETH_P_IP:
+    switch (skb->protocol) {
+    case bpf_htons(ETH_P_IP):
         l4_proto = load_byte(skb, info->data_off + offsetof(struct iphdr, protocol));
         info->tup.metadata |= CONN_V4;
         read_ipv4_skb(skb, info->data_off + offsetof(struct iphdr, saddr), &info->tup.saddr_l);
@@ -39,7 +38,7 @@ static __always_inline __u64 read_conn_tuple_skb(struct __sk_buff *skb, skb_info
         u8 iphdrLen = (load_byte(skb, info->data_off) & IPHDR_LEN) * 4;
         info->data_off += iphdrLen;
         break;
-    case ETH_P_IPV6:
+    case bpf_htons(ETH_P_IPV6):
         l4_proto = load_byte(skb, info->data_off + offsetof(struct ipv6hdr, nexthdr));
         info->tup.metadata |= CONN_V6;
         read_ipv6_skb(skb, info->data_off + offsetof(struct ipv6hdr, saddr), &info->tup.saddr_l, &info->tup.saddr_h);
