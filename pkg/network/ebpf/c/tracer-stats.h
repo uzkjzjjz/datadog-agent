@@ -4,6 +4,7 @@
 #include "tracer.h"
 
 static int read_conn_tuple(conn_tuple_t *t, struct sock *skp, u64 pid_tgid, metadata_mask_t type);
+static __u32 get_netns_from_sock(struct sock* sk);
 
 static __always_inline void _update_udp_conn_state(conn_stats_ts_t *cs, size_t sent_bytes, size_t recv_bytes) {
     if (cs->flags & CONN_ASSURED) {
@@ -107,13 +108,84 @@ static __always_inline void infer_direction(conn_tuple_t *t, conn_stats_ts_t *cs
     u8 *state = NULL;
     port_binding_t pb = {};
     pb.port = t->sport;
-    if (t->metadata & CONN_TYPE_TCP) {
-        //pb.netns = t->netns;
-        state = bpf_map_lookup_elem(&port_bindings, &pb);
-    } else {
+    switch (t->metadata & CONN_TYPE_MASK) {
+    case CONN_TYPE_TCP:
+        if (cs->netns != 0) {
+            pb.netns = cs->netns;
+            state = bpf_map_lookup_elem(&tcp_port_bindings, &pb);
+        }
+        break;
+
+    case CONN_TYPE_UDP:
         state = bpf_map_lookup_elem(&udp_port_bindings, &pb);
+        break;
     }
-    cs->direction = (state != NULL) ? CONN_DIRECTION_INCOMING : CONN_DIRECTION_OUTGOING;
+
+    if (state != NULL) {
+        log_debug("set dir=incoming\n");
+        cs->direction = CONN_DIRECTION_INCOMING;
+    }
+    //cs->direction = (state != NULL) ? CONN_DIRECTION_INCOMING : CONN_DIRECTION_OUTGOING;
+}
+
+static __always_inline void _add_port_binding(struct bpf_map_def *map, u32 port, u32 netns) {
+    if (port == 0) {
+        return;
+    }
+    u8 state = PORT_LISTENING;
+    port_binding_t pb = {};
+    pb.netns = netns;
+    pb.port = port;
+    bpf_map_update_elem(map, &pb, &state, BPF_NOEXIST);
+}
+
+static __always_inline void _delete_port_binding(struct bpf_map_def *map, u32 port, u32 netns) {
+    if (port == 0) {
+        return;
+    }
+    port_binding_t pb = {};
+    pb.netns = netns;
+    pb.port = port;
+    bpf_map_delete_elem(map, &pb);
+}
+
+static __always_inline void add_tcp_port_binding(u32 port, u32 netns) {
+    if (netns == 0) {
+        return;
+    }
+    _add_port_binding(&tcp_port_bindings, port, netns);
+}
+
+static __always_inline void delete_tcp_port_binding(u32 port, u32 netns) {
+    if (netns == 0) {
+        return;
+    }
+    _delete_port_binding(&tcp_port_bindings, port, netns);
+}
+
+static __always_inline void add_udp_port_binding(u32 port) {
+    _add_port_binding(&udp_port_bindings, port, 0);
+}
+
+static __always_inline void delete_udp_port_binding(u32 port) {
+    _delete_port_binding(&udp_port_bindings, port, 0);
+}
+
+static __always_inline void set_pid(conn_stats_ts_t *cs, u32 pid) {
+    if (pid <= 0) {
+        return;
+    }
+    log_debug("set pid=%u\n", pid);
+    cs->pid = pid;
+}
+
+static __always_inline void set_netns_from_sock(conn_stats_ts_t *cs, struct sock* sk) {
+    if (cs->netns != 0) {
+        return;
+    }
+    u32 netns = get_netns_from_sock(sk);
+    log_debug("set netns=%u\n", netns);
+    cs->netns = netns;
 }
 
 static __always_inline tcp_stats_t *get_tcp_stats(conn_tuple_t *t) {

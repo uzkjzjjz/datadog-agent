@@ -51,8 +51,8 @@ func getSnooper(
 			// These maps are unrelated to DNS but are getting set because the eBPF library loads all of them
 			string(probes.ConnMap):            {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 			string(probes.TcpStatsMap):        {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
-			string(probes.PortBindingsMap):    {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
-			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
+			string(probes.TCPPortBindingsMap): {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
+			string(probes.UDPPortBindingsMap): {Type: ebpf.Hash, MaxEntries: 1024, EditorFlag: manager.EditMaxEntries},
 		},
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,

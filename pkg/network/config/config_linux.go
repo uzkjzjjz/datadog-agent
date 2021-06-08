@@ -26,6 +26,7 @@ func (c *Config) EnabledProbes(runtimeTracer bool) (map[probes.ProbeName]struct{
 		}
 		enabled[probes.TCPCleanupRBuf] = struct{}{}
 		enabled[probes.TCPDestroySock] = struct{}{}
+		enabled[probes.TCPConnect] = struct{}{}
 		enabled[probes.TCPCloseReturn] = struct{}{}
 		enabled[probes.InetCskAcceptReturn] = struct{}{}
 		enabled[probes.InetCskListenStop] = struct{}{}

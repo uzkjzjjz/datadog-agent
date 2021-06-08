@@ -74,11 +74,10 @@ struct bpf_map_def SEC("maps/udp_recv_sock") udp_recv_sock = {
 
 /* This maps tracks listening TCP ports. Entries are added to the map via tracing the inet_csk_accept syscall.  The
  * key in the map is the network namespace inode together with the port and the value is a flag that
- * indicates if the port is listening or not. When the socket is destroyed (via tcp_v4_destroy_sock), we set the
- * value to be "port closed" to indicate that the port is no longer being listened on.  We leave the data in place
- * for the userspace side to read and clean up
+ * indicates if the port is listening or not. When the socket is no longer listening (via inet_csk_listen_stop),
+ * we delete the entry.
  */
-struct bpf_map_def SEC("maps/port_bindings") port_bindings = {
+struct bpf_map_def SEC("maps/tcp_port_bindings") tcp_port_bindings = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(port_binding_t),
     .value_size = sizeof(__u8),
@@ -87,7 +86,7 @@ struct bpf_map_def SEC("maps/port_bindings") port_bindings = {
     .namespace = "",
 };
 
-/* This behaves the same as port_bindings, except it tracks UDP ports.
+/* This behaves the same as tcp_port_bindings, except it tracks UDP ports.
  * Key: a port
  * Value: one of PORT_CLOSED, and PORT_OPEN
  */

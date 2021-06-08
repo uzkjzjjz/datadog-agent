@@ -291,24 +291,28 @@ static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* s
     update_rtt(ts, rtt, rtt_var);
 }
 
-int handle_tcp_sendmsg(struct sock* skp, size_t size) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     log_debug("kprobe/tcp_sendmsg: pid_tgid: %d, size: %d\n", pid_tgid, size);
 
+int handle_tcp_sendmsg(struct sock* sk, size_t size) {
     conn_tuple_t t = {};
     if (!read_conn_tuple(&t, skp, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
+
     tcp_stats_t *ts = get_tcp_stats(&t);
     if (ts == NULL) {
         return 0;
     }
-    update_rtt_from_sock(ts, skp);
+    update_rtt_from_sock(ts, sk);
 
-//    conn_stats_ts_t *cs = get_conn_stats(&t);
-//    if (cs == NULL) {
-//        return 0;
-//    }
+    conn_stats_ts_t *cs = get_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    set_pid(cs, bpf_get_current_pid_tgid() >> 32);
+    set_netns_from_sock(cs, sk);
+
 //    add_sent_bytes(&t, cs, size);
 //    infer_direction(&t, cs);
 //    update_timestamp(cs);
@@ -347,9 +351,8 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     if (cs == NULL) {
         return 0;
     }
-    add_recv_bytes(&t, cs, copied);
-    infer_direction(&t, cs);
-    update_timestamp(cs);
+    set_pid(cs, bpf_get_current_pid_tgid() >> 32);
+    set_netns_from_sock(cs, sk);
     return 0;
 }
 
@@ -365,7 +368,6 @@ int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
         return 0;
     }
     log_debug("kprobe/tcp_v4_destroy_sock: sport: %u, dport: %u\n", t.sport, t.dport);
-
     cleanup_conn(&t);
     return 0;
 }
@@ -628,10 +630,27 @@ int kprobe__tcp_retransmit_skb_pre_4_7_0(struct pt_regs* ctx) {
     return handle_retransmit(sk, 1);
 }
 
+SEC("kprobe/tcp_connect")
+int kprobe__tcp_connect(struct pt_regs* ctx) {
+    log_debug("kprobe/tcp_connect\n");
+    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+    conn_tuple_t t = {};
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
+        return 0;
+    }
+
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
+    if (cs == NULL) {
+        return 0;
+    }
+    set_pid(cs, bpf_get_current_pid_tgid() >> 32);
+    set_netns_from_sock(cs, sk);
+    return 0;
+}
+
 SEC("kprobe/tcp_set_state")
 int kprobe__tcp_set_state(struct pt_regs* ctx) {
     u8 state = (u8)PT_REGS_PARM2(ctx);
-
     // For now we're tracking only TCP_ESTABLISHED
     if (state != TCP_ESTABLISHED) {
         return 0;
@@ -665,6 +684,7 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
+
     tcp_stats_t *ts = get_tcp_stats(&t);
     if (ts == NULL) {
         return 0;
@@ -676,13 +696,9 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
         return 0;
     }
     set_direction(cs, CONN_DIRECTION_INCOMING);
+    set_netns_from_sock(cs, sk);
+    add_tcp_port_binding(t.sport, cs->netns);
     update_timestamp(cs);
-
-    port_binding_t pb = {};
-    //pb.netns = t.netns;
-    pb.port = t.sport;
-    __u8 state = PORT_LISTENING;
-    bpf_map_update_elem(&port_bindings, &pb, &state, BPF_NOEXIST);
 
     log_debug("kretprobe/inet_csk_accept: sport: %u, dport: %u\n", t.sport, t.dport);
     return 0;
@@ -697,12 +713,9 @@ int kprobe__inet_csk_listen_stop(struct pt_regs* ctx) {
         return 0;
     }
 
-    port_binding_t t = {};
-    //t.netns = get_netns_from_sock(sk);
-    t.port = lport;
-    bpf_map_delete_elem(&port_bindings, &t);
-
-    log_debug("kprobe/inet_csk_listen_stop: net ns: %u, lport: %u\n", t.netns, t.port);
+    u32 netns = get_netns_from_sock(sk);
+    delete_tcp_port_binding(lport, netns);
+    log_debug("kprobe/inet_csk_listen_stop: net ns: %u, lport: %u\n", netns, lport);
     return 0;
 }
 
@@ -730,11 +743,7 @@ int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
     // although we have net ns info, we don't use it in the key
     // since we don't have it everywhere for udp port bindings
     // (see sys_enter_bind/sys_exit_bind below)
-    port_binding_t t = {};
-    t.netns = 0;
-    t.port = lport;
-    bpf_map_delete_elem(&udp_port_bindings, &t);
-
+    delete_udp_port_binding(lport);
     log_debug("kprobe/udp_destroy_sock: port %d marked as closed\n", lport);
 
     return 0;
@@ -827,14 +836,8 @@ static __always_inline int sys_exit_bind(__s64 ret) {
         return 0;
     }
 
-    __u16 sin_port = args->port;
-    __u8 port_state = PORT_LISTENING;
-    port_binding_t t = {};
-    t.netns = 0; // don't have net ns info in this context
-    t.port = sin_port;
-    bpf_map_update_elem(&udp_port_bindings, &t, &port_state, BPF_ANY);
-    log_debug("sys_exit_bind: bound UDP port %u\n", sin_port);
-
+    add_udp_port_binding(args->port);
+    log_debug("sys_exit_bind: bound UDP port %u\n", args->port);
     return 0;
 }
 

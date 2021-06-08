@@ -41,6 +41,8 @@ const (
 	TCPDestroySock ProbeName = "kprobe/tcp_v4_destroy_sock"
 	// TCPCloseReturn traces the return of tcp_close() system call
 	TCPCloseReturn ProbeName = "kretprobe/tcp_close"
+	// TCPConnect traces the tcp_connect kernel function
+	TCPConnect ProbeName = "kprobe/tcp_connect"
 
 	// We use the following two probes for UDP sends
 	IPMakeSkb        ProbeName = "kprobe/ip_make_skb"
@@ -99,8 +101,8 @@ const (
 	TcpStatsMap           BPFMapName = "tcp_stats"
 	ConnCloseEventMap     BPFMapName = "conn_close_event"
 	TracerStatusMap       BPFMapName = "tracer_status"
-	PortBindingsMap       BPFMapName = "port_bindings"
-	UdpPortBindingsMap    BPFMapName = "udp_port_bindings"
+	TCPPortBindingsMap    BPFMapName = "tcp_port_bindings"
+	UDPPortBindingsMap    BPFMapName = "udp_port_bindings"
 	TelemetryMap          BPFMapName = "telemetry"
 	ConnCloseBatchMap     BPFMapName = "conn_close_batch"
 	HttpInFlightMap       BPFMapName = "http_in_flight"
