@@ -511,11 +511,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
 //
 // On UDP side, no similar function exists in all kernel versions, though we may be able to use something like
 // skb_consume_udp (v4.10+, https://elixir.bootlin.com/linux/v4.10/source/net/ipv4/udp.c#L1500)
-SEC("kprobe/udp_recvmsg")
-int kprobe__udp_recvmsg(struct pt_regs* ctx) {
-    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-    struct msghdr* msg = (struct msghdr*)PT_REGS_PARM2(ctx);
-    int flags = (int)PT_REGS_PARM5(ctx);
+int handle_udp_recvmsg(struct sock* sk, struct msghdr *msg, int flags) {
     log_debug("kprobe/udp_recvmsg: flags: %x\n", flags);
     if (flags & MSG_PEEK) {
         return 0;
@@ -534,27 +530,20 @@ int kprobe__udp_recvmsg(struct pt_regs* ctx) {
     return 0;
 }
 
+SEC("kprobe/udp_recvmsg")
+int kprobe__udp_recvmsg(struct pt_regs* ctx) {
+    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+    struct msghdr* msg = (struct msghdr*)PT_REGS_PARM2(ctx);
+    int flags = (int)PT_REGS_PARM5(ctx);
+    return handle_udp_recvmsg(sk, msg, flags);
+}
+
 SEC("kprobe/udp_recvmsg/pre_4_1_0")
 int kprobe__udp_recvmsg_pre_4_1_0(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM2(ctx);
     struct msghdr* msg = (struct msghdr*)PT_REGS_PARM3(ctx);
     int flags = (int)PT_REGS_PARM6(ctx);
-    log_debug("kprobe/udp_recvmsg: flags: %x\n", flags);
-    if (flags & MSG_PEEK) {
-        return 0;
-    }
-
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    udp_recv_sock_t t = { .sk = NULL, .msg = NULL };
-    if (sk) {
-        bpf_probe_read(&t.sk, sizeof(t.sk), &sk);
-    }
-    if (msg) {
-        bpf_probe_read(&t.msg, sizeof(t.msg), &msg);
-    }
-
-    bpf_map_update_elem(&udp_recv_sock, &pid_tgid, &t, BPF_ANY);
-    return 0;
+    return handle_udp_recvmsg(sk, msg, flags);
 }
 
 SEC("kretprobe/udp_recvmsg")
@@ -584,7 +573,6 @@ int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
     conn_tuple_t t = {};
     __builtin_memset(&t, 0, sizeof(conn_tuple_t));
     sockaddr_to_addr(sa, &t.daddr_h, &t.daddr_l, &t.dport);
-
     if (!read_conn_tuple_partial(&t, st->sk, CONN_TYPE_UDP)) {
         log_debug("ERR(kretprobe/udp_recvmsg): error reading conn tuple\n");
         return 0;
