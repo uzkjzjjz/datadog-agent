@@ -172,7 +172,7 @@ static __always_inline void delete_udp_port_binding(u32 port) {
 }
 
 static __always_inline void set_pid(conn_stats_ts_t *cs, u32 pid) {
-    if (pid <= 0) {
+    if (pid == 0 || cs->pid != 0) {
         return;
     }
     log_debug("set pid=%u\n", pid);
@@ -184,8 +184,10 @@ static __always_inline void set_netns_from_sock(conn_stats_ts_t *cs, struct sock
         return;
     }
     u32 netns = get_netns_from_sock(sk);
-    log_debug("set netns=%u\n", netns);
-    cs->netns = netns;
+    if (netns != 0) {
+        log_debug("set netns=%u\n", netns);
+        cs->netns = netns;
+    }
 }
 
 static __always_inline tcp_stats_t *get_tcp_stats(conn_tuple_t *t) {
