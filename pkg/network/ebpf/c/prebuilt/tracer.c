@@ -353,19 +353,18 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     return 0;
 }
 
-SEC("kprobe/tcp_close")
-int kprobe__tcp_close(struct pt_regs* ctx) {
-    struct sock* sk;
-    conn_tuple_t t = {};
+// this is called for both IPv4 and IPv6
+SEC("kprobe/tcp_v4_destroy_sock")
+int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
+    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
-    sk = (struct sock*)PT_REGS_PARM1(ctx);
+    conn_tuple_t t = {};
 
-    // Get network namespace id
-    log_debug("kprobe/tcp_close: tgid: %u, pid: %u\n", pid_tgid >> 32, pid_tgid & 0xFFFFFFFF);
+    log_debug("kprobe/tcp_v4_destroy_sock: tgid: %u, pid: %u\n", pid_tgid >> 32, pid_tgid & 0xFFFFFFFF);
     if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
         return 0;
     }
-    log_debug("kprobe/tcp_close: sport: %u, dport: %u\n", t.sport, t.dport);
+    log_debug("kprobe/tcp_v4_destroy_sock: sport: %u, dport: %u\n", t.sport, t.dport);
 
     cleanup_conn(&t);
     return 0;

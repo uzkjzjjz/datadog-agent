@@ -37,8 +37,8 @@ const (
 
 	// TCPCleanupRBuf traces the tcp_cleanup_rbuf() system call
 	TCPCleanupRBuf ProbeName = "kprobe/tcp_cleanup_rbuf"
-	// TCPClose traces the tcp_close() system call
-	TCPClose ProbeName = "kprobe/tcp_close"
+	// TCPDestroySock traces the tcp_v4_destroy_sock() system call
+	TCPDestroySock ProbeName = "kprobe/tcp_v4_destroy_sock"
 	// TCPCloseReturn traces the return of tcp_close() system call
 	TCPCloseReturn ProbeName = "kretprobe/tcp_close"
 
