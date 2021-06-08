@@ -290,7 +290,7 @@ static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* s
     update_rtt(ts, rtt, rtt_var);
 }
 
-int handle_tcp_sendmsg(struct sock* sk, size_t size) {
+static __always_inline int handle_tcp_sendmsg(struct sock* sk, size_t size) {
     log_debug("kprobe/tcp_sendmsg: size: %d\n", size);
     conn_tuple_t t = {};
     if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
@@ -303,7 +303,7 @@ int handle_tcp_sendmsg(struct sock* sk, size_t size) {
     }
     update_rtt_from_sock(ts, sk);
 
-    conn_stats_ts_t *cs = get_conn_stats(&t);
+    conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
     }
