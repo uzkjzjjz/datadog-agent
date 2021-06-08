@@ -333,12 +333,6 @@ int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
 SEC("kprobe/tcp_cleanup_rbuf")
 int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-    int copied = (int)PT_REGS_PARM2(ctx);
-    if (copied < 0) {
-        return 0;
-    }
-    log_debug("kprobe/tcp_cleanup_rbuf: copied: %d\n", copied);
-
     conn_tuple_t t = {};
     if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
