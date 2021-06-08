@@ -3,7 +3,7 @@
 
 #include "tracer.h"
 
-static int read_conn_tuple(conn_tuple_t *t, struct sock *skp, u64 pid_tgid, metadata_mask_t type);
+static int read_conn_tuple(conn_tuple_t *t, struct sock *skp, metadata_mask_t type);
 static __u32 get_netns_from_sock(struct sock* sk);
 
 static __always_inline void _update_udp_conn_state(conn_stats_ts_t *cs, size_t sent_bytes, size_t recv_bytes) {
@@ -221,8 +221,7 @@ static __always_inline void update_state_transitions(tcp_stats_t *t, u16 transit
 
 static __always_inline int handle_retransmit(struct sock *sk, int segs) {
     conn_tuple_t t = {};
-    u64 zero = 0;
-    if (!read_conn_tuple(&t, sk, zero, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
     tcp_stats_t *stats = get_tcp_stats(&t);

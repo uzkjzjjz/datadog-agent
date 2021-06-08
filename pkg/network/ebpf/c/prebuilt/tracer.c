@@ -192,8 +192,7 @@ static __always_inline bool check_family(struct sock* sk, u16 expected_family) {
  * Reads values into a `conn_tuple_t` from a `sock`. Any values that are already set in conn_tuple_t
  * are not overwritten. Returns 1 success, 0 otherwise.
  */
-static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock* skp, u64 pid_tgid, metadata_mask_t type) {
-    //t->pid = pid_tgid >> 32;
+static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock* skp, metadata_mask_t type) {
     t->metadata = type;
 
     // Retrieve network namespace id first since addresses and ports may not be available for unconnected UDP
@@ -278,9 +277,9 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
 /**
  * Reads values into a `conn_tuple_t` from a `sock`. Initializes all values in conn_tuple_t to `0`. Returns 1 success, 0 otherwise.
  */
-static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, u64 pid_tgid, metadata_mask_t type) {
+static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, metadata_mask_t type) {
     __builtin_memset(t, 0, sizeof(conn_tuple_t));
-    return read_conn_tuple_partial(t, skp, pid_tgid, type);
+    return read_conn_tuple_partial(t, skp, type);
 }
 
 static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* sk) {
@@ -291,12 +290,10 @@ static __always_inline void update_rtt_from_sock(tcp_stats_t *ts, struct sock* s
     update_rtt(ts, rtt, rtt_var);
 }
 
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    log_debug("kprobe/tcp_sendmsg: pid_tgid: %d, size: %d\n", pid_tgid, size);
-
 int handle_tcp_sendmsg(struct sock* sk, size_t size) {
+    log_debug("kprobe/tcp_sendmsg: size: %d\n", size);
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, skp, pid_tgid, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
 
@@ -321,16 +318,16 @@ int handle_tcp_sendmsg(struct sock* sk, size_t size) {
 
 SEC("kprobe/tcp_sendmsg")
 int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
-    struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
+    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     size_t size = (size_t)PT_REGS_PARM3(ctx);
-    return handle_tcp_sendmsg(skp, size);
+    return handle_tcp_sendmsg(sk, size);
 }
 
 SEC("kprobe/tcp_sendmsg/pre_4_1_0")
 int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
-    struct sock* skp = (struct sock*)PT_REGS_PARM2(ctx);
+    struct sock* sk = (struct sock*)PT_REGS_PARM2(ctx);
     size_t size = (size_t)PT_REGS_PARM4(ctx);
-    return handle_tcp_sendmsg(skp, size);
+    return handle_tcp_sendmsg(sk, size);
 }
 
 SEC("kprobe/tcp_cleanup_rbuf")
@@ -340,13 +337,13 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     if (copied < 0) {
         return 0;
     }
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    log_debug("kprobe/tcp_cleanup_rbuf: pid_tgid: %d, copied: %d\n", pid_tgid, copied);
+    log_debug("kprobe/tcp_cleanup_rbuf: copied: %d\n", copied);
 
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
+
     conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
@@ -360,11 +357,8 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
 SEC("kprobe/tcp_v4_destroy_sock")
 int kprobe__tcp_v4_destroy_sock(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-    u64 pid_tgid = bpf_get_current_pid_tgid();
     conn_tuple_t t = {};
-
-    log_debug("kprobe/tcp_v4_destroy_sock: tgid: %u, pid: %u\n", pid_tgid >> 32, pid_tgid & 0xFFFFFFFF);
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
     log_debug("kprobe/tcp_v4_destroy_sock: sport: %u, dport: %u\n", t.sport, t.dport);
@@ -379,11 +373,10 @@ int kretprobe__tcp_close(struct pt_regs* ctx) {
 }
 
 static __always_inline int handle_ip6_skb(struct sock* sk, size_t size, struct flowi6* fl6) {
-    u64 pid_tgid = bpf_get_current_pid_tgid();
     size = size - sizeof(struct udphdr);
 
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_UDP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_UDP)) {
         if (!are_fl6_offsets_known()) {
             log_debug("ERR: src/dst addr not set, fl6 offsets are not known\n");
             increment_telemetry_count(udp_send_missed);
@@ -427,7 +420,7 @@ static __always_inline int handle_ip6_skb(struct sock* sk, size_t size, struct f
         t.dport = ntohs(t.dport);
     }
 
-    log_debug("kprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
+    log_debug("kprobe/ip6_make_skb: size: %d\n", size);
     conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
         return 0;
@@ -465,12 +458,10 @@ SEC("kprobe/ip_make_skb")
 int kprobe__ip_make_skb(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     size_t size = (size_t)PT_REGS_PARM5(ctx);
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-
     size = size - sizeof(struct udphdr);
 
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_UDP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_UDP)) {
         if (!are_fl4_offsets_known()) {
             log_debug("ERR: src/dst addr not set src:%d,dst:%d. fl4 offsets are not known\n", t.saddr_l, t.daddr_l);
             increment_telemetry_count(udp_send_missed);
@@ -500,7 +491,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
         t.dport = ntohs(t.dport);
     }
 
-    log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
+    log_debug("kprobe/ip_send_skb: size: %d\n", size);
 
     conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
@@ -568,20 +559,18 @@ int kprobe__udp_recvmsg_pre_4_1_0(struct pt_regs* ctx) {
 
 SEC("kretprobe/udp_recvmsg")
 int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-
     // Retrieve socket pointer from kprobe via pid/tgid
+    u64 pid_tgid = bpf_get_current_pid_tgid();
     udp_recv_sock_t* st = bpf_map_lookup_elem(&udp_recv_sock, &pid_tgid);
-    if (!st) { // Missed entry
+    if (!st) {
         return 0;
     }
-
     // Make sure we clean up the key
     bpf_map_delete_elem(&udp_recv_sock, &pid_tgid);
 
     int copied = (int)PT_REGS_RC(ctx);
     if (copied < 0) { // Non-zero values are errors (or a peek) (e.g -EINVAL)
-        log_debug("kretprobe/udp_recvmsg: ret=%d < 0, pid_tgid=%d\n", copied, pid_tgid);
+        log_debug("kretprobe/udp_recvmsg: ret=%d < 0\n", copied);
         return 0;
     }
 
@@ -596,12 +585,12 @@ int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
     __builtin_memset(&t, 0, sizeof(conn_tuple_t));
     sockaddr_to_addr(sa, &t.daddr_h, &t.daddr_l, &t.dport);
 
-    if (!read_conn_tuple_partial(&t, st->sk, pid_tgid, CONN_TYPE_UDP)) {
-        log_debug("ERR(kretprobe/udp_recvmsg): error reading conn tuple, pid_tgid=%d\n", pid_tgid);
+    if (!read_conn_tuple_partial(&t, st->sk, CONN_TYPE_UDP)) {
+        log_debug("ERR(kretprobe/udp_recvmsg): error reading conn tuple\n");
         return 0;
     }
 
-    log_debug("kretprobe/udp_recvmsg: pid_tgid: %d, return: %d\n", pid_tgid, copied);
+    log_debug("kretprobe/udp_recvmsg: return: %d\n", copied);
 
     conn_stats_ts_t *cs = upsert_conn_stats(&t);
     if (cs == NULL) {
@@ -657,11 +646,11 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
     }
 
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
-    u64 pid_tgid = bpf_get_current_pid_tgid();
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
+
     tcp_stats_t *stats = get_tcp_stats(&t);
     if (stats == NULL) {
         return 0;
@@ -676,12 +665,10 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
     if (sk == NULL) {
         return 0;
     }
-
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    log_debug("kretprobe/inet_csk_accept: tgid: %u, pid: %u\n", pid_tgid >> 32, pid_tgid & 0xFFFFFFFF);
+    log_debug("kretprobe/inet_csk_accept\n");
 
     conn_tuple_t t = {};
-    if (!read_conn_tuple(&t, sk, pid_tgid, CONN_TYPE_TCP)) {
+    if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
 
@@ -723,8 +710,7 @@ SEC("kprobe/udp_destroy_sock")
 int kprobe__udp_destroy_sock(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     conn_tuple_t tup = {};
-     u64 pid_tgid = bpf_get_current_pid_tgid();
-    int valid_tuple = read_conn_tuple(&tup, sk, pid_tgid, CONN_TYPE_UDP);
+    int valid_tuple = read_conn_tuple(&tup, sk, CONN_TYPE_UDP);
 
     __u16 lport = 0;
     if (valid_tuple) {
@@ -758,7 +744,7 @@ int kretprobe__udp_destroy_sock(struct pt_regs * ctx) {
 //region sys_enter_bind
 
 static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* addr) {
-    __u64 tid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
 
     __u16 type = 0;
     bpf_probe_read(&type, sizeof(__u16), &sock->type);
@@ -767,7 +753,7 @@ static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* 
     }
 
     if (addr == NULL) {
-        log_debug("sys_enter_bind: could not read sockaddr, sock=%llx, tid=%u\n", sock, tid);
+        log_debug("sys_enter_bind: could not read sockaddr, sock=%llx, pid_tgid=%u\n", sock, pid_tgid);
         return 0;
     }
 
@@ -790,8 +776,8 @@ static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* 
     bind_syscall_args_t args = {};
     args.port = sin_port;
 
-    bpf_map_update_elem(&pending_bind, &tid, &args, BPF_ANY);
-    log_debug("sys_enter_bind: started a bind on UDP port=%d sock=%llx tid=%u\n", sin_port, sock, tid);
+    bpf_map_update_elem(&pending_bind, &pid_tgid, &args, BPF_ANY);
+    log_debug("sys_enter_bind: started a bind on UDP port=%d sock=%llx pid_tgid=%u\n", sin_port, sock, pid_tgid);
 
     return 0;
 }
@@ -817,21 +803,17 @@ int kprobe__inet6_bind(struct pt_regs* ctx) {
 //region sys_exit_bind
 
 static __always_inline int sys_exit_bind(__s64 ret) {
-    __u64 tid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    log_debug("sys_exit_bind: pid_tgid=%u, ret=%d\n", pid_tgid, ret);
 
     // bail if this bind() is not the one we're instrumenting
-    bind_syscall_args_t* args;
-    args = bpf_map_lookup_elem(&pending_bind, &tid);
-
-    log_debug("sys_exit_bind: tid=%u, ret=%d\n", tid, ret);
-
+    bind_syscall_args_t* args = bpf_map_lookup_elem(&pending_bind, &pid_tgid);
     if (args == NULL) {
         log_debug("sys_exit_bind: was not a UDP bind, will not process\n");
         return 0;
     }
 
-    bpf_map_delete_elem(&pending_bind, &tid);
-
+    bpf_map_delete_elem(&pending_bind, &pid_tgid);
     if (ret != 0) {
         return 0;
     }
