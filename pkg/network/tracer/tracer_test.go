@@ -213,9 +213,10 @@ func TestPreexistingConnectionDirection(t *testing.T) {
 
 	server := NewTCPServer(func(c net.Conn) {
 		r := bufio.NewReader(c)
-		_, _ = r.ReadBytes(byte('\n'))
-		_, _ = c.Write(genPayload(serverMessageSize))
-		_ = c.Close()
+		for {
+			_, _ = r.ReadBytes(byte('\n'))
+			_, _ = c.Write(genPayload(serverMessageSize))
+		}
 	})
 	err := server.Run(doneChan)
 	require.NoError(t, err)
@@ -224,21 +225,25 @@ func TestPreexistingConnectionDirection(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = c.Close() }()
 
-	if _, err = c.Write(genPayload(clientMessageSize)); err != nil {
-		t.Fatal(err)
-	}
+	_, err = c.Write(genPayload(clientMessageSize))
+	require.NoError(t, err)
 
 	// Enable BPF-based system probe
 	tr, err := NewTracer(testConfig())
 	require.NoError(t, err)
 	defer tr.Stop()
 
+	// warmup
+	_ = getConnections(t, tr)
+
 	// Write more data so that the tracer will notice the connection
 	_, err = c.Write(genPayload(clientMessageSize))
 	require.NoError(t, err)
 
 	r := bufio.NewReader(c)
-	_, _ = r.ReadBytes(byte('\n'))
+	n, err := r.ReadBytes(byte('\n'))
+	require.NoError(t, err)
+	require.Equal(t, serverMessageSize, len(n))
 
 	connections := getConnections(t, tr)
 
