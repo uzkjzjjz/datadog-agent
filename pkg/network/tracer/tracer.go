@@ -157,8 +157,8 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		MapSpecEditors: map[string]manager.MapSpecEditor{
 			string(probes.ConnMap):            {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			string(probes.TcpStatsMap):        {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			string(probes.PortBindingsMap):    {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			string(probes.TCPPortBindingsMap): {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			string(probes.UDPPortBindingsMap): {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 		},
 	}
 
@@ -305,7 +305,7 @@ func initializePortBindingMaps(config *config.Config, m *manager.Manager) error 
 	if tcpPorts, err := network.ReadInitialState(config.ProcRoot, network.TCP, config.CollectIPv6Conns); err != nil {
 		return fmt.Errorf("failed to read initial TCP pid->port mapping: %s", err)
 	} else {
-		tcpPortMap, _, err := m.GetMap(string(probes.PortBindingsMap))
+		tcpPortMap, _, err := m.GetMap(string(probes.TCPPortBindingsMap))
 		if err != nil {
 			return fmt.Errorf("failed to get TCP port binding map: %w", err)
 		}
@@ -323,7 +323,7 @@ func initializePortBindingMaps(config *config.Config, m *manager.Manager) error 
 	if udpPorts, err := network.ReadInitialState(config.ProcRoot, network.UDP, config.CollectIPv6Conns); err != nil {
 		return fmt.Errorf("failed to read initial UDP pid->port mapping: %s", err)
 	} else {
-		udpPortMap, _, err := m.GetMap(string(probes.UdpPortBindingsMap))
+		udpPortMap, _, err := m.GetMap(string(probes.UDPPortBindingsMap))
 		if err != nil {
 			return fmt.Errorf("failed to get UDP port binding map: %w", err)
 		}
