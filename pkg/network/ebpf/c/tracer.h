@@ -14,7 +14,7 @@ typedef enum
     CONN_DIRECTION_OUTGOING = 0b10,
 } conn_direction_t;
 
-typedef enum 
+typedef enum
 {
     PACKET_COUNT_NONE = 0,
     PACKET_COUNT_ABSOLUTE = 1,
@@ -165,12 +165,5 @@ typedef struct {
     __u32 netns;
     __u16 family;
 } ip_route_dest_t;
-
-typedef struct {
-    __u64 gw_h;
-    __u64 gw_l;
-    __u16 family;
-    __u32 ifindex;
-} ip_route_gateway_t;
 
 #endif
