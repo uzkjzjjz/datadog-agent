@@ -58,13 +58,7 @@ type portBindingTuple C.port_binding_t
 
 */
 
-/* ip_route_dest_t
-__u64 daddr_h;
-__u64 daddr_l;
-__u32 netns;
-__u16 family;
 */
-type ipRouteDest C.ip_route_dest_t
 
 func (t *ConnTuple) copy() *ConnTuple {
 	return &ConnTuple{
