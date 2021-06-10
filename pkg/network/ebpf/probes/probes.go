@@ -58,7 +58,7 @@ const (
 
 	// UDPDestroySock traces the udp_destroy_sock() function
 	UDPDestroySock ProbeName = "kprobe/udp_destroy_sock"
-	// UDPDestroySockrReturn traces the return of the udp_destroy_sock() system call
+	// UDPDestroySockReturn traces the return of the udp_destroy_sock() system call
 	UDPDestroySockReturn ProbeName = "kretprobe/udp_destroy_sock"
 
 	// TCPRetransmit traces the return value for the tcp_retransmit_skb() system call
@@ -73,9 +73,9 @@ const (
 	// Inet6Bind is the kprobe of the bind() syscall for IPv6
 	Inet6Bind ProbeName = "kprobe/inet6_bind"
 
-	// InetBind is the kretprobe of the bind() syscall for IPv4
+	// InetBindRet is the kretprobe of the bind() syscall for IPv4
 	InetBindRet ProbeName = "kretprobe/inet_bind"
-	// Inet6Bind is the kretprobe of the bind() syscall for IPv6
+	// Inet6BindRet is the kretprobe of the bind() syscall for IPv6
 	Inet6BindRet ProbeName = "kretprobe/inet6_bind"
 
 	// SocketDnsFilter is the socket probe for dns
