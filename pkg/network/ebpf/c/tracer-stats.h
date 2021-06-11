@@ -190,35 +190,35 @@ static __always_inline void set_netns_from_sock(conn_stats_ts_t *cs, struct sock
     }
 }
 
-static __always_inline tcp_stats_t *get_tcp_stats(conn_tuple_t *t) {
+static __always_inline tcp_stats_t *upsert_tcp_stats(conn_tuple_t *t) {
     // initialize-if-no-exist the connection state, and load it
     tcp_stats_t empty = {};
     bpf_map_update_elem(&tcp_stats, t, &empty, BPF_NOEXIST);
     return bpf_map_lookup_elem(&tcp_stats, t);
 }
 
-static __always_inline void update_retransmits(tcp_stats_t *t, u32 retransmits) {
+static __always_inline void update_retransmits(tcp_stats_t *ts, u32 retransmits) {
     if (retransmits <= 0) {
         return;
     }
-    __sync_fetch_and_add(&t->retransmits, retransmits);
+    __sync_fetch_and_add(&ts->retransmits, retransmits);
 }
 
-static __always_inline void update_rtt(tcp_stats_t *t, u32 rtt, u32 rtt_var) {
+static __always_inline void update_rtt(tcp_stats_t *ts, u32 rtt, u32 rtt_var) {
     if (rtt <= 0) {
         return;
     }
     // For more information on the bit shift operations see:
     // https://elixir.bootlin.com/linux/v4.6/source/net/ipv4/tcp.c#L2686
-    t->rtt = rtt >> 3;
-    t->rtt_var = rtt_var >> 2;
+    ts->rtt = rtt >> 3;
+    ts->rtt_var = rtt_var >> 2;
 }
 
-static __always_inline void update_state_transitions(tcp_stats_t *t, u16 transitions) {
+static __always_inline void update_state_transitions(tcp_stats_t *ts, u16 transitions) {
     if (transitions <= 0) {
         return;
     }
-    t->state_transitions |= transitions;
+    ts->state_transitions |= transitions;
 }
 
 static __always_inline int handle_retransmit(struct sock *sk, int segs) {
@@ -226,11 +226,11 @@ static __always_inline int handle_retransmit(struct sock *sk, int segs) {
     if (!read_conn_tuple(&t, sk, CONN_TYPE_TCP)) {
         return 0;
     }
-    tcp_stats_t *stats = get_tcp_stats(&t);
-    if (stats == NULL) {
+    tcp_stats_t *ts = upsert_tcp_stats(&t);
+    if (ts == NULL) {
         return 0;
     }
-    update_retransmits(stats, segs);
+    update_retransmits(ts, segs);
     return 0;
 }
 

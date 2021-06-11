@@ -297,7 +297,7 @@ static __always_inline int handle_tcp_sendmsg(struct sock* sk, size_t size) {
         return 0;
     }
 
-    tcp_stats_t *ts = get_tcp_stats(&t);
+    tcp_stats_t *ts = upsert_tcp_stats(&t);
     if (ts == NULL) {
         return 0;
     }
@@ -633,11 +633,11 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
         return 0;
     }
 
-    tcp_stats_t *stats = get_tcp_stats(&t);
-    if (stats == NULL) {
+    tcp_stats_t *ts = upsert_tcp_stats(&t);
+    if (ts == NULL) {
         return 0;
     }
-    update_state_transitions(stats, (1 << state));
+    update_state_transitions(ts, (1 << state));
     return 0;
 }
 
@@ -654,7 +654,7 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
         return 0;
     }
 
-    tcp_stats_t *ts = get_tcp_stats(&t);
+    tcp_stats_t *ts = upsert_tcp_stats(&t);
     if (ts == NULL) {
         return 0;
     }

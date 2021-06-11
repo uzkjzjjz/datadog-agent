@@ -9,6 +9,8 @@
 
 #include "bpf_helpers.h"
 
+static void update_state_transitions(tcp_stats_t *ts, u16 transitions);
+
 static __always_inline int get_proto(conn_tuple_t *t) {
     return (t->metadata & CONN_TYPE_TCP) ? CONN_TYPE_TCP : CONN_TYPE_UDP;
 }
@@ -18,20 +20,20 @@ static __always_inline void cleanup_conn(conn_tuple_t *tup) {
 
     // Will hold the full connection data to send through the perf buffer
     conn_t conn = { .tup = *tup };
-    tcp_stats_t *tst = NULL;
+    tcp_stats_t *ts = NULL;
     conn_stats_ts_t *cst = NULL;
     bool is_tcp = get_proto(&conn.tup) == CONN_TYPE_TCP;
     bool is_udp = get_proto(&conn.tup) == CONN_TYPE_UDP;
 
     if (is_tcp) {
-        tst = bpf_map_lookup_elem(&tcp_stats, &(conn.tup));
+        ts = bpf_map_lookup_elem(&tcp_stats, &(conn.tup));
         bpf_map_delete_elem(&tcp_stats, &(conn.tup));
 
-        if (tst) {
-            conn.tcp_stats = *tst;
+        if (ts) {
+            conn.tcp_stats = *ts;
         }
 
-        conn.tcp_stats.state_transitions |= (1 << TCP_CLOSE);
+        update_state_transitions(&conn.tcp_stats, 1 << TCP_CLOSE);
     }
 
     cst = bpf_map_lookup_elem(&conn_stats, &(conn.tup));

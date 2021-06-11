@@ -151,8 +151,8 @@ static __always_inline void handle_tcp_stats(conn_tuple_t* t, struct sock* skp) 
     bpf_probe_read(&rtt_var, sizeof(rtt_var), &tcp_sk(skp)->mdev_us);
 
  
-    tcp_stats_t stats = { .retransmits = 0, .rtt = rtt, .rtt_var = rtt_var };
-    update_tcp_stats(t, stats);
+    tcp_stats_t ts = { .retransmits = 0, .rtt = rtt, .rtt_var = rtt_var };
+    update_tcp_stats(t, ts);
 }
 
 static __always_inline void get_tcp_segment_counts(struct sock* skp, __u32* packets_in, __u32* packets_out) {
@@ -438,8 +438,8 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
         return 0;
     }
 
-    tcp_stats_t stats = { .state_transitions = (1 << state) };
-    update_tcp_stats(&t, stats);
+    tcp_stats_t ts = { .state_transitions = (1 << state) };
+    update_tcp_stats(&t, ts);
 
     return 0;
 }
