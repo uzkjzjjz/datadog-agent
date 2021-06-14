@@ -732,8 +732,6 @@ func (t *Tracer) removeEntries(mp, tcpMp *ebpf.Map, entries []*ConnTuple) {
 			keys = append(keys, string(bk))
 		}
 
-		// We have to remove the PID to remove the element from the TCP Map since we don't use the pid there
-		//entries[i].pid = 0
 		// We can ignore the error for this map since it will not always contain the entry
 		_ = tcpMp.Delete(unsafe.Pointer(entries[i]))
 	}
@@ -751,10 +749,6 @@ func (t *Tracer) getTCPStats(mp *ebpf.Map, tuple *ConnTuple, seen map[ConnTuple]
 		return stats
 	}
 
-	// The PID isn't used as a key in the stats map, we will temporarily set it to 0 here and reset it when we're done
-	//pid := tuple.pid
-	//tuple.pid = 0
-
 	_ = mp.Lookup(unsafe.Pointer(tuple), unsafe.Pointer(stats))
 
 	// This is required to avoid (over)reporting retransmits for connections sharing the same socket.
@@ -765,7 +759,6 @@ func (t *Tracer) getTCPStats(mp *ebpf.Map, tuple *ConnTuple, seen map[ConnTuple]
 		seen[*tuple] = struct{}{}
 	}
 
-	//tuple.pid = pid
 	return stats
 }
 
@@ -926,11 +919,11 @@ func (t *Tracer) connectionExpired(conn *ConnTuple, latestTime uint64, stats *Co
 	if conn.isUDP() {
 		return true
 	}
-	//if !procutil.PidExists(int(conn.Pid())) {
-	//	return true
-	//}
+	if !procutil.PidExists(int(stats.pid)) {
+		return true
+	}
 
-	exists, err := ctr.Exists(conn)
+	exists, err := ctr.Exists(conn, uint64(stats.netns), int(stats.pid))
 	if err != nil {
 		log.Warnf("error checking conntrack for connection %s: %s", conn, err)
 	}

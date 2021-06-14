@@ -91,7 +91,7 @@ func TestCachedConntrackExists(t *testing.T) {
 	daddr := util.AddressFromString("2.3.4.5")
 	var sport uint16 = 23
 	var dport uint16 = 223
-	ct := newConnTuple(os.Getpid(), 1234, saddr, daddr, sport, dport, network.TCP)
+	ct := newConnTuple(saddr, daddr, sport, dport, network.TCP)
 
 	m.EXPECT().Exists(gomock.Not(gomock.Nil())).Times(1).DoAndReturn(func(c *netlink.Con) (bool, error) {
 		require.Equal(t, saddr.String(), c.Origin.Src.String())
@@ -102,7 +102,7 @@ func TestCachedConntrackExists(t *testing.T) {
 		return true, nil
 	})
 
-	exists, err := cache.Exists(ct)
+	exists, err := cache.Exists(ct, 1234, os.Getpid())
 	require.NoError(t, err)
 	require.True(t, exists)
 	require.Equal(t, 1, n)
@@ -135,7 +135,7 @@ func TestCachedConntrackExists(t *testing.T) {
 		return false, nil
 	})
 
-	exists, err = cache.Exists(ct)
+	exists, err = cache.Exists(ct, 1234, os.Getpid())
 	require.NoError(t, err)
 	require.True(t, exists)
 	require.Equal(t, 1, n)

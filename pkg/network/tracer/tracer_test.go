@@ -1600,7 +1600,7 @@ func testDNSStats(t *testing.T, domain string, success int, failure int, timeout
 	require.True(t, ok)
 
 	assert.Equal(t, queryMsg.Len(), int(conn.MonotonicSentBytes))
-	//assert.Equal(t, os.Getpid(), int(conn.Pid))
+	assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, dnsServerAddr.Port, int(conn.DPort))
 
 	// DNS Stats
@@ -2566,7 +2566,7 @@ func TestConnectionAssured(t *testing.T) {
 	connMp, err := tr.getMap(probes.ConnMap)
 	require.NoError(t, err)
 	defer connMp.Close()
-	key, err := connTupleFromConn(c, conn.Pid, conn.NetNS)
+	key, err := connTupleFromConn(c)
 	stats := &ConnStatsWithTimestamp{}
 	err = connMp.Lookup(unsafe.Pointer(key), unsafe.Pointer(stats))
 	require.NoError(t, err)
@@ -2610,7 +2610,7 @@ func TestConnectionNotAssured(t *testing.T) {
 	connMp, err := tr.getMap(probes.ConnMap)
 	require.NoError(t, err)
 	defer connMp.Close()
-	key, err := connTupleFromConn(c, conn.Pid, conn.NetNS)
+	key, err := connTupleFromConn(c)
 	stats := &ConnStatsWithTimestamp{}
 	err = connMp.Lookup(unsafe.Pointer(key), unsafe.Pointer(stats))
 	require.NoError(t, err)

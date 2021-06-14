@@ -32,8 +32,6 @@ __u64 daddr_h;
 __u64 daddr_l;
 __u16 sport;
 __u16 dport;
-__u32 netns;
-__u32 pid;
 __u32 metadata;
 */
 type ConnTuple C.conn_tuple_t
@@ -43,7 +41,6 @@ conn_t c0;
 conn_t c1;
 conn_t c2;
 conn_t c3;
-conn_t c4;
 __u16 pos;
 __u16 cpu;
 */
@@ -56,22 +53,34 @@ __u16 port;
 */
 type portBindingTuple C.port_binding_t
 
+/* conn_stats_ts_t
+__u64 sent_bytes;
+__u64 recv_bytes;
+__u64 timestamp;
+__u32 flags;
+__u8  direction;
+__u64 sent_packets;
+__u64 recv_packets;
+__u32 netns;
+__u32 pid;
 */
+type ConnStatsWithTimestamp C.conn_stats_ts_t
 
+/* tcp_stats_t
+__u32 retransmits;
+__u32 rtt;
+__u32 rtt_var;
 */
+type TCPStats C.tcp_stats_t
+
+/*
+__u32 tcp_sent_miscounts;
+*/
+type kernelTelemetry C.telemetry_t
 
 func (t *ConnTuple) copy() *ConnTuple {
-	return &ConnTuple{
-		//pid:      t.pid,
-		saddr_h: t.saddr_h,
-		saddr_l: t.saddr_l,
-		daddr_h: t.daddr_h,
-		daddr_l: t.daddr_l,
-		sport:   t.sport,
-		dport:   t.dport,
-		//netns:    t.netns,
-		metadata: t.metadata,
-	}
+	c := *t
+	return &c
 }
 
 func ipPortFromAddr(addr net.Addr) (net.IP, int) {
@@ -84,7 +93,7 @@ func ipPortFromAddr(addr net.Addr) (net.IP, int) {
 	return nil, 0
 }
 
-func connTupleFromConn(conn net.Conn, pid uint32, netns uint32) (*ConnTuple, error) {
+func connTupleFromConn(conn net.Conn) (*ConnTuple, error) {
 	saddr := conn.LocalAddr()
 	shost, sport := ipPortFromAddr(saddr)
 
@@ -92,8 +101,6 @@ func connTupleFromConn(conn net.Conn, pid uint32, netns uint32) (*ConnTuple, err
 	dhost, dport := ipPortFromAddr(daddr)
 
 	ct := &ConnTuple{
-		//netns: C.__u32(netns),
-		//pid:   C.__u32(pid),
 		sport: C.__u16(sport),
 		dport: C.__u16(dport),
 	}
@@ -126,24 +133,18 @@ func connTupleFromConn(conn net.Conn, pid uint32, netns uint32) (*ConnTuple, err
 }
 
 func toConnTupleFromConnectionStats(ct *ConnTuple, stats *network.ConnectionStats) error {
-	return toConnTuple(ct, int(stats.Pid), stats.NetNS, stats.Source, stats.Dest, stats.SPort, stats.DPort, stats.Type)
+	return toConnTuple(ct, stats.Source, stats.Dest, stats.SPort, stats.DPort, stats.Type)
 }
 
-func connTupleFromConnectionStats(stats *network.ConnectionStats) *ConnTuple {
-	return newConnTuple(int(stats.Pid), stats.NetNS, stats.Source, stats.Dest, stats.SPort, stats.DPort, stats.Type)
-}
-
-func newConnTuple(pid int, netns uint32, saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) *ConnTuple {
+func newConnTuple(saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) *ConnTuple {
 	ct := &ConnTuple{}
-	if err := toConnTuple(ct, pid, netns, saddr, daddr, sport, dport, proto); err != nil {
+	if err := toConnTuple(ct, saddr, daddr, sport, dport, proto); err != nil {
 		return nil
 	}
 	return ct
 }
 
-func toConnTuple(ct *ConnTuple, pid int, netns uint32, saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) error {
-	//ct.pid = C.__u32(pid)
-	//ct.netns = C.__u32(netns)
+func toConnTuple(ct *ConnTuple, saddr, daddr util.Address, sport, dport uint16, proto network.ConnectionType) error {
 	ct.sport = C.__u16(sport)
 	ct.dport = C.__u16(dport)
 	ct.metadata = 0
@@ -175,15 +176,15 @@ func toConnTuple(ct *ConnTuple, pid int, netns uint32, saddr, daddr util.Address
 }
 
 func (t *ConnTuple) isTCP() bool {
-	return connType(uint(t.metadata)) == network.TCP
+	return t.Type() == network.TCP
 }
 
 func (t *ConnTuple) isUDP() bool {
-	return connType(uint(t.metadata)) == network.UDP
+	return t.Type() == network.UDP
 }
 
 func (t *ConnTuple) isIPv4() bool {
-	return connFamily(uint(t.metadata)) == network.AFINET
+	return t.Family() == network.AFINET
 }
 
 func (t *ConnTuple) SourceAddress() util.Address {
@@ -218,50 +219,15 @@ func (t *ConnTuple) DestPort() uint16 {
 	return uint16(t.dport)
 }
 
-//func (t *ConnTuple) Pid() uint32 {
-//	return uint32(t.pid)
-//}
-
-//func (t *ConnTuple) NetNS() uint64 {
-//	return uint64(t.netns)
-//}
-
 func (t *ConnTuple) String() string {
-	m := uint(t.metadata)
 	return fmt.Sprintf(
 		"[%s%s] [%s ⇄ %s]",
-		connType(m),
-		connFamily(m),
-		//uint32(t.pid),
+		t.Type(),
+		t.Family(),
 		t.SourceEndpoint(),
 		t.DestEndpoint(),
-		//uint32(t.netns),
 	)
 }
-
-/* conn_stats_ts_t
-__u64 sent_bytes;
-__u64 recv_bytes;
-__u64 timestamp;
-__u32 flags;
-__u8  direction;
-__u64 sent_packets;
-__u64 recv_packets;
-
-*/
-type ConnStatsWithTimestamp C.conn_stats_ts_t
-
-/* tcp_stats_t
-__u32 retransmits;
-__u32 rtt;
-__u32 rtt_var;
-*/
-type TCPStats C.tcp_stats_t
-
-/*
-__u32 tcp_sent_miscounts;
-*/
-type kernelTelemetry C.telemetry_t
 
 func (cs *ConnStatsWithTimestamp) isExpired(latestTime uint64, timeout uint64) bool {
 	return latestTime > timeout+uint64(cs.timestamp)
@@ -276,24 +242,15 @@ func toBatch(data []byte) *batch {
 }
 
 func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) network.ConnectionStats {
-	metadata := uint(t.metadata)
-	family := connFamily(metadata)
-
-	var source, dest util.Address
-	if family == network.AFINET {
-		source = util.V4Address(uint32(t.saddr_l))
-		dest = util.V4Address(uint32(t.daddr_l))
-	} else {
-		source = util.V6Address(uint64(t.saddr_l), uint64(t.saddr_h))
-		dest = util.V6Address(uint64(t.daddr_l), uint64(t.daddr_h))
-	}
+	source := t.SourceAddress()
+	dest := t.DestAddress()
 
 	stats := network.ConnectionStats{
-		//Pid:                  uint32(t.pid),
-		Type:      connType(metadata),
-		Direction: connDirection(uint8(s.direction)),
-		Family:    family,
-		//NetNS:                uint32(t.netns),
+		Pid:                  uint32(s.pid),
+		Type:                 t.Type(),
+		Direction:            s.Direction(),
+		Family:               t.Family(),
+		NetNS:                uint32(s.netns),
 		Source:               source,
 		Dest:                 dest,
 		SPort:                uint16(t.sport),
@@ -305,7 +262,7 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 		LastUpdateEpoch:      uint64(s.timestamp),
 	}
 
-	if connType(metadata) == network.TCP {
+	if stats.Type == network.TCP {
 		stats.MonotonicRetransmits = uint32(tcpStats.retransmits)
 		stats.MonotonicTCPEstablished = uint32(tcpStats.state_transitions >> C.TCP_ESTABLISHED & 1)
 		stats.MonotonicTCPClosed = uint32(tcpStats.state_transitions >> C.TCP_CLOSE & 1)
@@ -316,25 +273,24 @@ func connStats(t *ConnTuple, s *ConnStatsWithTimestamp, tcpStats *TCPStats) netw
 	return stats
 }
 
-func connType(m uint) network.ConnectionType {
+func (t *ConnTuple) Type() network.ConnectionType {
 	// First bit of metadata indicates if the connection is TCP or UDP
-	if m&C.CONN_TYPE_TCP == 0 {
+	if t.metadata&C.CONN_TYPE_TCP == 0 {
 		return network.UDP
 	}
 	return network.TCP
 }
 
-func connFamily(m uint) network.ConnectionFamily {
+func (t *ConnTuple) Family() network.ConnectionFamily {
 	// Second bit of metadata indicates if the connection is IPv6 or IPv4
-	if m&C.CONN_V6 == 0 {
+	if t.metadata&C.CONN_V6 == 0 {
 		return network.AFINET
 	}
-
 	return network.AFINET6
 }
 
-func connDirection(m uint8) network.ConnectionDirection {
-	switch m {
+func (cs *ConnStatsWithTimestamp) Direction() network.ConnectionDirection {
+	switch cs.direction {
 	case C.CONN_DIRECTION_INCOMING:
 		return network.INCOMING
 	case C.CONN_DIRECTION_OUTGOING:
