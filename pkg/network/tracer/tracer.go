@@ -129,7 +129,12 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		}
 	}
 
-	ebpfTracer, err := kprobe.New(config, constantEditors)
+	var ebpfTracer connection.Tracer
+	if config.EnableRuntimeCompiler {
+		ebpfTracer, err = altkprobe.New(config)
+	} else {
+		ebpfTracer, err = kprobe.New(config, constantEditors)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -1384,9 +1384,9 @@ func TestTCPDirection(t *testing.T) {
 
 	// Verify connection directions
 	conn := outgoingConns[0]
-	assert.Equal(t, conn.Direction, network.OUTGOING, "connection direction must be outgoing: %s", conn)
+	assert.Equal(t, network.OUTGOING, conn.Direction, "connection direction must be outgoing: %s", conn)
 	conn = incomingConns[0]
-	assert.Equal(t, conn.Direction, network.INCOMING, "connection direction must be incoming: %s", conn)
+	assert.Equal(t, network.INCOMING, conn.Direction, "connection direction must be incoming: %s", conn)
 }
 
 func TestTCPDirectionWithPreexistingConnection(t *testing.T) {

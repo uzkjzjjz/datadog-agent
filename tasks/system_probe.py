@@ -653,6 +653,7 @@ def generate_runtime_files(ctx):
         "./pkg/network/http/compile.go",
         "./pkg/network/tracer/compile.go",
         "./pkg/network/tracer/connection/kprobe/compile.go",
+        "./pkg/network/tracer/connection/altkprobe/compile.go",
         "./pkg/security/probe/compile.go",
     ]
     for f in runtime_compiler_files:
@@ -692,6 +693,7 @@ def generate_cgo_types(ctx, windows=is_windows, replace_absolutes=True):
             "./pkg/network/ebpf/conntrack_types.go",
             "./pkg/network/ebpf/tuple_types.go",
             "./pkg/network/ebpf/kprobe_types.go",
+            "./pkg/network/ebpf/altkprobe_types.go",
         ]
 
     for f in def_files:

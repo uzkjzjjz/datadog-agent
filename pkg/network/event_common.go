@@ -78,8 +78,10 @@ func (d ConnectionDirection) String() string {
 		return "local"
 	case NONE:
 		return "none"
-	default:
+	case INCOMING:
 		return "incoming"
+	default:
+		return "unknown"
 	}
 }
 
@@ -149,6 +151,8 @@ type RuntimeCompilationTelemetry struct {
 
 // ConnectionStats stores statistics for a single connection.  Field order in the struct should be 8-byte aligned
 type ConnectionStats struct {
+	ID uint64
+
 	Source util.Address
 	Dest   util.Address
 

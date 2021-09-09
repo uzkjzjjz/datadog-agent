@@ -87,7 +87,7 @@ func TestTCPRemoveEntries(t *testing.T) {
 		time.Sleep(time.Second)
 	})
 
-	// Wait a bit for the first connection to be considered as timeouting
+	// Wait a bit for the first connection to be considered as timed out
 	time.Sleep(1 * time.Second)
 
 	// Create a new client
