@@ -32,13 +32,18 @@ typedef struct {
 } flow_stats_t;
 
 typedef struct {
+    __u32   retransmits;
+} tcp_flow_stats_t;
+
+typedef struct {
     tuple_t       tup;
     flow_stats_t  stats;
+    tcp_flow_stats_t   tcpstats;
 } tcp_flow_t;
 
 typedef struct {
-    __u64               skp;
-    tcp_flow_t          flow;
+    __u64           skp;
+    tcp_flow_t      flow;
     socket_info_t   skinfo;
 } tcp_close_event_t;
 

@@ -249,4 +249,23 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
     return 0;
 }
 
+SEC("kprobe/tcp_retransmit_skb")
+int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
+    struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+    int segs = 1;
+#else
+    int segs = (int)PT_REGS_PARM3(ctx);
+#endif
+    log_debug("kprobe/tcp_retransmit sk=%llx\n", skp);
+
+    tcp_flow_t *flow = bpf_map_lookup_elem(&tcp_flows, &skp);
+    if (!flow) {
+        return 0;
+    }
+    __sync_fetch_and_add(&flow->tcpstats.retransmits, segs);
+    return 0;
+}
+
 #endif

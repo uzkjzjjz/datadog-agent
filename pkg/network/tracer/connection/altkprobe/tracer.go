@@ -193,7 +193,7 @@ func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*n
 			continue
 		}
 
-		conn := toConn(key, &flow.Tup, &flow.Stats, skinfo)
+		conn := toConn(key, &flow.Tup, &flow.Stats, skinfo, &flow.Tcpstats)
 		if filter != nil && filter(&conn) {
 			buffer = append(buffer, conn)
 		}
@@ -215,7 +215,7 @@ func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*n
 			continue
 		}
 
-		conn := toConn(sk, &tup, &stats, skinfo)
+		conn := toConn(sk, &tup, &stats, skinfo, nil)
 		if filter != nil && filter(&conn) {
 			buffer = append(buffer, conn)
 		}
@@ -283,7 +283,7 @@ func toUDPEvent(b []byte) *netebpf.UDPCloseEvent {
 	return (*netebpf.UDPCloseEvent)(unsafe.Pointer(&b[0]))
 }
 
-func toConn(key uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo) network.ConnectionStats {
+func toConn(key uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo, tcpStats *netebpf.TCPFlowStats) network.ConnectionStats {
 	conn := network.ConnectionStats{
 		ID:                      key,
 		Pid:                     skinfo.Tgid,
@@ -304,6 +304,10 @@ func toConn(key uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *
 		Type:                    connType(tuple.Protocol),
 		Family:                  connFamily(tuple.Family),
 		IsAssured:               false,
+	}
+
+	if tcpStats != nil {
+		conn.MonotonicRetransmits = tcpStats.Retransmits
 	}
 
 	if conn.Family == network.AFINET {
@@ -327,7 +331,7 @@ func (t *tracer) initPerfPolling() error {
 				}
 				//atomic.AddInt64(&t.perfReceived, 1)
 				evt := toTCPEvent(eventData.Data)
-				c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo)
+				c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Flow.Tcpstats)
 				log.Debugf("closed tcp conn: %x %s", evt.Skp, c)
 				t.closedCh <- c
 			case _, ok := <-t.perfHandlerTCP.LostChannel:
@@ -352,7 +356,7 @@ func (t *tracer) initPerfPolling() error {
 					if err := t.udpStats.Lookup(unsafe.Pointer(&tp), unsafe.Pointer(&st)); err != nil {
 						continue
 					}
-					c := toConn(evt.Skp, &tp, &st, &evt.Skinfo)
+					c := toConn(evt.Skp, &tp, &st, &evt.Skinfo, nil)
 					log.Debugf("closed udp conn: %x %s", evt.Skp, c)
 					t.closedCh <- c
 				}

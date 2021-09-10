@@ -16,9 +16,14 @@ type FlowStats struct {
 	Sent_bytes  uint64
 	Recv_bytes  uint64
 }
+type TCPFlowStats struct {
+	Retransmits uint32
+}
 type TCPFlow struct {
-	Tup   Tuple
-	Stats FlowStats
+	Tup       Tuple
+	Stats     FlowStats
+	Tcpstats  TCPFlowStats
+	Pad_cgo_0 [4]byte
 }
 type SocketInfo struct {
 	Ns        uint64
