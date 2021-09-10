@@ -44,8 +44,8 @@ import (
 )
 
 var (
-	clientMessageSize = 2 << 8
-	serverMessageSize = 2 << 14
+	clientMessageSize = 2 << 8  // 512
+	serverMessageSize = 2 << 14 // 32768
 	payloadSizesTCP   = []int{2 << 5, 2 << 8, 2 << 10, 2 << 12, 2 << 14, 2 << 15}
 	payloadSizesUDP   = []int{2 << 5, 2 << 8, 2 << 12, 2 << 14}
 )
@@ -466,20 +466,21 @@ func TestUDPSendAndReceive(t *testing.T) {
 
 	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)
 	require.True(t, ok)
-	require.Equal(t, network.INCOMING, incoming.Direction)
 
 	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
 	require.True(t, ok)
-	require.Equal(t, network.OUTGOING, outgoing.Direction)
 
-	require.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
-	require.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
-	require.True(t, outgoing.IntraHost)
+	assert.Equal(t, network.INCOMING, incoming.Direction, "incoming flow direction is incorrect")
+	assert.Equal(t, network.OUTGOING, outgoing.Direction, "outgoing flow direction is incorrect")
+
+	assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
+	assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
+	assert.True(t, outgoing.IntraHost)
 
 	// make sure the inverse values are seen for the other message
-	require.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes))
-	require.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes))
-	require.True(t, incoming.IntraHost)
+	assert.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes))
+	assert.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes))
+	assert.True(t, incoming.IntraHost)
 }
 
 func TestUDPDisabled(t *testing.T) {

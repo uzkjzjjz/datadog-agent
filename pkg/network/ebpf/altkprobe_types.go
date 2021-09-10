@@ -3,10 +3,13 @@
 package ebpf
 
 /*
-#include "./c/runtime/alttracer-types.h"
+#include "./c/runtime/alttracer/types.h"
 */
 import "C"
 
 type Tuple C.tuple_t
-type TCPSocketInfo C.tcp_socket_info_t
-type ConnEvent C.conn_event_t
+type FlowStats C.flow_stats_t
+type TCPFlow C.tcp_flow_t
+type SocketInfo C.socket_info_t
+type TCPCloseEvent C.tcp_close_event_t
+type UDPCloseEvent C.udp_close_event_t

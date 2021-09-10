@@ -4,24 +4,35 @@
 package ebpf
 
 type Tuple struct {
-	Family     uint8
-	Protocol   uint8
-	Sport      uint16
-	Dport      uint16
-	Saddr      [16]uint8
-	Daddr      [16]uint8
-	Sent_bytes uint64
-	Recv_bytes uint64
+	Family   uint8
+	Protocol uint8
+	Sport    uint16
+	Dport    uint16
+	Saddr    [16]uint8
+	Daddr    [16]uint8
 }
-type TCPSocketInfo struct {
+type FlowStats struct {
+	Last_update uint64
+	Sent_bytes  uint64
+	Recv_bytes  uint64
+}
+type TCPFlow struct {
+	Tup   Tuple
+	Stats FlowStats
+}
+type SocketInfo struct {
 	Ns        uint64
 	Tgid      uint32
 	Netns     uint32
 	Direction uint8
 	Pad_cgo_0 [7]byte
 }
-type ConnEvent struct {
+type TCPCloseEvent struct {
 	Skp    uint64
-	Skinfo TCPSocketInfo
-	Tup    Tuple
+	Flow   TCPFlow
+	Skinfo SocketInfo
+}
+type UDPCloseEvent struct {
+	Skp    uint64
+	Skinfo SocketInfo
 }

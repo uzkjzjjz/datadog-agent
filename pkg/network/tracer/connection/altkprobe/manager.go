@@ -16,24 +16,37 @@ const (
 	maxActive = 128
 )
 
-func newManager(closedHandler *ebpf.PerfHandler) *manager.Manager {
+func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfHandler) *manager.Manager {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
-			{Name: "tcp_open_socks"},
-			{Name: "tuples"},
+			{Name: tcpOpenSocksName},
+			{Name: tcpFlowsMapName},
 			//{Name: "inet_release_args"},
 			{Name: "inet_csk_listen_start_args"},
 			{Name: "inet_csk_accept_args"},
 			{Name: "tcp_sendmsg_args"},
+			//{Name: "udp_get_port_args"},
+			{Name: udpOpenSocksName},
+			{Name: udpStatsName},
+			{Name: udpTuplesToSocksName},
 		},
 		PerfMaps: []*manager.PerfMap{
 			{
-				Map: manager.Map{Name: "conn_close_event"},
+				Map: manager.Map{Name: "tcp_close_event"},
 				PerfMapOptions: manager.PerfMapOptions{
 					PerfRingBufferSize: 8 * os.Getpagesize(),
 					Watermark:          1,
-					DataHandler:        closedHandler.DataHandler,
-					LostHandler:        closedHandler.LostHandler,
+					DataHandler:        tcpClosedHandler.DataHandler,
+					LostHandler:        tcpClosedHandler.LostHandler,
+				},
+			},
+			{
+				Map: manager.Map{Name: "udp_close_event"},
+				PerfMapOptions: manager.PerfMapOptions{
+					PerfRingBufferSize: 8 * os.Getpagesize(),
+					Watermark:          1,
+					DataHandler:        udpClosedHandler.DataHandler,
+					LostHandler:        udpClosedHandler.LostHandler,
 				},
 			},
 		},
@@ -50,6 +63,15 @@ func newManager(closedHandler *ebpf.PerfHandler) *manager.Manager {
 			{Section: "kprobe/tcp_sendmsg"},
 			{Section: "kretprobe/tcp_sendmsg", KProbeMaxActive: maxActive},
 			{Section: "kprobe/tcp_cleanup_rbuf"},
+
+			//{Section: "kprobe/udp_v4_get_port"},
+			//{Section: "kretprobe/udp_v4_get_port", KProbeMaxActive: maxActive},
+			{Section: "kprobe/udp_init_sock"},
+			{Section: "kprobe/ip_send_skb"},
+			{Section: "kprobe/ip6_send_skb"},
+			{Section: "kprobe/skb_consume_udp"},
+			//{Section: "kprobe/udp_v6_get_port"},
+			//{Section: "kretprobe/udp_v6_get_port", KProbeMaxActive: maxActive},
 		},
 	}
 	return mgr

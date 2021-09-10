@@ -14,7 +14,7 @@ typedef struct {
     __u32 tgid;
     __u32 netns;
     __u8  direction;
-} tcp_socket_info_t;
+} socket_info_t;
 
 typedef struct {
     __u8  family;
@@ -23,15 +23,28 @@ typedef struct {
     __u16 dport;
     __u8  saddr[16];
     __u8  daddr[16];
-
-    __u64 sent_bytes;
-    __u64 recv_bytes;
 } tuple_t;
 
 typedef struct {
+    __u64   last_update;
+    __u64   sent_bytes;
+    __u64   recv_bytes;
+} flow_stats_t;
+
+typedef struct {
+    tuple_t       tup;
+    flow_stats_t  stats;
+} tcp_flow_t;
+
+typedef struct {
     __u64               skp;
-    tcp_socket_info_t   skinfo;
-    tuple_t             tup;
-} conn_event_t;
+    tcp_flow_t          flow;
+    socket_info_t   skinfo;
+} tcp_close_event_t;
+
+typedef struct {
+    __u64               skp;
+    socket_info_t   skinfo;
+} udp_close_event_t;
 
 #endif
