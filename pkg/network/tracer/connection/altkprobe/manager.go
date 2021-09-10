@@ -64,14 +64,12 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Section: "kretprobe/tcp_sendmsg", KProbeMaxActive: maxActive},
 			{Section: "kprobe/tcp_cleanup_rbuf"},
 
-			//{Section: "kprobe/udp_v4_get_port"},
-			//{Section: "kretprobe/udp_v4_get_port", KProbeMaxActive: maxActive},
+			{Section: "kprobe/udp_lib_get_port"},
+			{Section: "kretprobe/udp_lib_get_port", KProbeMaxActive: maxActive},
 			{Section: "kprobe/udp_init_sock"},
 			{Section: "kprobe/ip_send_skb"},
 			{Section: "kprobe/ip6_send_skb"},
 			{Section: "kprobe/skb_consume_udp"},
-			//{Section: "kprobe/udp_v6_get_port"},
-			//{Section: "kretprobe/udp_v6_get_port", KProbeMaxActive: maxActive},
 		},
 	}
 	return mgr

@@ -46,14 +46,14 @@ struct bpf_map_def SEC("maps/udp_close_event") udp_close_event = {
     .namespace = "",
 };
 
-//struct bpf_map_def SEC("maps/udp_get_port_args") udp_get_port_args = {
-//    .type = BPF_MAP_TYPE_HASH,
-//    .key_size = sizeof(u64),
-//    .value_size = sizeof(struct sock *),
-//    .max_entries = 1024,
-//    .pinning = 0,
-//    .namespace = "",
-//};
+struct bpf_map_def SEC("maps/udp_lib_get_port_args") udp_lib_get_port_args = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(u64),
+    .value_size = sizeof(struct sock *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
 
 static __always_inline void add_udp_open_sock(struct sock *skp, enum conn_direction dir) {
     socket_info_t udp_sk_info = {};
@@ -64,44 +64,43 @@ static __always_inline void add_udp_open_sock(struct sock *skp, enum conn_direct
     bpf_map_update_elem(&udp_open_socks, &skp, &udp_sk_info, BPF_NOEXIST);
 }
 
-//SEC("kprobe/udp_v4_get_port")
-//int kprobe__udp_v4_get_port(struct pt_regs* ctx) {
-//    struct sock *skp = (struct sock*)PT_REGS_PARM1(ctx);
-//    log_debug("kprobe/udp_v4_get_port: sk=%llx\n", skp);
-//
-//    u64 pid_tgid = bpf_get_current_pid_tgid();
-//    bpf_map_update_elem(&udp_get_port_args, &pid_tgid, &skp, BPF_ANY);
-//    return 0;
-//}
+SEC("kprobe/udp_lib_get_port")
+int kprobe__udp_lib_get_port(struct pt_regs* ctx) {
+    struct sock *skp = (struct sock*)PT_REGS_PARM1(ctx);
+    unsigned short snum = (unsigned short)PT_REGS_PARM2(ctx);
+    log_debug("kprobe/udp_v4_get_port: sk=%llx snum=%u\n", skp, snum);
 
-//SEC("kprobe/udp_v6_get_port")
-//int kprobe__udp_v4_get_port(struct pt_regs* ctx) {
-//
-//}
+    if (snum > 0) {
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        bpf_map_update_elem(&udp_lib_get_port_args, &pid_tgid, &skp, BPF_ANY);
+    }
+    return 0;
+}
 
-//SEC("kretprobe/udp_v4_get_port")
-//int kretprobe__udp_v4_get_port(struct pt_regs* ctx) {
-//    u64 pid_tgid = bpf_get_current_pid_tgid();
-//    struct sock **skpp = bpf_map_lookup_elem(&udp_get_port_args, &pid_tgid);
-//    if (!skpp) {
-//        return 0;
-//    }
-//    struct sock *skp = *skpp;
-//    log_debug("kretprobe/udp_v4_get_port: sk=%llx\n", skp);
-//
-//    socket_info_t *skinfop = bpf_map_lookup_elem(&udp_open_socks, &skp);
-//    if (skinfop) {
-//        return 0;
-//    }
-//
-//    add_udp_open_sock(skp, CONN_DIRECTION_UNKNOWN);
-//    return 0;
-//}
+SEC("kretprobe/udp_lib_get_port")
+int kretprobe__udp_lib_get_port(struct pt_regs* ctx) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct sock **skpp = bpf_map_lookup_elem(&udp_lib_get_port_args, &pid_tgid);
+    if (!skpp) {
+        return 0;
+    }
+    struct sock *skp = *skpp;
+    bpf_map_delete_elem(&udp_lib_get_port_args, &pid_tgid);
+    log_debug("kretprobe/udp_lib_get_port: sk=%llx\n", skp);
 
-//SEC("kretprobe/udp_v6_get_port")
-//int kretprobe__udp_v4_get_port(struct pt_regs* ctx) {
-//
-//}
+    int err = (int)PT_REGS_RC(ctx);
+    if (err) {
+        return 0;
+    }
+
+    socket_info_t *skinfop = bpf_map_lookup_elem(&udp_open_socks, &skp);
+    if (!skinfop) {
+        return 0;
+    }
+
+    skinfop->direction = CONN_DIRECTION_INCOMING;
+    return 0;
+}
 
 SEC("kprobe/udp_init_sock")
 int kprobe__udp_init_sock(struct pt_regs* ctx) {
@@ -112,7 +111,7 @@ int kprobe__udp_init_sock(struct pt_regs* ctx) {
         return 0;
     }
 
-    add_udp_open_sock(skp, CONN_DIRECTION_UNKNOWN);
+    add_udp_open_sock(skp, CONN_DIRECTION_OUTGOING);
     return 0;
 }
 

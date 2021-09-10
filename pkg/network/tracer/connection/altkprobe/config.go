@@ -23,11 +23,11 @@ func enabledProbes(c *config.Config) (map[string]struct{}, error) {
 	}
 
 	if c.CollectUDPConns {
-		//enabled["kprobe/udp_v4_get_port"] = struct{}{}
-		//enabled["kretprobe/udp_v4_get_port"] = struct{}{}
 		enabled["kprobe/udp_init_sock"] = struct{}{}
 		enabled["kprobe/ip_send_skb"] = struct{}{}
 		enabled["kprobe/skb_consume_udp"] = struct{}{}
+		enabled["kprobe/udp_lib_get_port"] = struct{}{}
+		enabled["kretprobe/udp_lib_get_port"] = struct{}{}
 		enabled["kprobe/security_sk_free"] = struct{}{}
 
 		if c.CollectIPv6Conns {

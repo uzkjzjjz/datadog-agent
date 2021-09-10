@@ -63,7 +63,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
                 };
                 int ret = bpf_perf_event_output(ctx, &tcp_close_event, BPF_F_CURRENT_CPU, &evt, sizeof(evt));
                 if (ret) {
-                    log_debug("tcp close send error: ret=%u sk=%llx\n", ret, skp);
+                    log_debug("tcp close send error: ret=%d sk=%llx\n", ret, skp);
                 }
                 bpf_map_delete_elem(&tcp_flows, &skp);
             }
@@ -80,7 +80,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
             };
             int ret = bpf_perf_event_output(ctx, &udp_close_event, BPF_F_CURRENT_CPU, &evt, sizeof(evt));
             if (ret) {
-                log_debug("udp close send error: ret=%u sk=%llx\n", ret, skp);
+                log_debug("udp close send error: ret=%d sk=%llx\n", ret, skp);
             }
             bpf_map_delete_elem(&udp_open_socks, &skp);
             return 0;
