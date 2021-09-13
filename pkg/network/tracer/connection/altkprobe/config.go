@@ -22,8 +22,6 @@ func enabledProbes(c *config.Config) (map[string]struct{}, error) {
 		enabled["kprobe/tcp_cleanup_rbuf"] = struct{}{}
 		enabled["kprobe/tcp_retransmit_skb"] = struct{}{}
 		enabled["kprobe/tcp_set_state"] = struct{}{}
-		enabled["kprobe/tcp_rcv_state_process"] = struct{}{}
-		enabled["kretprobe/tcp_rcv_state_process"] = struct{}{}
 	}
 
 	if c.CollectUDPConns {

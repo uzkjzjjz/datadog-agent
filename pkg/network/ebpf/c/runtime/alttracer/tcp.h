@@ -81,6 +81,7 @@ static __always_inline void update_rtt(struct sock *skp, tcp_flow_t *flow) {
         // https://elixir.bootlin.com/linux/v4.6/source/net/ipv4/tcp.c#L2686
         flow->tcpstats.rtt = rtt >> 3;
         flow->tcpstats.rtt_var = rtt_var >> 2;
+        log_debug("update_rtt: sk=%llx rtt=%d rtt_var=%d\n", skp, flow->tcpstats.rtt, flow->tcpstats.rtt_var);
     }
 }
 
@@ -312,34 +313,6 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
 
     add_tcp_open_sock(skp, CONN_DIRECTION_UNKNOWN);
     create_tcp_flow(skp, family);
-    return 0;
-}
-
-SEC("kprobe/tcp_rcv_state_process")
-int kprobe__tcp_rcv_state_process(struct pt_regs *ctx) {
-    struct sock *skp = (struct sock *)PT_REGS_PARM1(ctx);
-    log_debug("kprobe/tcp_rcv_state_process: sk=%llx\n", skp);
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    bpf_map_update_elem(&tcp_rcv_state_process_args, &pid_tgid, &skp, BPF_ANY);
-    return 0;
-}
-
-SEC("kretprobe/tcp_rcv_state_process")
-int kretprobe__tcp_rcv_state_process(struct pt_regs *ctx) {
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    struct sock **skpp = bpf_map_lookup_elem(&tcp_rcv_state_process_args, &pid_tgid);
-    if (!skpp) {
-        return 0;
-    }
-    struct sock *skp = *skpp;
-    log_debug("kretprobe/tcp_rcv_state_process: sk=%llx\n", skp);
-    bpf_map_delete_elem(&tcp_rcv_state_process_args, &pid_tgid);
-
-    tcp_flow_t *flow = bpf_map_lookup_elem(&tcp_flows, &skp);
-    if (!flow) {
-        return 0;
-    }
-    update_rtt(skp, flow);
     return 0;
 }
 

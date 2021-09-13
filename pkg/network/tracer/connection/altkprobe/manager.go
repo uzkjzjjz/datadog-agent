@@ -65,8 +65,6 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Section: "kprobe/tcp_cleanup_rbuf"},
 			{Section: "kprobe/tcp_retransmit_skb"},
 			{Section: "kprobe/tcp_set_state"},
-			{Section: "kprobe/tcp_rcv_state_process"},
-			{Section: "kretprobe/tcp_rcv_state_process", KProbeMaxActive: maxActive},
 
 			{Section: "kprobe/udp_lib_get_port"},
 			{Section: "kretprobe/udp_lib_get_port", KProbeMaxActive: maxActive},
