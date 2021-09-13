@@ -55,6 +55,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
         if (skinfop) {
             tcp_flow_t *flowp = bpf_map_lookup_elem(&tcp_flows, &skp);
             if (flowp) {
+                flowp->tcpstats.state_transitions |= (1 << TCP_CLOSE);
                 log_debug("closed perf send: sk=%llx\n", skp);
                 tcp_close_event_t evt = {
                     .skp = (__u64)skp,

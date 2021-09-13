@@ -1,6 +1,8 @@
 #ifndef __TCP_H
 #define __TCP_H
 
+#include <linux/tcp.h>
+
 #include "bpf_helpers.h"
 #include "types.h"
 #include "netns.h"
@@ -60,6 +62,28 @@ struct bpf_map_def SEC("maps/tcp_sendmsg_args") tcp_sendmsg_args = {
     .namespace = "",
 };
 
+struct bpf_map_def SEC("maps/tcp_rcv_state_process_args") tcp_rcv_state_process_args = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(u64),
+    .value_size = sizeof(struct sock *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
+static __always_inline void update_rtt(struct sock *skp, tcp_flow_t *flow) {
+    u32 rtt = 0;
+    bpf_probe_read(&rtt, sizeof(rtt), &tcp_sk(skp)->srtt_us);
+    if (rtt > 0) {
+        u32 rtt_var = 0;
+        bpf_probe_read(&rtt_var, sizeof(rtt_var), &tcp_sk(skp)->mdev_us);
+        // For more information on the bit shift operations see:
+        // https://elixir.bootlin.com/linux/v4.6/source/net/ipv4/tcp.c#L2686
+        flow->tcpstats.rtt = rtt >> 3;
+        flow->tcpstats.rtt_var = rtt_var >> 2;
+    }
+}
+
 static __always_inline void create_tcp_flow(struct sock *skp, u16 family) {
     tuple_t tup = {
         .family   = family,
@@ -79,7 +103,9 @@ static __always_inline void create_tcp_flow(struct sock *skp, u16 family) {
 
     tcp_flow_t flow = {};
     flow.tup = tup;
-    bpf_map_update_elem(&tcp_flows, &skp, &flow, BPF_ANY);
+    flow.tcpstats.state_transitions |= (1 << TCP_ESTABLISHED);
+    update_rtt(skp, &flow);
+    bpf_map_update_elem(&tcp_flows, &skp, &flow, BPF_NOEXIST);
 }
 
 // socket OPEN
@@ -117,10 +143,6 @@ int kprobe__tcp_connect(struct pt_regs* ctx) {
         return 0;
     }
     tcp_sk_infop->direction = CONN_DIRECTION_OUTGOING;
-
-    u16 family = 0;
-    bpf_probe_read(&family, sizeof(family), &skp->sk_family);
-    create_tcp_flow(skp, family);
     return 0;
 }
 
@@ -186,8 +208,11 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
         return 0;
     }
 
-    add_tcp_open_sock(newskp, CONN_DIRECTION_INCOMING);
-    create_tcp_flow(newskp, family);
+    socket_info_t *tcp_sk_infop = bpf_map_lookup_elem(&tcp_open_socks, &newskp);
+    if (!tcp_sk_infop) {
+        return 0;
+    }
+    tcp_sk_infop->direction = CONN_DIRECTION_INCOMING;
     return 0;
 }
 
@@ -225,6 +250,7 @@ int kretprobe__tcp_sendmsg(struct pt_regs* ctx) {
 
     flow->stats.last_update = bpf_ktime_get_ns();
     __sync_fetch_and_add(&flow->stats.sent_bytes, copied);
+    update_rtt(skp, flow);
     return 0;
 }
 
@@ -265,6 +291,55 @@ int kprobe__tcp_retransmit_skb(struct pt_regs* ctx) {
         return 0;
     }
     __sync_fetch_and_add(&flow->tcpstats.retransmits, segs);
+    return 0;
+}
+
+SEC("kprobe/tcp_set_state")
+int kprobe__tcp_set_state(struct pt_regs* ctx) {
+    int state = (int)PT_REGS_PARM2(ctx);
+    if (state != TCP_ESTABLISHED) {
+        return 0;
+    }
+
+    struct sock *skp = (struct sock *)PT_REGS_PARM1(ctx);
+    log_debug("kprobe/tcp_set_state: sk=%llx state=%d\n", skp, state);
+
+    u16 family = 0;
+    bpf_probe_read(&family, sizeof(family), &skp->sk_family);
+    if (family != AF_INET && family != AF_INET6) {
+        return 0;
+    }
+
+    add_tcp_open_sock(skp, CONN_DIRECTION_UNKNOWN);
+    create_tcp_flow(skp, family);
+    return 0;
+}
+
+SEC("kprobe/tcp_rcv_state_process")
+int kprobe__tcp_rcv_state_process(struct pt_regs *ctx) {
+    struct sock *skp = (struct sock *)PT_REGS_PARM1(ctx);
+    log_debug("kprobe/tcp_rcv_state_process: sk=%llx\n", skp);
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    bpf_map_update_elem(&tcp_rcv_state_process_args, &pid_tgid, &skp, BPF_ANY);
+    return 0;
+}
+
+SEC("kretprobe/tcp_rcv_state_process")
+int kretprobe__tcp_rcv_state_process(struct pt_regs *ctx) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct sock **skpp = bpf_map_lookup_elem(&tcp_rcv_state_process_args, &pid_tgid);
+    if (!skpp) {
+        return 0;
+    }
+    struct sock *skp = *skpp;
+    log_debug("kretprobe/tcp_rcv_state_process: sk=%llx\n", skp);
+    bpf_map_delete_elem(&tcp_rcv_state_process_args, &pid_tgid);
+
+    tcp_flow_t *flow = bpf_map_lookup_elem(&tcp_flows, &skp);
+    if (!flow) {
+        return 0;
+    }
+    update_rtt(skp, flow);
     return 0;
 }
 

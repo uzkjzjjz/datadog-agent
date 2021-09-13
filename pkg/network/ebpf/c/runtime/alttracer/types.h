@@ -33,6 +33,11 @@ typedef struct {
 
 typedef struct {
     __u32   retransmits;
+    __u32   rtt;
+    __u32   rtt_var;
+
+    // Bit mask containing all TCP state transitions tracked by our tracer
+    __u16   state_transitions;
 } tcp_flow_stats_t;
 
 typedef struct {

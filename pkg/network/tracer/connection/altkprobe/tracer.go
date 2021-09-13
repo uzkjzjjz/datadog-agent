@@ -308,6 +308,10 @@ func toConn(key uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *
 
 	if tcpStats != nil {
 		conn.MonotonicRetransmits = tcpStats.Retransmits
+		conn.RTT = tcpStats.Rtt
+		conn.RTTVar = tcpStats.Rtt_var
+		conn.MonotonicTCPEstablished = uint32(tcpStats.State_transitions >> netebpf.Established & 1)
+		conn.MonotonicTCPClosed = uint32(tcpStats.State_transitions >> netebpf.Close & 1)
 	}
 
 	if conn.Family == network.AFINET {
@@ -332,7 +336,7 @@ func (t *tracer) initPerfPolling() error {
 				//atomic.AddInt64(&t.perfReceived, 1)
 				evt := toTCPEvent(eventData.Data)
 				c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Flow.Tcpstats)
-				log.Debugf("closed tcp conn: %x %s", evt.Skp, c)
+				log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
 				t.closedCh <- c
 			case _, ok := <-t.perfHandlerTCP.LostChannel:
 				if !ok {

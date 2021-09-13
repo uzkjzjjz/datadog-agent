@@ -17,13 +17,16 @@ type FlowStats struct {
 	Recv_bytes  uint64
 }
 type TCPFlowStats struct {
-	Retransmits uint32
+	Retransmits       uint32
+	Rtt               uint32
+	Rtt_var           uint32
+	State_transitions uint16
+	Pad_cgo_0         [2]byte
 }
 type TCPFlow struct {
-	Tup       Tuple
-	Stats     FlowStats
-	Tcpstats  TCPFlowStats
-	Pad_cgo_0 [4]byte
+	Tup      Tuple
+	Stats    FlowStats
+	Tcpstats TCPFlowStats
 }
 type SocketInfo struct {
 	Ns        uint64
