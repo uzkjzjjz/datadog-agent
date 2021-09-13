@@ -21,11 +21,12 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 		Maps: []*manager.Map{
 			{Name: tcpOpenSocksName},
 			{Name: tcpFlowsMapName},
-			//{Name: "inet_release_args"},
 			{Name: "inet_csk_listen_start_args"},
 			{Name: "inet_csk_accept_args"},
 			{Name: "tcp_sendmsg_args"},
-			//{Name: "udp_get_port_args"},
+			{Name: tcpBoundPortsMap},
+			{Name: inoToPIDMap},
+
 			{Name: udpOpenSocksName},
 			{Name: udpStatsName},
 			{Name: udpTuplesToSocksName},
@@ -52,8 +53,6 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 		},
 		Probes: []*manager.Probe{
 			{Section: "kprobe/tcp_init_sock"},
-			//{Section: "kprobe/inet_release"},
-			//{Section: "kretprobe/inet_release", KProbeMaxActive: maxActive},
 			{Section: "kprobe/security_sk_free"},
 			{Section: "kprobe/tcp_connect"},
 			{Section: "kprobe/inet_csk_listen_start"},
@@ -65,6 +64,10 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Section: "kprobe/tcp_cleanup_rbuf"},
 			{Section: "kprobe/tcp_retransmit_skb"},
 			{Section: "kprobe/tcp_set_state"},
+			{Section: tcp4SeqShowProbe},
+			{Section: tcp6SeqShowProbe},
+			{Section: udp4SeqShowProbe},
+			{Section: udp6SeqShowProbe},
 
 			{Section: "kprobe/udp_lib_get_port"},
 			{Section: "kretprobe/udp_lib_get_port", KProbeMaxActive: maxActive},

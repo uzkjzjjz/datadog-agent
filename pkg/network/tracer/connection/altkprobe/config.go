@@ -22,6 +22,11 @@ func enabledProbes(c *config.Config) (map[string]struct{}, error) {
 		enabled["kprobe/tcp_cleanup_rbuf"] = struct{}{}
 		enabled["kprobe/tcp_retransmit_skb"] = struct{}{}
 		enabled["kprobe/tcp_set_state"] = struct{}{}
+		enabled[tcp4SeqShowProbe] = struct{}{}
+
+		if c.CollectIPv6Conns {
+			enabled[tcp6SeqShowProbe] = struct{}{}
+		}
 	}
 
 	if c.CollectUDPConns {
@@ -31,9 +36,11 @@ func enabledProbes(c *config.Config) (map[string]struct{}, error) {
 		enabled["kprobe/udp_lib_get_port"] = struct{}{}
 		enabled["kretprobe/udp_lib_get_port"] = struct{}{}
 		enabled["kprobe/security_sk_free"] = struct{}{}
+		enabled[udp4SeqShowProbe] = struct{}{}
 
 		if c.CollectIPv6Conns {
 			enabled["kprobe/ip6_send_skb"] = struct{}{}
+			enabled[udp6SeqShowProbe] = struct{}{}
 		}
 	}
 

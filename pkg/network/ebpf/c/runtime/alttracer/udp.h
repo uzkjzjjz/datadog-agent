@@ -246,4 +246,24 @@ int kprobe__skb_consume_udp(struct pt_regs* ctx) {
     return 0;
 }
 
+SEC("kprobe/udp4_seq_show")
+int kprobe__udp4_seq_show(struct pt_regs* ctx) {
+    void *v = PT_REGS_PARM2(ctx);
+    struct sock *skp = (struct sock *)v;
+    if (v == SEQ_START_TOKEN) {
+        return 0;
+    }
+    log_debug("kprobe/udp4_seq_show: sk=%llx\n", skp);
+}
+
+SEC("kprobe/udp6_seq_show")
+int kprobe__udp6_seq_show(struct pt_regs* ctx) {
+    void *v = PT_REGS_PARM2(ctx);
+    struct sock *skp = (struct sock *)v;
+    if (v == SEQ_START_TOKEN) {
+        return 0;
+    }
+    log_debug("kprobe/udp6_seq_show: sk=%llx\n", skp);
+}
+
 #endif

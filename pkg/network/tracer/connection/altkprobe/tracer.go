@@ -31,6 +31,13 @@ const (
 	udpOpenSocksName     = "udp_open_socks"
 	udpStatsName         = "udp_stats"
 	udpTuplesToSocksName = "udp_tuples_to_socks"
+
+	tcpBoundPortsMap = "tcp_seq_listen_ports"
+	inoToPIDMap      = "ino_to_pid"
+	tcp4SeqShowProbe = "kprobe/tcp4_seq_show"
+	tcp6SeqShowProbe = "kprobe/tcp6_seq_show"
+	udp4SeqShowProbe = "kprobe/udp4_seq_show"
+	udp6SeqShowProbe = "kprobe/udp6_seq_show"
 )
 
 var _ connection.Tracer = &tracer{}
@@ -45,37 +52,40 @@ type tracer struct {
 	udpSocks         *ebpf.Map
 	udpTuplesToSocks *ebpf.Map
 	udpStats         *ebpf.Map
+	inoToPID         *ebpf.Map
+
+	cfg *config.Config
 }
 
-func New(config *config.Config) (connection.Tracer, error) {
+func New(cfg *config.Config) (connection.Tracer, error) {
 	mgrOptions := manager.Options{
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
 			Max: math.MaxUint64,
 		},
 		MapSpecEditors: map[string]manager.MapSpecEditor{
-			tcpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			tcpFlowsMapName:      {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpStatsName:         {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpTuplesToSocksName: {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			tcpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			tcpFlowsMapName:      {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			udpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			udpStatsName:         {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			udpTuplesToSocksName: {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 		},
 	}
 
-	buf, err := getRuntimeCompiledAlttracer(config)
+	buf, err := getRuntimeCompiledAlttracer(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	closedChannelSize := defaultClosedChannelSize
-	if config.ClosedChannelSize > 0 {
-		closedChannelSize = config.ClosedChannelSize
+	if cfg.ClosedChannelSize > 0 {
+		closedChannelSize = cfg.ClosedChannelSize
 	}
 	perfHandlerTCP := ddebpf.NewPerfHandler(closedChannelSize)
 	perfHandlerUDP := ddebpf.NewPerfHandler(closedChannelSize)
 	m := newManager(perfHandlerTCP, perfHandlerUDP)
 
-	enabledProbes, err := enabledProbes(config)
+	enabledProbes, err := enabledProbes(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("invalid probe configuration: %v", err)
 	}
@@ -104,6 +114,7 @@ func New(config *config.Config) (connection.Tracer, error) {
 		m:              m,
 		perfHandlerTCP: perfHandlerTCP,
 		perfHandlerUDP: perfHandlerUDP,
+		cfg:            cfg,
 	}
 
 	tr.tcpFlows, _, err = m.GetMap(tcpFlowsMapName)
@@ -136,6 +147,12 @@ func New(config *config.Config) (connection.Tracer, error) {
 		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", udpStatsName, err)
 	}
 
+	tr.inoToPID, _, err = m.GetMap(inoToPIDMap)
+	if err != nil {
+		tr.Stop()
+		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", inoToPIDMap, err)
+	}
+
 	if err = tr.initPerfPolling(); err != nil {
 		tr.Stop()
 		return nil, fmt.Errorf("error starting perf event polling: %s", err)
@@ -149,6 +166,7 @@ func (t *tracer) Start() (<-chan network.ConnectionStats, error) {
 	if err := t.m.Start(); err != nil {
 		return nil, fmt.Errorf("could not start ebpf manager: %s", err)
 	}
+	go t.getExistingSockets()
 	return t.closedCh, nil
 }
 
@@ -158,6 +176,35 @@ func (t *tracer) Stop() {
 	t.perfHandlerUDP.Stop()
 	if t.closedCh != nil {
 		close(t.closedCh)
+	}
+}
+
+func (t *tracer) getExistingSockets() {
+	err := t.walkProcFds()
+	if err != nil {
+		log.Warnf("error walking existing process fds to create ino-to-pid mapping: %s", err)
+		return
+	}
+
+	err = walkProcNets(t.cfg)
+	if err != nil {
+		log.Warnf("error walking existing processes to read existing sockets: %s", err)
+		return
+	}
+
+	probes := []string{tcp4SeqShowProbe, tcp6SeqShowProbe, udp4SeqShowProbe, udp6SeqShowProbe}
+	for _, probeName := range probes {
+		if sp, ok := t.m.GetProbe(manager.ProbeIdentificationPair{Section: probeName}); ok {
+			_ = sp.Stop()
+		}
+	}
+
+	maps := []string{tcpBoundPortsMap, inoToPIDMap}
+	for _, mapName := range maps {
+		m, _, _ := t.m.GetMap(mapName)
+		if m != nil {
+			_ = m.Close()
+		}
 	}
 }
 
