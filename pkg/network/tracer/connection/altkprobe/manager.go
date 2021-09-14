@@ -24,7 +24,7 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Name: "inet_csk_listen_start_args"},
 			{Name: "inet_csk_accept_args"},
 			{Name: "tcp_sendmsg_args"},
-			{Name: tcpBoundPortsMap},
+			{Name: boundPortsMap},
 			{Name: inoToPIDMap},
 
 			{Name: udpOpenSocksName},

@@ -8,7 +8,7 @@
 #include "bpf_helpers.h"
 #include "types.h"
 #include "netns.h"
-#include "inet.h"
+#include "sock.h"
 
 struct bpf_map_def SEC("maps/udp_open_socks") udp_open_socks = {
     .type = BPF_MAP_TYPE_HASH,
@@ -248,22 +248,44 @@ int kprobe__skb_consume_udp(struct pt_regs* ctx) {
 
 SEC("kprobe/udp4_seq_show")
 int kprobe__udp4_seq_show(struct pt_regs* ctx) {
-    void *v = PT_REGS_PARM2(ctx);
-    struct sock *skp = (struct sock *)v;
+    void *v = (void *)PT_REGS_PARM2(ctx);
     if (v == SEQ_START_TOKEN) {
         return 0;
     }
-    log_debug("kprobe/udp4_seq_show: sk=%llx\n", skp);
+    struct sock *skp = (struct sock *)v;
+    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE, &udp_open_socks);
+    if (family) {
+        tuple_t tup = { .protocol = IPPROTO_UDP, .family = family };
+        tuple_from_sock(skp, &tup);
+        flow_stats_t *statsp = ensure_udp_stats_exist(&tup, skp);
+        if (!statsp) {
+            return 0;
+        }
+
+        statsp->last_update = bpf_ktime_get_ns();
+    }
+    return 0;
 }
 
 SEC("kprobe/udp6_seq_show")
 int kprobe__udp6_seq_show(struct pt_regs* ctx) {
-    void *v = PT_REGS_PARM2(ctx);
-    struct sock *skp = (struct sock *)v;
+    void *v = (void *)PT_REGS_PARM2(ctx);
     if (v == SEQ_START_TOKEN) {
         return 0;
     }
-    log_debug("kprobe/udp6_seq_show: sk=%llx\n", skp);
+    struct sock *skp = (struct sock *)v;
+    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE, &udp_open_socks);
+    if (family) {
+        tuple_t tup = { .protocol = IPPROTO_UDP, .family = family };
+        tuple_from_sock(skp, &tup);
+        flow_stats_t *statsp = ensure_udp_stats_exist(&tup, skp);
+        if (!statsp) {
+            return 0;
+        }
+
+        statsp->last_update = bpf_ktime_get_ns();
+    }
+    return 0;
 }
 
 #endif

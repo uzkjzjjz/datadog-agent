@@ -11,13 +11,13 @@ import (
 	"unsafe"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
-	"github.com/DataDog/datadog-agent/pkg/util/log"
-
+	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/ebpf"
 	"github.com/DataDog/ebpf/manager"
 	"golang.org/x/sys/unix"
@@ -32,8 +32,9 @@ const (
 	udpStatsName         = "udp_stats"
 	udpTuplesToSocksName = "udp_tuples_to_socks"
 
-	tcpBoundPortsMap = "tcp_seq_listen_ports"
-	inoToPIDMap      = "ino_to_pid"
+	boundPortsMap = "seq_listen_ports"
+	inoToPIDMap   = "ino_to_pid"
+
 	tcp4SeqShowProbe = "kprobe/tcp4_seq_show"
 	tcp6SeqShowProbe = "kprobe/tcp6_seq_show"
 	udp4SeqShowProbe = "kprobe/udp4_seq_show"
@@ -58,6 +59,7 @@ type tracer struct {
 }
 
 func New(cfg *config.Config) (connection.Tracer, error) {
+	runtime.RuntimeCompilationEnabled = true
 	mgrOptions := manager.Options{
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
@@ -199,7 +201,7 @@ func (t *tracer) getExistingSockets() {
 		}
 	}
 
-	maps := []string{tcpBoundPortsMap, inoToPIDMap}
+	maps := []string{boundPortsMap, inoToPIDMap}
 	for _, mapName := range maps {
 		m, _, _ := t.m.GetMap(mapName)
 		if m != nil {
