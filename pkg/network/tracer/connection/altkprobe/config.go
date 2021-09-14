@@ -19,6 +19,8 @@ func enabledProbes(c *config.Config) (map[string]struct{}, error) {
 		enabled["kretprobe/inet_csk_accept"] = struct{}{}
 		enabled["kprobe/tcp_sendmsg"] = struct{}{}
 		enabled["kretprobe/tcp_sendmsg"] = struct{}{}
+		enabled["kprobe/tcp_sendpage"] = struct{}{}
+		enabled["kretprobe/tcp_sendpage"] = struct{}{}
 		enabled["kprobe/tcp_cleanup_rbuf"] = struct{}{}
 		enabled["kprobe/tcp_retransmit_skb"] = struct{}{}
 		enabled["kprobe/tcp_set_state"] = struct{}{}

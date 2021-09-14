@@ -24,6 +24,7 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Name: "inet_csk_listen_start_args"},
 			{Name: "inet_csk_accept_args"},
 			{Name: "tcp_sendmsg_args"},
+			{Name: "tcp_sendpage_args"},
 			{Name: boundPortsMap},
 			{Name: inoToPIDMap},
 
@@ -61,6 +62,8 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Section: "kretprobe/inet_csk_accept", KProbeMaxActive: maxActive},
 			{Section: "kprobe/tcp_sendmsg"},
 			{Section: "kretprobe/tcp_sendmsg", KProbeMaxActive: maxActive},
+			{Section: "kprobe/tcp_sendpage"},
+			{Section: "kretprobe/tcp_sendpage", KProbeMaxActive: maxActive},
 			{Section: "kprobe/tcp_cleanup_rbuf"},
 			{Section: "kprobe/tcp_retransmit_skb"},
 			{Section: "kprobe/tcp_set_state"},

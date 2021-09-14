@@ -63,6 +63,15 @@ struct bpf_map_def SEC("maps/tcp_sendmsg_args") tcp_sendmsg_args = {
     .namespace = "",
 };
 
+struct bpf_map_def SEC("maps/tcp_sendpage_args") tcp_sendpage_args = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(u64),
+    .value_size = sizeof(struct sock *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
 static __always_inline void update_rtt(struct sock *skp, tcp_flow_t *flow) {
     u32 rtt = 0;
     bpf_probe_read(&rtt, sizeof(rtt), &tcp_sk(skp)->srtt_us);
@@ -329,6 +338,42 @@ int kprobe__tcp6_seq_show(struct pt_regs* ctx) {
     if (family) {
         create_tcp_flow(skp, family, NULL);
     }
+    return 0;
+}
+
+SEC("kprobe/tcp_sendpage")
+int kprobe__tcp_sendpage(struct pt_regs* ctx) {
+    struct sock *skp = (struct sock *)PT_REGS_PARM1(ctx);
+    log_debug("kprobe/tcp_sendpage: sk=%llx\n", skp);
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    bpf_map_update_elem(&tcp_sendpage_args, &pid_tgid, &skp, BPF_ANY);
+    return 0;
+}
+
+SEC("kretprobe/tcp_sendpage")
+int kretprobe__tcp_sendpage(struct pt_regs* ctx) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct sock **skpp = bpf_map_lookup_elem(&tcp_sendpage_args, &pid_tgid);
+    if (!skpp) {
+        return 0;
+    }
+    bpf_map_delete_elem(&tcp_sendmsg_args, &pid_tgid);
+
+    int sent = (int)PT_REGS_RC(ctx);
+    if (sent <= 0) {
+        return 0;
+    }
+
+    struct sock *skp = *skpp;
+    log_debug("kretprobe/tcp_sendpage: sk=%llx sent=%u\n", skp, sent);
+    tcp_flow_t *flow = bpf_map_lookup_elem(&tcp_flows, &skp);
+    if (!flow) {
+        return 0;
+    }
+
+    flow->stats.last_update = bpf_ktime_get_ns();
+    __sync_fetch_and_add(&flow->stats.sent_bytes, sent);
+    update_rtt(skp, flow);
     return 0;
 }
 
