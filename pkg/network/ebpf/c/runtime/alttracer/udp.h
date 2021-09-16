@@ -10,28 +10,10 @@
 #include "netns.h"
 #include "sock.h"
 
-struct bpf_map_def SEC("maps/udp_open_socks") udp_open_socks = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(struct sock *),
-    .value_size = sizeof(socket_info_t),
-    .max_entries = 1024,
-    .pinning = 0,
-    .namespace = "",
-};
-
 struct bpf_map_def SEC("maps/udp_stats") udp_stats = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(tuple_t),
     .value_size = sizeof(flow_stats_t),
-    .max_entries = 1024,
-    .pinning = 0,
-    .namespace = "",
-};
-
-struct bpf_map_def SEC("maps/udp_tuples_to_socks") udp_tuples_to_socks = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(tuple_t),
-    .value_size = sizeof(struct sock *),
     .max_entries = 1024,
     .pinning = 0,
     .namespace = "",
@@ -54,15 +36,6 @@ struct bpf_map_def SEC("maps/udp_lib_get_port_args") udp_lib_get_port_args = {
     .pinning = 0,
     .namespace = "",
 };
-
-static __always_inline void add_udp_open_sock(struct sock *skp, enum conn_direction dir) {
-    socket_info_t udp_sk_info = {};
-    udp_sk_info.created_ns = bpf_ktime_get_ns();
-    udp_sk_info.tgid = bpf_get_current_pid_tgid() >> 32;
-    udp_sk_info.netns = get_netns(&skp->sk_net);
-    udp_sk_info.direction = dir;
-    bpf_map_update_elem(&udp_open_socks, &skp, &udp_sk_info, BPF_NOEXIST);
-}
 
 SEC("kprobe/udp_lib_get_port")
 int kprobe__udp_lib_get_port(struct pt_regs* ctx) {
@@ -93,7 +66,7 @@ int kretprobe__udp_lib_get_port(struct pt_regs* ctx) {
         return 0;
     }
 
-    socket_info_t *skinfop = bpf_map_lookup_elem(&udp_open_socks, &skp);
+    socket_info_t *skinfop = bpf_map_lookup_elem(&open_socks, &skp);
     if (!skinfop) {
         return 0;
     }
@@ -106,12 +79,12 @@ SEC("kprobe/udp_init_sock")
 int kprobe__udp_init_sock(struct pt_regs* ctx) {
     struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
     log_debug("kprobe/udp_init_sock: sk=%llx\n", skp);
-    socket_info_t *udp_sk_infop = bpf_map_lookup_elem(&udp_open_socks, &skp);
-    if (udp_sk_infop) {
+    socket_info_t *skinfop = bpf_map_lookup_elem(&open_socks, &skp);
+    if (skinfop) {
         return 0;
     }
 
-    add_udp_open_sock(skp, CONN_DIRECTION_OUTGOING);
+    add_open_sock(skp, IPPROTO_UDP, CONN_DIRECTION_OUTGOING);
     return 0;
 }
 
@@ -177,8 +150,7 @@ static __always_inline u64 udp_sk_buff_to_tuple(struct sk_buff *skb, u8 (*laddr)
 static __always_inline flow_stats_t *ensure_udp_stats_exist(tuple_t *tup, struct sock *skp) {
     flow_stats_t stats = {};
     bpf_map_update_elem(&udp_stats, tup, &stats, BPF_NOEXIST);
-    // TODO do we need to care if entry already exists for a tuple?
-    bpf_map_update_elem(&udp_tuples_to_socks, tup, &skp, BPF_ANY);
+    // TODO report new tuple to sock association to userspace
     return bpf_map_lookup_elem(&udp_stats, tup);
 }
 
@@ -189,7 +161,8 @@ static __always_inline int ip46_send_skb(struct sk_buff *skb) {
         return 0;
     }
 
-    tuple_t tup = { .protocol = IPPROTO_UDP };
+    u32 tgid = bpf_get_current_pid_tgid() >> 32;
+    tuple_t tup = { .protocol = IPPROTO_UDP, .tgid = tgid };
     u64 len = udp_sk_buff_to_tuple(skb, &tup.saddr, &tup.sport, &tup.daddr, &tup.dport, &tup.family);
     if (!len) {
         return 0;
@@ -228,7 +201,8 @@ int kprobe__skb_consume_udp(struct pt_regs* ctx) {
         return 0;
     }
 
-    tuple_t tup = { .protocol = IPPROTO_UDP };
+    u32 tgid = bpf_get_current_pid_tgid() >> 32;
+    tuple_t tup = { .protocol = IPPROTO_UDP, .tgid = tgid };
     // raddr needs to be datagram source address
     u64 readlen = udp_sk_buff_to_tuple(skb, &tup.daddr, &tup.dport, &tup.saddr, &tup.sport, &tup.family);
     if (!readlen) {
@@ -253,10 +227,11 @@ int kprobe__udp4_seq_show(struct pt_regs* ctx) {
         return 0;
     }
     struct sock *skp = (struct sock *)v;
-    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE, &udp_open_socks);
+    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE);
     if (family) {
-        tuple_t tup = { .protocol = IPPROTO_UDP, .family = family };
-        tuple_from_sock(skp, &tup);
+        u32 tgid = bpf_get_current_pid_tgid() >> 32;
+        tuple_t tup = {};
+        tuple_from_sock(skp, IPPROTO_UDP, tgid, &tup);
         flow_stats_t *statsp = ensure_udp_stats_exist(&tup, skp);
         if (!statsp) {
             return 0;
@@ -274,10 +249,11 @@ int kprobe__udp6_seq_show(struct pt_regs* ctx) {
         return 0;
     }
     struct sock *skp = (struct sock *)v;
-    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE, &udp_open_socks);
+    int family = read_fs_socket(skp, IPPROTO_UDP, TCP_CLOSE);
     if (family) {
-        tuple_t tup = { .protocol = IPPROTO_UDP, .family = family };
-        tuple_from_sock(skp, &tup);
+        u32 tgid = bpf_get_current_pid_tgid() >> 32;
+        tuple_t tup = {};
+        tuple_from_sock(skp, IPPROTO_UDP, tgid, &tup);
         flow_stats_t *statsp = ensure_udp_stats_exist(&tup, skp);
         if (!statsp) {
             return 0;

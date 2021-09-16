@@ -19,16 +19,17 @@ const (
 func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfHandler) *manager.Manager {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
-			{Name: tcpOpenSocksName},
+			{Name: openSocksName},
+			{Name: boundPortsMap},
+			{Name: inoToPIDMap},
+
 			{Name: tcpFlowsMapName},
+			{Name: tcpSockStatsMapName},
 			{Name: "inet_csk_listen_start_args"},
 			{Name: "inet_csk_accept_args"},
 			{Name: "tcp_sendmsg_args"},
 			{Name: "tcp_sendpage_args"},
-			{Name: boundPortsMap},
-			{Name: inoToPIDMap},
 
-			{Name: udpOpenSocksName},
 			{Name: udpStatsName},
 			{Name: udpTuplesToSocksName},
 		},

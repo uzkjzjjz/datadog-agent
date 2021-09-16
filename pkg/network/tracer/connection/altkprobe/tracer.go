@@ -27,8 +27,8 @@ const (
 	defaultClosedChannelSize = 500
 
 	tcpFlowsMapName      = "tcp_flows"
-	tcpOpenSocksName     = "tcp_open_socks"
-	udpOpenSocksName     = "udp_open_socks"
+	tcpSockStatsMapName  = "tcp_sock_stats"
+	openSocksName        = "open_socks"
 	udpStatsName         = "udp_stats"
 	udpTuplesToSocksName = "udp_tuples_to_socks"
 
@@ -44,16 +44,21 @@ const (
 var _ connection.Tracer = &tracer{}
 
 type tracer struct {
-	m                *manager.Manager
-	perfHandlerTCP   *ddebpf.PerfHandler
-	perfHandlerUDP   *ddebpf.PerfHandler
-	closedCh         chan network.ConnectionStats
-	tcpFlows         *ebpf.Map
-	tcpSocks         *ebpf.Map
-	udpSocks         *ebpf.Map
-	udpTuplesToSocks *ebpf.Map
-	udpStats         *ebpf.Map
-	inoToPID         *ebpf.Map
+	m              *manager.Manager
+	perfHandlerTCP *ddebpf.PerfHandler
+	perfHandlerUDP *ddebpf.PerfHandler
+	closedCh       chan network.ConnectionStats
+	tcpFlowsMap    *ebpf.Map
+	socks          *ebpf.Map
+	sockStats      *ebpf.Map
+	udpStats       *ebpf.Map
+	inoToPID       *ebpf.Map
+
+	// TODO max size on these maps?
+	// map from struct sock * to tgid(s), so we can craft a flow key
+	tcpFlows map[uint64][]uint32
+	// map from struct sock * to tuples
+	udpTuples map[uint64][]netebpf.Tuple
 
 	cfg *config.Config
 }
@@ -66,9 +71,9 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 			Max: math.MaxUint64,
 		},
 		MapSpecEditors: map[string]manager.MapSpecEditor{
-			tcpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			openSocksName:        {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			tcpSockStatsMapName:  {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			tcpFlowsMapName:      {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpOpenSocksName:     {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			udpStatsName:         {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			udpTuplesToSocksName: {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 		},
@@ -117,30 +122,26 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 		perfHandlerTCP: perfHandlerTCP,
 		perfHandlerUDP: perfHandlerUDP,
 		cfg:            cfg,
+		tcpFlows:       map[uint64][]uint32{},
+		udpTuples:      map[uint64][]netebpf.Tuple{},
 	}
 
-	tr.tcpFlows, _, err = m.GetMap(tcpFlowsMapName)
+	tr.tcpFlowsMap, _, err = m.GetMap(tcpFlowsMapName)
 	if err != nil {
 		tr.Stop()
 		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", tcpFlowsMapName, err)
 	}
 
-	tr.tcpSocks, _, err = m.GetMap(tcpOpenSocksName)
+	tr.socks, _, err = m.GetMap(openSocksName)
 	if err != nil {
 		tr.Stop()
-		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", tcpOpenSocksName, err)
+		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", openSocksName, err)
 	}
 
-	tr.udpSocks, _, err = m.GetMap(udpOpenSocksName)
+	tr.socks, _, err = m.GetMap(tcpSockStatsMapName)
 	if err != nil {
 		tr.Stop()
-		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", udpOpenSocksName, err)
-	}
-
-	tr.udpTuplesToSocks, _, err = m.GetMap(udpTuplesToSocksName)
-	if err != nil {
-		tr.Stop()
-		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", udpTuplesToSocksName, err)
+		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", tcpSockStatsMapName, err)
 	}
 
 	tr.udpStats, _, err = m.GetMap(udpStatsName)
@@ -179,6 +180,8 @@ func (t *tracer) Stop() {
 	if t.closedCh != nil {
 		close(t.closedCh)
 	}
+	t.tcpFlows = map[uint64][]uint32{}
+	t.udpTuples = map[uint64][]netebpf.Tuple{}
 }
 
 func (t *tracer) getExistingSockets() {
@@ -233,44 +236,48 @@ func connFamily(family uint8) network.ConnectionFamily {
 }
 
 func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*network.ConnectionStats) bool) ([]network.ConnectionStats, error) {
-	// Iterate through all key-value pairs in map
-	key, flow, skinfo := uint64(0), &netebpf.TCPFlow{}, &netebpf.SocketInfo{}
-	entries := t.tcpFlows.IterateFrom(unsafe.Pointer(&key))
-	for entries.Next(unsafe.Pointer(&key), unsafe.Pointer(flow)) {
-		err := t.tcpSocks.Lookup(unsafe.Pointer(&key), unsafe.Pointer(skinfo))
-		if err != nil {
-			continue
-		}
+	{
+		key, flow, skinfo, tcpStats := &netebpf.TCPFlowKey{}, &netebpf.TCPFlow{}, &netebpf.SocketInfo{}, &netebpf.TCPSockStats{}
+		entries := t.tcpFlowsMap.IterateFrom(unsafe.Pointer(&key))
+		for entries.Next(unsafe.Pointer(&key), unsafe.Pointer(flow)) {
+			err := t.socks.Lookup(unsafe.Pointer(&key), unsafe.Pointer(skinfo))
+			if err != nil {
+				continue
+			}
+			err = t.sockStats.Lookup(unsafe.Pointer(&key.Skp), unsafe.Pointer(tcpStats))
+			if err != nil {
+				continue
+			}
 
-		conn := toConn(key, &flow.Tup, &flow.Stats, skinfo, &flow.Tcpstats)
-		if filter != nil && filter(&conn) {
-			buffer = append(buffer, conn)
+			conn := toConn(key.Skp, &flow.Tup, &flow.Stats, skinfo, tcpStats)
+			if filter != nil && filter(&conn) {
+				buffer = append(buffer, conn)
+			}
+		}
+		if err := entries.Err(); err != nil {
+			return nil, fmt.Errorf("unable to iterate tcp connection map: %s", err)
 		}
 	}
-	if err := entries.Err(); err != nil {
-		return nil, fmt.Errorf("unable to iterate tcp connection map: %s", err)
-	}
 
-	sk, tup, stats := uint64(0), netebpf.Tuple{}, netebpf.FlowStats{}
-	entries = t.udpStats.IterateFrom(unsafe.Pointer(&tup))
-	for entries.Next(unsafe.Pointer(&tup), unsafe.Pointer(&stats)) {
-		err := t.udpTuplesToSocks.Lookup(unsafe.Pointer(&tup), unsafe.Pointer(&sk))
-		if err != nil {
-			continue
-		}
-		// TODO this seems unnecessary, simplify
-		err = t.udpSocks.Lookup(unsafe.Pointer(&sk), unsafe.Pointer(skinfo))
-		if err != nil {
-			continue
-		}
+	{
+		sk, tup, skinfo, stats := uint64(0), netebpf.Tuple{}, &netebpf.SocketInfo{}, netebpf.FlowStats{}
+		entries := t.udpStats.IterateFrom(unsafe.Pointer(&tup))
+		for entries.Next(unsafe.Pointer(&tup), unsafe.Pointer(&stats)) {
+			// TODO pivot from tuple to socket info?
+			// TODO this seems unnecessary, simplify
+			err := t.socks.Lookup(unsafe.Pointer(&sk), unsafe.Pointer(skinfo))
+			if err != nil {
+				continue
+			}
 
-		conn := toConn(sk, &tup, &stats, skinfo, nil)
-		if filter != nil && filter(&conn) {
-			buffer = append(buffer, conn)
+			conn := toConn(sk, &tup, &stats, skinfo, nil)
+			if filter != nil && filter(&conn) {
+				buffer = append(buffer, conn)
+			}
 		}
-	}
-	if err := entries.Err(); err != nil {
-		return nil, fmt.Errorf("unable to iterate udp connection map: %s", err)
+		if err := entries.Err(); err != nil {
+			return nil, fmt.Errorf("unable to iterate udp connection map: %s", err)
+		}
 	}
 
 	return buffer, nil
@@ -282,21 +289,31 @@ func (t *tracer) FlushPending() []network.ConnectionStats {
 }
 
 func (t *tracer) Remove(conn *network.ConnectionStats) error {
+	if err := t.socks.Delete(unsafe.Pointer(&conn.ID)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+		return err
+	}
+
 	if conn.Type == network.TCP {
-		if err := t.tcpSocks.Delete(unsafe.Pointer(&conn.ID)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
-			return err
+		var key netebpf.TCPFlowKey
+		if tgids, ok := t.tcpFlows[conn.ID]; ok {
+			for _, tgid := range tgids {
+				key.Skp, key.Tgid = conn.ID, tgid
+				if err := t.tcpFlowsMap.Delete(unsafe.Pointer(&key)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+					return err
+				}
+			}
+			delete(t.tcpFlows, conn.ID)
 		}
-		if err := t.tcpFlows.Delete(unsafe.Pointer(&conn.ID)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+
+		if err := t.sockStats.Delete(unsafe.Pointer(&conn.ID)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
 			return err
 		}
 	} else if conn.Type == network.UDP {
-		if err := t.udpSocks.Delete(unsafe.Pointer(&conn.ID)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
-			return err
-		}
 		tup := netebpf.Tuple{
 			Sport:    conn.SPort,
 			Dport:    conn.DPort,
 			Protocol: syscall.IPPROTO_UDP,
+			Tgid:     conn.Pid,
 		}
 		copy(tup.Saddr[:], conn.Source.Bytes())
 		copy(tup.Daddr[:], conn.Dest.Bytes())
@@ -307,9 +324,6 @@ func (t *tracer) Remove(conn *network.ConnectionStats) error {
 		}
 
 		if err := t.udpStats.Delete(unsafe.Pointer(&tup)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
-			return err
-		}
-		if err := t.udpTuplesToSocks.Delete(unsafe.Pointer(&tup)); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
 			return err
 		}
 	}
@@ -332,10 +346,10 @@ func toUDPEvent(b []byte) *netebpf.UDPCloseEvent {
 	return (*netebpf.UDPCloseEvent)(unsafe.Pointer(&b[0]))
 }
 
-func toConn(key uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo, tcpStats *netebpf.TCPFlowStats) network.ConnectionStats {
+func toConn(skp uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo, tcpStats *netebpf.TCPSockStats) network.ConnectionStats {
 	conn := network.ConnectionStats{
-		ID:                      key,
-		Pid:                     skinfo.Tgid,
+		ID:                      skp,
+		Pid:                     tuple.Tgid,
 		NetNS:                   skinfo.Netns,
 		LastUpdateEpoch:         stats.Last_update,
 		Direction:               network.ConnectionDirection(skinfo.Direction),
@@ -384,9 +398,31 @@ func (t *tracer) initPerfPolling() error {
 				}
 				//atomic.AddInt64(&t.perfReceived, 1)
 				evt := toTCPEvent(eventData.Data)
-				c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Flow.Tcpstats)
-				log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
-				t.closedCh <- c
+				if tgids, ok := t.tcpFlows[evt.Skp]; ok {
+					key, flow := netebpf.TCPFlowKey{}, netebpf.TCPFlow{}
+					for _, tgid := range tgids {
+						if tgid == evt.Flow.Tup.Tgid {
+							c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Tcpstats)
+							//log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
+							t.closedCh <- c
+						} else {
+							key.Skp, key.Tgid = evt.Skp, tgid
+							if err := t.tcpFlowsMap.Lookup(unsafe.Pointer(&key), unsafe.Pointer(&flow)); err == nil {
+								addStats := evt.Tcpstats
+								addStats.Retransmits = 0
+								c := toConn(evt.Skp, &flow.Tup, &flow.Stats, &evt.Skinfo, &addStats)
+								//log.Debugf("add closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
+								t.closedCh <- c
+							}
+						}
+					}
+					delete(t.tcpFlows, evt.Skp)
+				} else {
+					// pass through data as given
+					c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Tcpstats)
+					//log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
+					t.closedCh <- c
+				}
 			case _, ok := <-t.perfHandlerTCP.LostChannel:
 				if !ok {
 					return
@@ -399,10 +435,9 @@ func (t *tracer) initPerfPolling() error {
 				}
 				//atomic.AddInt64(&t.perfReceived, 1)
 				evt := toUDPEvent(eventData.Data)
-				tups, err := t.findUDPTuplesFromSock(evt.Skp)
-				if err != nil {
-					log.Warnf("error finding udp tuples from sk: %s", err)
-					return
+				tups, ok := t.udpTuples[evt.Skp]
+				if !ok {
+					continue
 				}
 				for _, tp := range tups {
 					st := netebpf.FlowStats{}
@@ -410,9 +445,10 @@ func (t *tracer) initPerfPolling() error {
 						continue
 					}
 					c := toConn(evt.Skp, &tp, &st, &evt.Skinfo, nil)
-					log.Debugf("closed udp conn: %x %s", evt.Skp, c)
+					//log.Debugf("closed udp conn: %x %s", evt.Skp, c)
 					t.closedCh <- c
 				}
+				delete(t.udpTuples, evt.Skp)
 
 			case _, ok := <-t.perfHandlerUDP.LostChannel:
 				if !ok {
@@ -424,20 +460,4 @@ func (t *tracer) initPerfPolling() error {
 	}()
 
 	return nil
-}
-
-func (t *tracer) findUDPTuplesFromSock(sk uint64) ([]netebpf.Tuple, error) {
-	tp, entrySk := netebpf.Tuple{}, uint64(0)
-	entries := t.udpStats.IterateFrom(unsafe.Pointer(&tp))
-
-	var tuples []netebpf.Tuple
-	for entries.Next(unsafe.Pointer(&tp), unsafe.Pointer(&entrySk)) {
-		if sk == entrySk {
-			tuples = append(tuples, tp)
-		}
-	}
-	if err := entries.Err(); err != nil {
-		return nil, err
-	}
-	return tuples, nil
 }
