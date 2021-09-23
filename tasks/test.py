@@ -58,6 +58,7 @@ TOOL_LIST = [
     'gotest.tools/gotestsum',
     'honnef.co/go/tools/cmd/staticcheck',
     'github.com/vektra/mockery/v2',
+    'golang.org/x/perf/cmd/benchstat',
 ]
 
 TOOL_LIST_PROTO = [

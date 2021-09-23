@@ -24,22 +24,22 @@ for _ in {1..5}
 do
   go test \
     -mod=mod \
-    -tags linux_bpf \
-    ./pkg/network/ebpf/... \
+    -tags npm,linux_bpf \
+    ./pkg/network/tracer/connection/kprobe \
     -bench BenchmarkTCPLatency \
     -count=1 \
     -run XXX \
-    >> "${RESFILE}"
+    | tee -a "${RESFILE}"
   go test \
     -mod=mod \
-    -tags linux_bpf \
-    ./pkg/network/ebpf/... \
+    -tags npm,linux_bpf \
+    ./pkg/network/tracer/connection/kprobe \
     -bench BenchmarkUDPLatency \
     -count=1 \
     -run XXX \
-    >> "${RESFILE}"
+    | tee -a "${RESFILE}"
 done
 
-benchstat -sort name "${RESFILE}" > "${STATFILE}"
+benchstat -sort name "${RESFILE}" | tee "${STATFILE}"
 echo "${RESFILE}"
 echo "${STATFILE}"

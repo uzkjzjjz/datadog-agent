@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"testing"
 
 	"github.com/DataDog/datadog-agent/pkg/process/util"
@@ -32,31 +33,82 @@ func StartServerTCPNs(t *testing.T, ip net.IP, port int, ns string) io.Closer {
 // It will respond to any connection with "hello" and then close the connection.
 // It returns an io.Closer that should be Close'd when you are finished with it.
 func StartServerTCP(t *testing.T, ip net.IP, port int) io.Closer {
-	ch := make(chan struct{})
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	_, closer, err := NewTCPServerOnAddress(ip, uint16(port), func(c net.Conn) {
+		_, _ = c.Write([]byte("hello"))
+		c.Close()
+	})
+	require.NoError(t, err)
+	return closer
+}
+
+func NewTCPServer(onMessage func(c net.Conn)) (string, io.Closer, error) {
+	return NewTCPServerOnAddress(net.ParseIP("127.0.0.1"), 0, onMessage)
+}
+
+func NewTCPServerOnAddress(addr net.IP, port uint16, onMessage func(c net.Conn)) (string, io.Closer, error) {
 	network := "tcp"
-	if isIpv6(ip) {
+	if isIpv6(addr) {
 		network = "tcp6"
-		addr = fmt.Sprintf("[%s]:%d", ip, port)
+	}
+	ln, err := net.Listen(network, net.JoinHostPort(addr.String(), strconv.Itoa(int(port))))
+	if err != nil {
+		return "", nil, err
 	}
 
-	l, err := net.Listen(network, addr)
-	require.NoError(t, err)
+	started := make(chan struct{})
 	go func() {
-		close(ch)
+		close(started)
 		for {
-			conn, err := l.Accept()
+			conn, err := ln.Accept()
 			if err != nil {
 				return
 			}
-
-			_, _ = conn.Write([]byte("hello"))
-			conn.Close()
+			go onMessage(conn)
 		}
 	}()
-	<-ch
 
-	return l
+	<-started
+	return ln.Addr().String(), ln, nil
+}
+
+func NewUDPServer(payloadSize int, onMessage func(b []byte, n int) []byte) (string, io.Closer, error) {
+	return NewUDPServerOnAddress(net.ParseIP("127.0.0.1"), 0, payloadSize, onMessage)
+}
+
+func NewUDPServerOnAddress(addr net.IP, port int, payloadSize int, onMessage func(b []byte, n int) []byte) (string, io.Closer, error) {
+	network := "udp"
+	if isIpv6(addr) {
+		network = "udp6"
+	}
+	udpAddr, err := net.ResolveUDPAddr(network, net.JoinHostPort(addr.String(), strconv.Itoa(port)))
+	if err != nil {
+		return "", nil, err
+	}
+	ln, err := net.ListenUDP(network, udpAddr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	started := make(chan struct{})
+	go func() {
+		close(started)
+		buf := make([]byte, payloadSize)
+		for {
+			n, addr, err := ln.ReadFrom(buf)
+			if err != nil {
+				break
+			}
+			_, err = ln.WriteTo(onMessage(buf, n), addr)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+		}
+		ln.Close()
+	}()
+
+	<-started
+	return ln.LocalAddr().String(), ln, nil
 }
 
 // StartServerUDPNs is identical to StartServerUDP, but it operates with the
