@@ -65,18 +65,18 @@ func benchLatencyEchoTCP(size int) func(b *testing.B) {
 		require.NoError(b, err)
 		defer closer.Close()
 
-		c, err := net.DialTimeout("tcp", addr, 50*time.Millisecond)
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer c.Close()
-		r := bufio.NewReader(c)
-
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			c, err := net.DialTimeout("tcp", addr, 50*time.Millisecond)
+			if err != nil {
+				b.Fatal(err)
+			}
+			r := bufio.NewReader(c)
+
 			c.Write(payload)
 			buf, err := r.ReadBytes(byte('\n'))
 
+			c.Close()
 			if err != nil || len(buf) != len(payload) || !bytes.Equal(payload, buf) {
 				b.Fatalf("Sizes: %d, %d. Equal: %v. Error: %s", len(buf), len(payload), bytes.Equal(payload, buf), err)
 			}
@@ -98,19 +98,19 @@ func benchLatencyEchoUDP(size int) func(b *testing.B) {
 		require.NoError(b, err)
 		defer closer.Close()
 
-		c, err := net.DialTimeout("udp", addr, 50*time.Millisecond)
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer c.Close()
-		r := bufio.NewReader(c)
-
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			c, err := net.DialTimeout("udp", addr, 50*time.Millisecond)
+			if err != nil {
+				b.Fatal(err)
+			}
+			r := bufio.NewReader(c)
+
 			c.Write(payload)
 			buf := make([]byte, size)
 			n, err := r.Read(buf)
 
+			c.Close()
 			if err != nil || n != len(payload) || !bytes.Equal(payload, buf) {
 				b.Fatalf("Sizes: %d, %d. Equal: %v. Error: %s", len(buf), len(payload), bytes.Equal(payload, buf), err)
 			}
