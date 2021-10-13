@@ -12,6 +12,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/ebpf/manager"
 	"golang.org/x/sys/unix"
 )
@@ -133,7 +134,7 @@ func EnableBPFStats() (func() error, error) {
 		}
 	}
 
-	err = writeSysctl(bpfSysctlProcfile, []byte("1"))
+	err = writeSysctl(util.HostProc(bpfSysctlProcfile), []byte("1"))
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func disableBPFStats(fd *wrappedFD) func() error {
 		if fd != nil {
 			return fd.Close()
 		}
-		return writeSysctl(bpfSysctlProcfile, []byte("0"))
+		return writeSysctl(util.HostProc(bpfSysctlProcfile), []byte("0"))
 	}
 }
 
@@ -170,7 +171,7 @@ func getProgramStats(fd int) (*bpfProgramStats, error) {
 	}, nil
 }
 
-var bpfSysctlProcfile = "/proc/sys/kernel/bpf_stats_enabled"
+var bpfSysctlProcfile = "/sys/kernel/bpf_stats_enabled"
 
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
