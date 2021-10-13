@@ -185,8 +185,9 @@ func fileExists(path string) (bool, error) {
 }
 
 func validSysctlPath(path string) error {
-	if !strings.HasPrefix(path, "/proc/sys/kernel/") {
-		return fmt.Errorf("invalid sysctl path %s, it must begin with /proc/sys/kernel/", path)
+	prefix := util.HostProc("/sys/kernel/")
+	if !strings.HasPrefix(path, prefix) {
+		return fmt.Errorf("invalid sysctl path %s, it must begin with %s", path, prefix)
 	}
 	exists, err := fileExists(path)
 	if err != nil {
