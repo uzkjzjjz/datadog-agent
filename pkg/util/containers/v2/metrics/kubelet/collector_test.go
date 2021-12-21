@@ -37,16 +37,16 @@ func TestKubeletCollectorLinux(t *testing.T) {
 			Name:      "kube-dns-5877696fb4-m6cvp",
 			Namespace: "kube-system",
 		},
-		Containers: []workloadmeta.OrchestratorContainer{
-			{
+		Containers: map[string]workloadmeta.OrchestratorContainer{
+			"cID1": {
 				ID:   "cID1",
 				Name: "kubedns",
 			},
-			{
+			"cID2": {
 				ID:   "cID2",
 				Name: "prometheus-to-sd",
 			},
-			{
+			"cID3": {
 				ID:   "cID3",
 				Name: "sidecar",
 			},
@@ -156,8 +156,8 @@ func TestKubeletCollectorWindows(t *testing.T) {
 			Name:      "dd-datadog-lbvkl",
 			Namespace: "default",
 		},
-		Containers: []workloadmeta.OrchestratorContainer{
-			{
+		Containers: map[string]workloadmeta.OrchestratorContainer{
+			"cID1": {
 				ID:   "cID1",
 				Name: "process-agent",
 			},
