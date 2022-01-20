@@ -44,7 +44,6 @@ core,github.com/DataDog/gohai/network,MIT,Datadog <info@datadoghq.com> | Kentaro
 core,github.com/DataDog/gohai/platform,MIT,Datadog <info@datadoghq.com> | Kentaro Kuribayashi <kentarok@gmail.com>
 core,github.com/DataDog/gohai/processes,MIT,Datadog <info@datadoghq.com> | Kentaro Kuribayashi <kentarok@gmail.com>
 core,github.com/DataDog/gohai/processes/gops,MIT,Datadog <info@datadoghq.com> | Kentaro Kuribayashi <kentarok@gmail.com>
-core,github.com/DataDog/gohai/utils,MIT,Datadog <info@datadoghq.com> | Kentaro Kuribayashi <kentarok@gmail.com>
 core,github.com/DataDog/gopsutil/cpu,BSD-3-Clause,The Go Authors | WAKAYAMA Shirou
 core,github.com/DataDog/gopsutil/host,BSD-3-Clause,The Go Authors | WAKAYAMA Shirou
 core,github.com/DataDog/gopsutil/internal/common,BSD-3-Clause,The Go Authors | WAKAYAMA Shirou
@@ -336,9 +335,6 @@ core,github.com/fatih/color,MIT,Fatih Arslan
 core,github.com/felixge/httpsnoop,MIT,Felix Geisendörfer (felix@debuggable.com)
 core,github.com/florianl/go-conntrack,MIT,Florian Lehner <dev@der-flo.net>
 core,github.com/florianl/go-conntrack/internal/unix,MIT,Florian Lehner <dev@der-flo.net>
-core,github.com/florianl/go-tc,MIT,Florian Lehner <dev@der-flo.net>
-core,github.com/florianl/go-tc/core,MIT,Florian Lehner <dev@der-flo.net>
-core,github.com/florianl/go-tc/internal/unix,MIT,Florian Lehner <dev@der-flo.net>
 core,github.com/freddierice/go-losetup,MIT,Freddie Rice
 core,github.com/fsnotify/fsnotify,BSD-3-Clause,The fsnotify authors
 core,github.com/ghodss/yaml,MIT,Sam Ghods | The Go Authors
