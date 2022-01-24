@@ -24,7 +24,7 @@ var mainProbes = map[string]string{
 	"kprobe/inet_csk_accept":          "kprobe__inet_csk_accept",
 	"kretprobe_inet_csk_accept":       "kretprobe__inet_csk_accept",
 	"kprobe/tcp_sendmsg":              "kprobe__tcp_sendmsg",
-	"kretprobe/tcp_sendmsg":           "kretprobe_tcp_sendmsg",
+	"kretprobe/tcp_sendmsg":           "kretprobe__tcp_sendmsg",
 	"kprobe/tcp_sendpage":             "kprobe__tcp_sendpage",
 	"kretprobe/tcp_sendpage":          "kretprobe__tcp_sendpage",
 	"kprobe/tcp_cleanup_rbuf":         "kprobe__tcp_cleanup_rbuf",
@@ -53,7 +53,6 @@ func newManager(tcpClosedHandler *ebpf.PerfHandler, udpClosedHandler *ebpf.PerfH
 			{Name: "tcp_sendpage_args"},
 
 			{Name: udpStatsName},
-			{Name: udpTuplesToSocksName},
 		},
 		PerfMaps: []*manager.PerfMap{
 			{

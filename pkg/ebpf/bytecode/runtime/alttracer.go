@@ -3,4 +3,4 @@
 
 package runtime
 
-var Alttracer = NewRuntimeAsset("alttracer.c", "b2c668bfe0a14c8a46f9d00ae8b38e91984d84b9d6409a8bd7ca84e9882e3531")
+var Alttracer = NewRuntimeAsset("alttracer.c", "647b2f456e4e21c355fafe2d04aadd603fa9b01f072ee7d33f5e0b6de0fde713")

@@ -27,7 +27,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
             tcp_close_event_t evt = {
                 .skp = (__u64)skp,
                 .skinfo = *skinfop,
-                .stats = *tcpstatsp,
+                .tcpstats = *tcpstatsp,
                 //.flow = *flowp,
             };
             if (bpf_perf_event_output(ctx, &tcp_close_event, BPF_F_CURRENT_CPU, &evt, sizeof(evt))) {

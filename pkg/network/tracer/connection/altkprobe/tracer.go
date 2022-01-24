@@ -25,11 +25,10 @@ import (
 const (
 	defaultClosedChannelSize = 500
 
-	tcpFlowsMapName      = "tcp_flows"
-	tcpSockStatsMapName  = "tcp_sock_stats"
-	openSocksName        = "open_socks"
-	udpStatsName         = "udp_stats"
-	udpTuplesToSocksName = "udp_tuples_to_socks"
+	tcpFlowsMapName     = "tcp_flows"
+	tcpSockStatsMapName = "tcp_sock_stats"
+	openSocksName       = "open_socks"
+	udpStatsName        = "udp_stats"
 
 	boundPortsMap = "seq_listen_ports"
 	inoToPIDMap   = "ino_to_pid"
@@ -74,11 +73,10 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 			Max: math.MaxUint64,
 		},
 		MapSpecEditors: map[string]manager.MapSpecEditor{
-			openSocksName:        {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			tcpSockStatsMapName:  {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			tcpFlowsMapName:      {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpStatsName:         {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
-			udpTuplesToSocksName: {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			openSocksName:       {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			tcpSockStatsMapName: {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			tcpFlowsMapName:     {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			udpStatsName:        {Type: ebpf.Hash, MaxEntries: uint32(cfg.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 		},
 	}
 
@@ -142,7 +140,7 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", openSocksName, err)
 	}
 
-	tr.socks, _, err = m.GetMap(tcpSockStatsMapName)
+	tr.sockStats, _, err = m.GetMap(tcpSockStatsMapName)
 	if err != nil {
 		tr.Stop()
 		return nil, fmt.Errorf("error retrieving the bpf %s map: %s", tcpSockStatsMapName, err)
@@ -241,7 +239,7 @@ func (t *tracer) GetConnections(buffer *network.ConnectionBuffer, filter func(*n
 		key, flow, skinfo, tcpStats := &netebpf.TCPFlowKey{}, &netebpf.TCPFlow{}, &netebpf.SocketInfo{}, &netebpf.TCPSockStats{}
 		entries := t.tcpFlowsMap.Iterate()
 		for entries.Next(unsafe.Pointer(&key), unsafe.Pointer(flow)) {
-			err := t.socks.Lookup(unsafe.Pointer(&key), unsafe.Pointer(skinfo))
+			err := t.socks.Lookup(unsafe.Pointer(&key.Skp), unsafe.Pointer(skinfo))
 			if err != nil {
 				continue
 			}
