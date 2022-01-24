@@ -11,15 +11,14 @@ import (
 	"unsafe"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
-	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/ebpf"
-	"github.com/DataDog/ebpf/manager"
+	"github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
 	"golang.org/x/sys/unix"
 )
 
@@ -47,7 +46,7 @@ type tracer struct {
 	m              *manager.Manager
 	perfHandlerTCP *ddebpf.PerfHandler
 	perfHandlerUDP *ddebpf.PerfHandler
-	closedCh       chan network.ConnectionStats
+	callback       func([]network.ConnectionStats)
 	tcpFlowsMap    *ebpf.Map
 	socks          *ebpf.Map
 	sockStats      *ebpf.Map
@@ -63,8 +62,12 @@ type tracer struct {
 	cfg *config.Config
 }
 
+func (t *tracer) DumpMaps(_ ...string) (string, error) {
+	//TODO implement me
+	return "", nil
+}
+
 func New(cfg *config.Config) (connection.Tracer, error) {
-	runtime.RuntimeCompilationEnabled = true
 	mgrOptions := manager.Options{
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
@@ -98,16 +101,17 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 	}
 	// exclude all non-enabled probes to ensure we don't run into problems with unsupported probe types
 	for _, p := range m.Probes {
-		if _, enabled := enabledProbes[p.Section]; !enabled {
-			mgrOptions.ExcludedSections = append(mgrOptions.ExcludedSections, p.Section)
+		if _, enabled := enabledProbes[p.EBPFSection]; !enabled {
+			mgrOptions.ExcludedFunctions = append(mgrOptions.ExcludedFunctions, p.EBPFFuncName)
 		}
 	}
-	for probeName := range enabledProbes {
+	for probeName, funcName := range enabledProbes {
 		mgrOptions.ActivatedProbes = append(
 			mgrOptions.ActivatedProbes,
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
-					Section: probeName,
+					EBPFSection:  probeName,
+					EBPFFuncName: funcName,
 				},
 			})
 	}
@@ -164,22 +168,19 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 	return tr, nil
 }
 
-func (t *tracer) Start() (<-chan network.ConnectionStats, error) {
-	t.closedCh = make(chan network.ConnectionStats)
+func (t *tracer) Start(callback func([]network.ConnectionStats)) error {
 	if err := t.m.Start(); err != nil {
-		return nil, fmt.Errorf("could not start ebpf manager: %s", err)
+		return fmt.Errorf("could not start ebpf manager: %s", err)
 	}
+	t.callback = callback
 	go t.getExistingSockets()
-	return t.closedCh, nil
+	return nil
 }
 
 func (t *tracer) Stop() {
 	_ = t.m.Stop(manager.CleanAll)
 	t.perfHandlerTCP.Stop()
 	t.perfHandlerUDP.Stop()
-	if t.closedCh != nil {
-		close(t.closedCh)
-	}
 	t.tcpFlows = map[uint64][]uint32{}
 	t.udpTuples = map[uint64][]netebpf.Tuple{}
 }
@@ -199,7 +200,7 @@ func (t *tracer) getExistingSockets() {
 
 	probes := []string{tcp4SeqShowProbe, tcp6SeqShowProbe, udp4SeqShowProbe, udp6SeqShowProbe}
 	for _, probeName := range probes {
-		if sp, ok := t.m.GetProbe(manager.ProbeIdentificationPair{Section: probeName}); ok {
+		if sp, ok := t.m.GetProbe(manager.ProbeIdentificationPair{EBPFSection: probeName, EBPFFuncName: ""}); ok {
 			_ = sp.Stop()
 		}
 	}
@@ -235,10 +236,10 @@ func connFamily(family uint8) network.ConnectionFamily {
 	}
 }
 
-func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*network.ConnectionStats) bool) ([]network.ConnectionStats, error) {
+func (t *tracer) GetConnections(buffer *network.ConnectionBuffer, filter func(*network.ConnectionStats) bool) error {
 	{
 		key, flow, skinfo, tcpStats := &netebpf.TCPFlowKey{}, &netebpf.TCPFlow{}, &netebpf.SocketInfo{}, &netebpf.TCPSockStats{}
-		entries := t.tcpFlowsMap.IterateFrom(unsafe.Pointer(&key))
+		entries := t.tcpFlowsMap.Iterate()
 		for entries.Next(unsafe.Pointer(&key), unsafe.Pointer(flow)) {
 			err := t.socks.Lookup(unsafe.Pointer(&key), unsafe.Pointer(skinfo))
 			if err != nil {
@@ -250,18 +251,18 @@ func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*n
 			}
 
 			conn := toConn(key.Skp, &flow.Tup, &flow.Stats, skinfo, tcpStats)
-			if filter != nil && filter(&conn) {
-				buffer = append(buffer, conn)
+			if filter != nil && filter(conn) {
+				*buffer.Next() = *conn
 			}
 		}
 		if err := entries.Err(); err != nil {
-			return nil, fmt.Errorf("unable to iterate tcp connection map: %s", err)
+			return fmt.Errorf("unable to iterate tcp connection map: %s", err)
 		}
 	}
 
 	{
 		sk, tup, skinfo, stats := uint64(0), netebpf.Tuple{}, &netebpf.SocketInfo{}, netebpf.FlowStats{}
-		entries := t.udpStats.IterateFrom(unsafe.Pointer(&tup))
+		entries := t.udpStats.Iterate()
 		for entries.Next(unsafe.Pointer(&tup), unsafe.Pointer(&stats)) {
 			// TODO pivot from tuple to socket info?
 			// TODO this seems unnecessary, simplify
@@ -271,21 +272,20 @@ func (t *tracer) GetConnections(buffer []network.ConnectionStats, filter func(*n
 			}
 
 			conn := toConn(sk, &tup, &stats, skinfo, nil)
-			if filter != nil && filter(&conn) {
-				buffer = append(buffer, conn)
+			if filter != nil && filter(conn) {
+				*buffer.Next() = *conn
 			}
 		}
 		if err := entries.Err(); err != nil {
-			return nil, fmt.Errorf("unable to iterate udp connection map: %s", err)
+			return fmt.Errorf("unable to iterate udp connection map: %s", err)
 		}
 	}
 
-	return buffer, nil
+	return nil
 }
 
-func (t *tracer) FlushPending() []network.ConnectionStats {
+func (t *tracer) FlushPending() {
 	// TODO implement
-	return nil
 }
 
 func (t *tracer) Remove(conn *network.ConnectionStats) error {
@@ -346,7 +346,7 @@ func toUDPEvent(b []byte) *netebpf.UDPCloseEvent {
 	return (*netebpf.UDPCloseEvent)(unsafe.Pointer(&b[0]))
 }
 
-func toConn(skp uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo, tcpStats *netebpf.TCPSockStats) network.ConnectionStats {
+func toConn(skp uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *netebpf.SocketInfo, tcpStats *netebpf.TCPSockStats) *network.ConnectionStats {
 	conn := network.ConnectionStats{
 		ID:                      skp,
 		Pid:                     tuple.Tgid,
@@ -385,7 +385,7 @@ func toConn(skp uint64, tuple *netebpf.Tuple, stats *netebpf.FlowStats, skinfo *
 		conn.Dest = util.V6AddressFromBytes(tuple.Daddr[:])
 	}
 
-	return conn
+	return &conn
 }
 
 func (t *tracer) initPerfPolling() error {
@@ -404,7 +404,7 @@ func (t *tracer) initPerfPolling() error {
 						if tgid == evt.Flow.Tup.Tgid {
 							c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Tcpstats)
 							//log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
-							t.closedCh <- c
+							t.callback([]network.ConnectionStats{*c})
 						} else {
 							key.Skp, key.Tgid = evt.Skp, tgid
 							if err := t.tcpFlowsMap.Lookup(unsafe.Pointer(&key), unsafe.Pointer(&flow)); err == nil {
@@ -412,7 +412,7 @@ func (t *tracer) initPerfPolling() error {
 								addStats.Retransmits = 0
 								c := toConn(evt.Skp, &flow.Tup, &flow.Stats, &evt.Skinfo, &addStats)
 								//log.Debugf("add closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
-								t.closedCh <- c
+								t.callback([]network.ConnectionStats{*c})
 							}
 						}
 					}
@@ -421,7 +421,7 @@ func (t *tracer) initPerfPolling() error {
 					// pass through data as given
 					c := toConn(evt.Skp, &evt.Flow.Tup, &evt.Flow.Stats, &evt.Skinfo, &evt.Tcpstats)
 					//log.Debugf("closed tcp conn: %x state=%x %s", evt.Skp, evt.Flow.Tcpstats.State_transitions, c)
-					t.closedCh <- c
+					t.callback([]network.ConnectionStats{*c})
 				}
 			case _, ok := <-t.perfHandlerTCP.LostChannel:
 				if !ok {
@@ -439,6 +439,7 @@ func (t *tracer) initPerfPolling() error {
 				if !ok {
 					continue
 				}
+				conns := make([]network.ConnectionStats, 0, len(tups))
 				for _, tp := range tups {
 					st := netebpf.FlowStats{}
 					if err := t.udpStats.Lookup(unsafe.Pointer(&tp), unsafe.Pointer(&st)); err != nil {
@@ -446,8 +447,9 @@ func (t *tracer) initPerfPolling() error {
 					}
 					c := toConn(evt.Skp, &tp, &st, &evt.Skinfo, nil)
 					//log.Debugf("closed udp conn: %x %s", evt.Skp, c)
-					t.closedCh <- c
+					conns = append(conns, *c)
 				}
+				t.callback(conns)
 				delete(t.udpTuples, evt.Skp)
 
 			case _, ok := <-t.perfHandlerUDP.LostChannel:
