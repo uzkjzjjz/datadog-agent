@@ -655,6 +655,7 @@ def generate_runtime_files(ctx):
         "./pkg/network/tracer/connection/kprobe/compile.go",
         "./pkg/network/tracer/connection/altkprobe/compile.go",
         "./pkg/security/probe/compile.go",
+        "./pkg/network/tracer/connection/skb/compile.go",
     ]
     for f in runtime_compiler_files:
         ctx.run(f"go generate -mod=mod -tags {BPF_TAG} {f}")
@@ -694,6 +695,7 @@ def generate_cgo_types(ctx, windows=is_windows, replace_absolutes=True):
             "./pkg/network/ebpf/tuple_types.go",
             "./pkg/network/ebpf/kprobe_types.go",
             "./pkg/network/ebpf/altkprobe_types.go",
+            "./pkg/network/ebpf/skbtracer_types.go",
         ]
 
     for f in def_files:

@@ -14,6 +14,8 @@ import (
 	manager "github.com/DataDog/ebpf-manager"
 )
 
+type PerfFunc func(CPU int, data []byte, perfMap *manager.PerfMap, manager *manager.Manager)
+
 type PerfHandler struct {
 	DataChannel chan *DataEvent
 	LostChannel chan uint64

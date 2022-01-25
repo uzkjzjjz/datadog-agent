@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/dns"
@@ -51,6 +52,13 @@ func (c ConnectionFamily) String() string {
 		return "v4"
 	}
 	return "v6"
+}
+
+func (c ConnectionFamily) SyscallType() uint8 {
+	if c == AFINET {
+		return syscall.AF_INET
+	}
+	return syscall.AF_INET6
 }
 
 // ConnectionDirection indicates if the connection is incoming to the host or outbound

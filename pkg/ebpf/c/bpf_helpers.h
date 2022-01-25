@@ -80,8 +80,17 @@ static int (*bpf_probe_read_str)(void* dst, int size, void* unsafe_ptr) = (void*
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
 static int (*bpf_probe_read_user_str)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_user_str;
 static int (*bpf_probe_read_kernel_str)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_kernel_str;
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+static int (*bpf_probe_read_user_str)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_str;
+static int (*bpf_probe_read_kernel_str)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_str;
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
 static int (*bpf_probe_read_user)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_user;
 static int (*bpf_probe_read_kernel)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read_kernel;
+#else
+static int (*bpf_probe_read_user)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read;
+static int (*bpf_probe_read_kernel)(void* dst, int size, void* unsafe_ptr) = (void*)BPF_FUNC_probe_read;
 #endif
 
 #pragma clang diagnostic pop

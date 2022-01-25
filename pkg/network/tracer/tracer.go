@@ -29,8 +29,8 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/http"
 	"github.com/DataDog/datadog-agent/pkg/network/netlink"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection"
-	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/altkprobe"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
+	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/skb"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
@@ -132,7 +132,7 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 
 	var ebpfTracer connection.Tracer
 	if config.EnableRuntimeCompiler {
-		ebpfTracer, err = altkprobe.New(config)
+		ebpfTracer, err = skb.New(config)
 	} else {
 		ebpfTracer, err = kprobe.New(config, constantEditors)
 	}

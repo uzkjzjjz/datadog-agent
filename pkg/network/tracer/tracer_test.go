@@ -463,24 +463,29 @@ func TestUDPSendAndReceive(t *testing.T) {
 
 	// Iterate through active connections until we find connection created above, and confirm send + recv counts
 	connections := getConnections(t, tr)
+	pid := uint32(os.Getpid())
 
 	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)
-	require.True(t, ok)
-
-	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
-	require.True(t, ok)
-
-	assert.Equal(t, network.INCOMING, incoming.Direction, "incoming flow direction is incorrect")
-	assert.Equal(t, network.OUTGOING, outgoing.Direction, "outgoing flow direction is incorrect")
+	if assert.True(t, ok) {
+		assert.Equal(t, network.INCOMING, incoming.Direction, "incoming flow direction is incorrect")
+		assert.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes))
+		assert.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes))
+		assert.True(t, incoming.IntraHost)
+		assert.Equal(t, pid, incoming.Pid)
+	}
 
 	assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
 	assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
 	assert.True(t, outgoing.IntraHost)
 
-	// make sure the inverse values are seen for the other message
-	assert.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes))
-	assert.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes))
-	assert.True(t, incoming.IntraHost)
+	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
+	if assert.True(t, ok) {
+		assert.Equal(t, network.OUTGOING, outgoing.Direction, "outgoing flow direction is incorrect")
+		assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
+		assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
+		assert.True(t, outgoing.IntraHost)
+		assert.Equal(t, pid, outgoing.Pid)
+	}
 }
 
 func TestUDPDisabled(t *testing.T) {
