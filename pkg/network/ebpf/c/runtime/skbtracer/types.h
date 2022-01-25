@@ -29,15 +29,15 @@ typedef struct {
 } socket_info_t;
 
 typedef struct {
-    tuple_t tup;
-    __u64 sk;
-} udp_flow_t;
-
-typedef struct {
     __u64   last_update;
     __u64   sent_bytes;
     __u64   recv_bytes;
 } flow_stats_t;
+
+typedef struct {
+    tuple_t tup;
+    __u64 sk;
+} udp_flow_t;
 
 typedef struct {
     __u64           sk;

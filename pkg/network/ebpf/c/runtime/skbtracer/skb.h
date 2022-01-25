@@ -43,7 +43,9 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
         tup->family = AF_INET;
         bpf_probe_read_kernel(&tup->saddr, sizeof(__be32), &iph.saddr);
         bpf_probe_read_kernel(&tup->daddr, sizeof(__be32), &iph.daddr);
-    } else if (iph.version == 6) {
+    }
+#ifdef FEATURE_IPV6_ENABLED
+    else if (iph.version == 6) {
         struct ipv6hdr ip6h = {};
         ret = bpf_probe_read_kernel(&ip6h, sizeof(ip6h), (struct ipv6hdr *)(head + net_head));
         if (ret || (ip6h.nexthdr != IPPROTO_UDP && ip6h.nexthdr != IPPROTO_TCP)) {
@@ -55,7 +57,9 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
         tup->family = AF_INET6;
         bpf_probe_read_kernel(&tup->saddr, sizeof(__be32[4]), (__u8*)&ip6h.saddr.in6_u.u6_addr32);
         bpf_probe_read_kernel(&tup->daddr, sizeof(__be32[4]), (__u8*)&ip6h.daddr.in6_u.u6_addr32);
-    } else {
+    }
+#endif
+    else {
         return 0;
     }
 
@@ -66,6 +70,7 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
         return ret;
     }
 
+#ifdef FEATURE_UDP_ENABLED
     if (tup->protocol == IPPROTO_UDP) {
         struct udphdr udph = {};
         ret = bpf_probe_read_kernel(&udph, sizeof(udph), (struct udphdr *)(head + trans_head));
@@ -78,7 +83,10 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
 
         //log_debug("udp recv: udphdr.len=%d\n", bpf_ntohs(udph.len));
         return (int)(bpf_ntohs(udph.len) - sizeof(struct udphdr));
-    } else if (tup->protocol == IPPROTO_TCP) {
+    }
+#endif
+#ifdef FEATURE_TCP_ENABLED
+    if (tup->protocol == IPPROTO_TCP) {
         struct tcphdr tcph = {};
         ret = bpf_probe_read_kernel(&tcph, sizeof(tcph), (struct tcphdr *)(head + trans_head));
         if (ret) {
@@ -91,6 +99,7 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
         //log_debug("tcp recv: trans_len=%u tcphdr.doff=%u\n", trans_len, tcph.doff*4);
         return trans_len - (tcph.doff * 4);
     }
+#endif
 
     return 0;
 }

@@ -461,6 +461,14 @@ func TestUDPSendAndReceive(t *testing.T) {
 	_, err = c.Read(make([]byte, serverMessageSize))
 	require.NoError(t, err)
 
+	c2, err := net.DialTimeout("udp", server.address, 50*time.Millisecond)
+	require.NoError(t, err)
+	defer c2.Close()
+	_, err = c2.Write(genPayload(clientMessageSize))
+	require.NoError(t, err)
+	_, err = c2.Read(make([]byte, serverMessageSize))
+	require.NoError(t, err)
+
 	// Iterate through active connections until we find connection created above, and confirm send + recv counts
 	connections := getConnections(t, tr)
 	pid := uint32(os.Getpid())
@@ -474,9 +482,14 @@ func TestUDPSendAndReceive(t *testing.T) {
 		assert.Equal(t, pid, incoming.Pid)
 	}
 
-	assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
-	assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
-	assert.True(t, outgoing.IntraHost)
+	incoming2, ok := findConnection(c2.RemoteAddr(), c2.LocalAddr(), connections)
+	if assert.True(t, ok) {
+		assert.Equal(t, network.INCOMING, incoming2.Direction, "incoming2 flow direction is incorrect")
+		assert.Equal(t, serverMessageSize, int(incoming2.MonotonicSentBytes))
+		assert.Equal(t, clientMessageSize, int(incoming2.MonotonicRecvBytes))
+		assert.True(t, incoming2.IntraHost)
+		assert.Equal(t, pid, incoming2.Pid)
+	}
 
 	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
 	if assert.True(t, ok) {
@@ -485,6 +498,85 @@ func TestUDPSendAndReceive(t *testing.T) {
 		assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
 		assert.True(t, outgoing.IntraHost)
 		assert.Equal(t, pid, outgoing.Pid)
+	}
+
+	outgoing2, ok := findConnection(c2.LocalAddr(), c2.RemoteAddr(), connections)
+	if assert.True(t, ok) {
+		assert.Equal(t, network.OUTGOING, outgoing2.Direction, "outgoing2 flow direction is incorrect")
+		assert.Equal(t, clientMessageSize, int(outgoing2.MonotonicSentBytes))
+		assert.Equal(t, serverMessageSize, int(outgoing2.MonotonicRecvBytes))
+		assert.True(t, outgoing2.IntraHost)
+		assert.Equal(t, pid, outgoing2.Pid)
+	}
+}
+
+func TestUDPReceiveCount(t *testing.T) {
+	t.Run("v4", func(t *testing.T) {
+		testUDPReceiveCount(t, "127.0.0.1:12345", "udp4")
+	})
+	t.Run("v6", func(t *testing.T) {
+		testUDPReceiveCount(t, "[::1]:12345", "udp6")
+	})
+}
+
+func testUDPReceiveCount(t *testing.T, addr string, udpnet string) {
+	cfg := testConfig()
+	tr, err := NewTracer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Stop()
+
+	server := &UDPServer{
+		address: ":23456",
+		network: udpnet,
+		onMessage: func(b []byte, n int) []byte {
+			return genPayload(serverMessageSize)
+		},
+	}
+
+	doneChan := make(chan struct{})
+	err = server.Run(doneChan, clientMessageSize)
+	require.NoError(t, err)
+	defer close(doneChan)
+
+	laddr, err := net.ResolveUDPAddr(udpnet, addr)
+	require.NoError(t, err)
+	raddr, err := net.ResolveUDPAddr(udpnet, server.address)
+	require.NoError(t, err)
+
+	c, err := net.DialUDP(udpnet, laddr, raddr)
+	require.NoError(t, err)
+	defer c.Close()
+
+	_, err = c.Write(genPayload(clientMessageSize))
+	require.NoError(t, err)
+
+	_, err = c.Read(make([]byte, serverMessageSize))
+	require.NoError(t, err)
+
+	connections := getConnections(t, tr)
+	for _, c := range connections.Conns {
+		t.Log(c)
+	}
+
+	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)
+	if assert.True(t, ok, "unable to find incoming connection") {
+		assert.Equal(t, network.INCOMING, incoming.Direction, "incoming direction")
+
+		// make sure the inverse values are seen for the other message
+		assert.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes), "incoming sent")
+		assert.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes), "incoming recv")
+		assert.True(t, incoming.IntraHost, "incoming intrahost")
+	}
+
+	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
+	if assert.True(t, ok, "unable to find outgoing connection") {
+		assert.Equal(t, network.OUTGOING, outgoing.Direction, "outgoing direction")
+
+		assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes), "outgoing sent")
+		assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes), "outgoing recv")
+		assert.True(t, outgoing.IntraHost, "outgoing intrahost")
 	}
 }
 
@@ -926,6 +1018,7 @@ func (s *TCPServer) Run(done chan struct{}) error {
 }
 
 type UDPServer struct {
+	network   string
 	address   string
 	onMessage func(b []byte, n int) []byte
 }
@@ -942,7 +1035,12 @@ func NewUDPServerOnAddress(addr string, onMessage func(b []byte, n int) []byte) 
 }
 
 func (s *UDPServer) Run(done chan struct{}, payloadSize int) error {
-	ln, err := net.ListenPacket("udp", s.address)
+	network := "udp"
+	if s.network != "" {
+		network = s.network
+	}
+
+	ln, err := net.ListenPacket(network, s.address)
 	if err != nil {
 		return err
 	}

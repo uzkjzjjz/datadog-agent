@@ -19,6 +19,15 @@ func getRuntimeCompiledSKBTracer(cfg *config.Config) (runtime.CompiledOutput, er
 
 func getCFlags(cfg *config.Config) []string {
 	var cflags []string
+	if cfg.CollectUDPConns {
+		cflags = append(cflags, "-DFEATURE_UDP_ENABLED")
+	}
+	if cfg.CollectTCPConns {
+		cflags = append(cflags, "-DFEATURE_TCP_ENABLED")
+	}
+	if cfg.CollectIPv6Conns {
+		cflags = append(cflags, "-DFEATURE_IPV6_ENABLED")
+	}
 	if cfg.BPFDebug {
 		cflags = append(cflags, "-DDEBUG=1")
 	}

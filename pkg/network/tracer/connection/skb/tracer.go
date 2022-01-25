@@ -7,7 +7,6 @@ package skb
 
 import (
 	"fmt"
-	"math"
 	"net"
 	"syscall"
 	"unsafe"
@@ -21,7 +20,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	manager "github.com/DataDog/ebpf-manager"
 	"github.com/cilium/ebpf"
-	"golang.org/x/sys/unix"
 )
 
 var _ connection.Tracer = &tracer{}
@@ -37,14 +35,6 @@ type tracer struct {
 }
 
 func New(cfg *config.Config) (connection.Tracer, error) {
-	mgrOptions := manager.Options{
-		RLimit: &unix.Rlimit{
-			Cur: math.MaxUint64,
-			Max: math.MaxUint64,
-		},
-		MapSpecEditors: map[string]manager.MapSpecEditor{},
-	}
-
 	buf, err := getRuntimeCompiledSKBTracer(cfg)
 	if err != nil {
 		return nil, err
@@ -53,16 +43,17 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 	tr := &tracer{
 		cfg: cfg,
 	}
-	tr.m = newManager(tr.udpClosed)
-	err = tr.m.InitWithOptions(buf, mgrOptions)
+	tr.m, err = newManager(cfg, buf, tr.udpClosed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init ebpf manager: %w", err)
 	}
 
-	tr.udpStatsMap, _, err = tr.m.GetMap("udp_stats")
-	if err != nil {
-		_ = tr.m.Stop(manager.CleanAll)
-		return nil, fmt.Errorf("unable to find udp_stats map: %w", err)
+	if cfg.CollectUDPConns {
+		tr.udpStatsMap, _, err = tr.m.GetMap("udp_stats")
+		if err != nil {
+			_ = tr.m.Stop(manager.CleanAll)
+			return nil, fmt.Errorf("unable to find udp_stats map: %w", err)
+		}
 	}
 
 	tr.openSocksMap, _, err = tr.m.GetMap("open_socks")
@@ -88,20 +79,22 @@ func (t *tracer) Stop() {
 
 func (t *tracer) GetConnections(buffer *network.ConnectionBuffer, filter func(*network.ConnectionStats) bool) error {
 	flow, stats, skinfo := &netebpf.UDPFlow{}, &netebpf.FlowStats{}, &netebpf.SocketInfo{}
-	entries := t.udpStatsMap.Iterate()
-	for entries.Next(unsafe.Pointer(flow), unsafe.Pointer(stats)) {
-		if err := t.openSocksMap.Lookup(unsafe.Pointer(&flow.Sk), unsafe.Pointer(skinfo)); err != nil {
-			log.Warnf("error looking up open sock %x: %s", flow.Sk, err)
-			continue
-		}
+	if t.udpStatsMap != nil {
+		entries := t.udpStatsMap.Iterate()
+		for entries.Next(unsafe.Pointer(flow), unsafe.Pointer(stats)) {
+			if err := t.openSocksMap.Lookup(unsafe.Pointer(&flow.Sk), unsafe.Pointer(skinfo)); err != nil {
+				log.Warnf("error looking up open sock %x: %s", flow.Sk, err)
+				continue
+			}
 
-		c := toConn(flow.Sk, &flow.Tup, skinfo, stats)
-		if filter != nil && filter(&c) {
-			*buffer.Next() = c
+			c := toConn(flow.Sk, &flow.Tup, skinfo, stats)
+			if filter != nil && filter(&c) {
+				*buffer.Next() = c
+			}
 		}
-	}
-	if err := entries.Err(); err != nil {
-		return err
+		if err := entries.Err(); err != nil {
+			return err
+		}
 	}
 
 	return nil

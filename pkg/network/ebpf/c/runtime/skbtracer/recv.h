@@ -44,6 +44,7 @@ int kprobe__security_sock_rcv_skb(struct pt_regs* ctx) {
     print_ip(tup.saddr, tup.sport, tup.family, tup.protocol);
     print_ip(tup.daddr, tup.dport, tup.family, tup.protocol);
 
+#ifdef FEATURE_UDP_ENABLED
     if (tup.protocol == IPPROTO_UDP) {
         udp_flow_t flow = { .tup = tup, .sk = (u64)sk };
         flow_stats_t *stats = get_or_create_udp_stats(&flow);
@@ -51,9 +52,19 @@ int kprobe__security_sock_rcv_skb(struct pt_regs* ctx) {
             // TODO data loss
             return 0;
         }
+        if (stats->recv_bytes + stats->sent_bytes == 0) {
+            socket_info_t *skinfo = get_or_create_open_sock(sk, tup.protocol);
+            if (!skinfo) {
+                return 0;
+            }
+            // TODO this is likely to be wrong if we don't see the socket be created
+            skinfo->direction = CONN_DIRECTION_INCOMING;
+        }
+
         __sync_fetch_and_add(&stats->recv_bytes, (u64)recv_count);
         stats->last_update = bpf_ktime_get_ns();
     }
+#endif
 
     return 0;
 }
@@ -85,6 +96,7 @@ int tracepoint__net_dev_queue(struct tracepoint_net_net_dev_queue_t *args) {
     print_ip(tup.saddr, tup.sport, tup.family, tup.protocol);
     print_ip(tup.daddr, tup.dport, tup.family, tup.protocol);
 
+#ifdef FEATURE_UDP_ENABLED
     if (tup.protocol == IPPROTO_UDP) {
         udp_flow_t flow = { .tup = tup, .sk = (u64)sk };
         flow_stats_t *stats = get_or_create_udp_stats(&flow);
@@ -92,9 +104,18 @@ int tracepoint__net_dev_queue(struct tracepoint_net_net_dev_queue_t *args) {
             // TODO data loss
             return 0;
         }
+        if (stats->recv_bytes + stats->sent_bytes == 0) {
+            socket_info_t *skinfo = get_or_create_open_sock(sk, tup.protocol);
+            if (!skinfo) {
+                return 0;
+            }
+            // TODO this is likely to be wrong if we don't see the socket be created
+            skinfo->direction = CONN_DIRECTION_OUTGOING;
+        }
         __sync_fetch_and_add(&stats->sent_bytes, (u64)sent_count);
         stats->last_update = bpf_ktime_get_ns();
     }
+#endif
 
     return 0;
 }

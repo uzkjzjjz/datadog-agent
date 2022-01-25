@@ -13,6 +13,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
         return 0;
     }
 
+#ifdef FEATURE_UDP_ENABLED
     if (skinfo->protocol == IPPROTO_UDP) {
         udp_close_event_t evt = {
             .sk = (__u64)sk,
@@ -22,6 +23,7 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
             log_debug("udp close send error: sk=%llx\n", sk);
         }
     }
+#endif
 
     bpf_map_delete_elem(&open_socks, &sk);
     return 0;

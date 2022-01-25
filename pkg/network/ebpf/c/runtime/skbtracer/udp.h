@@ -8,6 +8,8 @@
 #include "sock.h"
 #include "types.h"
 
+#ifdef FEATURE_UDP_ENABLED
+
 struct bpf_map_def SEC("maps/udp_stats") udp_stats = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(udp_flow_t),
@@ -48,5 +50,7 @@ static __always_inline flow_stats_t *get_or_create_udp_stats(udp_flow_t *flow) {
     }
     return stats;
 }
+
+#endif
 
 #endif

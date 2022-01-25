@@ -9,9 +9,9 @@
 static __always_inline void print_ip(struct in6_addr addr, u16 port, u8 family, u8 protocol) {
     if (family == AF_INET6) {
         if (protocol == IPPROTO_TCP) {
-            log_debug("TCPv6 %llx%llx:%u\n", bpf_ntohll(addr.s6_addr32[0]), bpf_ntohll(addr.s6_addr32[2]), port);
+            log_debug("TCPv6 %llx%llx:%u\n", bpf_ntohll(*((u64*)&addr.s6_addr32[0])), bpf_ntohll(*((u64*)&addr.s6_addr32[2])), port);
         } else {
-            log_debug("UDPv6 %llx%llx:%u\n", bpf_ntohll(addr.s6_addr32[0]), bpf_ntohll(addr.s6_addr32[2]), port);
+            log_debug("UDPv6 %llx%llx:%u\n", bpf_ntohll(*((u64*)&addr.s6_addr32[0])), bpf_ntohll(*((u64*)&addr.s6_addr32[2])), port);
         }
     } else {
         if (protocol == IPPROTO_TCP) {
