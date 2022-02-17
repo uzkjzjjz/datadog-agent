@@ -100,7 +100,7 @@ type RuleEvent struct {
 	Event  Event  `json:"event"`
 }
 
-// DumpProcessCache handle process dump cache requests
+// DumpProcessCache handles process cache dump requests
 func (a *APIServer) DumpProcessCache(ctx context.Context, params *api.DumpProcessCacheParams) (*api.SecurityDumpProcessCacheMessage, error) {
 	resolvers := a.probe.GetResolvers()
 
@@ -177,6 +177,11 @@ func (a *APIServer) GenerateGraph(ctx context.Context, params *api.GenerateGraph
 	}
 
 	return nil, fmt.Errorf("monitor not configured")
+}
+
+// DumpNetworkNamespace handles network namespace cache dump requests
+func (a *APIServer) DumpNetworkNamespace(ctx context.Context, params *api.DumpNetworkNamespaceParams) (*api.DumpNetworkNamespaceMessage, error) {
+	return a.probe.GetResolvers().NamespaceResolver.DumpNetworkNamespaces(params), nil
 }
 
 func (a *APIServer) enqueue(msg *pendingMsg) {
