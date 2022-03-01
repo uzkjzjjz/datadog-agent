@@ -104,8 +104,8 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 			},
 		},
 		Probes: []*manager.Probe{
-			{Section: httpSocketFilter},
-			{Section: string(probes.TCPSendMsgReturn), KProbeMaxActive: maxActive},
+			{Section: httpSocketFilter, UID: c.UID},
+			{Section: string(probes.TCPSendMsgReturn), KProbeMaxActive: maxActive, UID: c.UID},
 		},
 	}
 
@@ -146,11 +146,13 @@ func (e *ebpfProgram) Init() error {
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: httpSocketFilter,
+					UID:     e.cfg.UID,
 				},
 			},
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: string(probes.TCPSendMsgReturn),
+					UID:     e.cfg.UID,
 				},
 			},
 		},

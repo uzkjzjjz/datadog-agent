@@ -9,6 +9,7 @@
 package http
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"runtime"
@@ -88,8 +89,8 @@ func (o *openSSLProgram) ConfigureManager(m *manager.Manager) {
 		})
 
 		m.Probes = append(m.Probes,
-			&manager.Probe{Section: doSysOpen, KProbeMaxActive: maxActive},
-			&manager.Probe{Section: doSysOpenRet, KProbeMaxActive: maxActive},
+			&manager.Probe{Section: doSysOpen, KProbeMaxActive: maxActive, UID: o.cfg.UID},
+			&manager.Probe{Section: doSysOpenRet, KProbeMaxActive: maxActive, UID: o.cfg.UID},
 		)
 	}
 }
@@ -110,11 +111,13 @@ func (o *openSSLProgram) ConfigureOptions(options *manager.Options) {
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: doSysOpen,
+					UID:     o.cfg.UID,
 				},
 			},
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: doSysOpenRet,
+					UID:     o.cfg.UID,
 				},
 			},
 		)
@@ -136,13 +139,13 @@ func (o *openSSLProgram) Start() {
 	o.watcher = newSOWatcher(o.cfg.ProcRoot, o.perfHandler,
 		soRule{
 			re:           regexp.MustCompile(`libssl.so`),
-			registerCB:   addHooks(o.manager, sslProbes),
-			unregisterCB: removeHooks(o.manager, sslProbes),
+			registerCB:   addHooks(o.manager, sslProbes, o.cfg.UID),
+			unregisterCB: removeHooks(o.manager, sslProbes, o.cfg.UID),
 		},
 		soRule{
 			re:           regexp.MustCompile(`libcrypto.so`),
-			registerCB:   addHooks(o.manager, cryptoProbes),
-			unregisterCB: removeHooks(o.manager, cryptoProbes),
+			registerCB:   addHooks(o.manager, cryptoProbes, o.cfg.UID),
+			unregisterCB: removeHooks(o.manager, cryptoProbes, o.cfg.UID),
 		},
 	)
 
@@ -157,11 +160,11 @@ func (o *openSSLProgram) Stop() {
 	o.perfHandler.Stop()
 }
 
-func addHooks(m *manager.Manager, probes []string) func(string) error {
+func addHooks(m *manager.Manager, probes []string, baseUID string) func(string) error {
 	return func(libPath string) error {
-		uid := getUID(libPath)
+		uid := fmt.Sprintf("%s%s", baseUID, getUID(libPath))
 		for _, sec := range probes {
-			p, found := m.GetProbe(manager.ProbeIdentificationPair{uid, sec})
+			p, found := m.GetProbe(manager.ProbeIdentificationPair{UID: uid, Section: sec})
 			if found {
 				if !p.IsRunning() {
 					err := p.Attach()
@@ -189,11 +192,11 @@ func addHooks(m *manager.Manager, probes []string) func(string) error {
 	}
 }
 
-func removeHooks(m *manager.Manager, probes []string) func(string) error {
+func removeHooks(m *manager.Manager, probes []string, baseUID string) func(string) error {
 	return func(libPath string) error {
-		uid := getUID(libPath)
+		uid := fmt.Sprintf("%s%s", baseUID, getUID(libPath))
 		for _, sec := range probes {
-			p, found := m.GetProbe(manager.ProbeIdentificationPair{uid, sec})
+			p, found := m.GetProbe(manager.ProbeIdentificationPair{UID: uid, Section: sec})
 			if !found {
 				continue
 			}

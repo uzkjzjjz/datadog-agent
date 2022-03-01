@@ -223,7 +223,7 @@ func newReverseDNS(supported bool, c *config.Config) dns.ReverseDNS {
 
 func runOffsetGuessing(config *config.Config, buf bytecode.AssetReader) ([]manager.ConstantEditor, error) {
 	// Enable kernel probes used for offset guessing.
-	offsetMgr := newOffsetManager()
+	offsetMgr := newOffsetManager(config.UID)
 	offsetOptions := manager.Options{
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
@@ -246,6 +246,7 @@ func runOffsetGuessing(config *config.Config, buf bytecode.AssetReader) ([]manag
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: string(probeName),
+					UID:     config.UID,
 				},
 			})
 	}

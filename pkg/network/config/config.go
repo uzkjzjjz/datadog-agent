@@ -31,6 +31,9 @@ const (
 type Config struct {
 	ebpf.Config
 
+	// UID is the string appended to eBPF probe names to prevent conflict with other modules/processes
+	UID string
+
 	// ServiceMonitoringEnabled is whether the service monitoring feature is enabled or not
 	ServiceMonitoringEnabled bool
 
@@ -174,6 +177,8 @@ func New() *Config {
 
 	c := &Config{
 		Config: *ebpf.NewConfig(),
+
+		UID: cfg.GetString(join(netNS, "uid")),
 
 		ServiceMonitoringEnabled: cfg.GetBool(join(smNS, "enabled")),
 

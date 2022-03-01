@@ -34,7 +34,7 @@ func NewReverseDNS(cfg *config.Config) (ReverseDNS, error) {
 		return nil, fmt.Errorf("error initializing ebpf programs: %w", err)
 	}
 
-	filter, _ := p.GetProbe(manager.ProbeIdentificationPair{Section: string(probes.SocketDnsFilter)})
+	filter, _ := p.GetProbe(manager.ProbeIdentificationPair{Section: string(probes.SocketDnsFilter), UID: cfg.UID})
 	if filter == nil {
 		return nil, fmt.Errorf("error retrieving socket filter")
 	}

@@ -64,7 +64,7 @@ func NewEBPFConntracker(cfg *config.Config) (netlink.Conntracker, error) {
 		return nil, fmt.Errorf("unable to compile ebpf conntracker: %w", err)
 	}
 
-	m, err := getManager(buf, cfg.ConntrackMaxStateSize)
+	m, err := getManager(buf, cfg.ConntrackMaxStateSize, cfg.UID)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (e *ebpfConntracker) Close() {
 	}
 }
 
-func getManager(buf io.ReaderAt, maxStateSize int) (*manager.Manager, error) {
+func getManager(buf io.ReaderAt, maxStateSize int, uid string) (*manager.Manager, error) {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: string(probes.ConntrackMap)},
@@ -361,7 +361,7 @@ func getManager(buf io.ReaderAt, maxStateSize int) (*manager.Manager, error) {
 		},
 		PerfMaps: []*manager.PerfMap{},
 		Probes: []*manager.Probe{
-			{Section: string(probes.ConntrackHashInsert)},
+			{Section: string(probes.ConntrackHashInsert), UID: uid},
 		},
 	}
 

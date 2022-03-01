@@ -119,7 +119,7 @@ type fieldValues struct {
 	dportFl6 uint16
 }
 
-func newOffsetManager() *manager.Manager {
+func newOffsetManager(uid string) *manager.Manager {
 	return &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: "connectsock_ipv6"},
@@ -127,13 +127,13 @@ func newOffsetManager() *manager.Manager {
 		},
 		PerfMaps: []*manager.PerfMap{},
 		Probes: []*manager.Probe{
-			{Section: string(probes.TCPGetSockOpt)},
-			{Section: string(probes.SockGetSockOpt)},
-			{Section: string(probes.TCPv6Connect)},
-			{Section: string(probes.IPMakeSkb)},
-			{Section: string(probes.IP6MakeSkb)},
-			{Section: string(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$"},
-			{Section: string(probes.TCPv6ConnectReturn), KProbeMaxActive: 128},
+			{Section: string(probes.TCPGetSockOpt), UID: uid},
+			{Section: string(probes.SockGetSockOpt), UID: uid},
+			{Section: string(probes.TCPv6Connect), UID: uid},
+			{Section: string(probes.IPMakeSkb), UID: uid},
+			{Section: string(probes.IP6MakeSkb), UID: uid},
+			{Section: string(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$", UID: uid},
+			{Section: string(probes.TCPv6ConnectReturn), KProbeMaxActive: 128, UID: uid},
 		},
 	}
 }

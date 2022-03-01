@@ -22,7 +22,7 @@ const (
 	maxActive = 128
 )
 
-func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Manager {
+func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool, uid string) *manager.Manager {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: string(probes.ConnMap)},
@@ -50,30 +50,30 @@ func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Ma
 			},
 		},
 		Probes: []*manager.Probe{
-			{Section: string(probes.TCPSendMsg)},
-			{Section: string(probes.TCPCleanupRBuf)},
-			{Section: string(probes.TCPClose)},
-			{Section: string(probes.TCPCloseReturn), KProbeMaxActive: maxActive},
-			{Section: string(probes.TCPSetState)},
-			{Section: string(probes.IPMakeSkb)},
-			{Section: string(probes.IP6MakeSkb)},
-			{Section: string(probes.UDPRecvMsg)},
-			{Section: string(probes.UDPRecvMsgReturn), KProbeMaxActive: maxActive},
-			{Section: string(probes.TCPRetransmit)},
-			{Section: string(probes.InetCskAcceptReturn), KProbeMaxActive: maxActive},
-			{Section: string(probes.InetCskListenStop)},
-			{Section: string(probes.UDPDestroySock)},
-			{Section: string(probes.UDPDestroySockReturn), KProbeMaxActive: maxActive},
-			{Section: string(probes.InetBind)},
-			{Section: string(probes.Inet6Bind)},
-			{Section: string(probes.InetBindRet), KProbeMaxActive: maxActive},
-			{Section: string(probes.Inet6BindRet), KProbeMaxActive: maxActive},
-			{Section: string(probes.IPRouteOutputFlow)},
-			{Section: string(probes.IPRouteOutputFlowReturn), KProbeMaxActive: maxActive},
-			{Section: string(probes.SockFDLookup)},
-			{Section: string(probes.SockFDLookupRet), KProbeMaxActive: maxActive},
-			{Section: string(probes.DoSendfile)},
-			{Section: string(probes.DoSendfileRet), KProbeMaxActive: maxActive},
+			{Section: string(probes.TCPSendMsg), UID: uid},
+			{Section: string(probes.TCPCleanupRBuf), UID: uid},
+			{Section: string(probes.TCPClose), UID: uid},
+			{Section: string(probes.TCPCloseReturn), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.TCPSetState), UID: uid},
+			{Section: string(probes.IPMakeSkb), UID: uid},
+			{Section: string(probes.IP6MakeSkb), UID: uid},
+			{Section: string(probes.UDPRecvMsg), UID: uid},
+			{Section: string(probes.UDPRecvMsgReturn), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.TCPRetransmit), UID: uid},
+			{Section: string(probes.InetCskAcceptReturn), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.InetCskListenStop), UID: uid},
+			{Section: string(probes.UDPDestroySock), UID: uid},
+			{Section: string(probes.UDPDestroySockReturn), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.InetBind), UID: uid},
+			{Section: string(probes.Inet6Bind), UID: uid},
+			{Section: string(probes.InetBindRet), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.Inet6BindRet), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.IPRouteOutputFlow), UID: uid},
+			{Section: string(probes.IPRouteOutputFlowReturn), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.SockFDLookup), UID: uid},
+			{Section: string(probes.SockFDLookupRet), KProbeMaxActive: maxActive, UID: uid},
+			{Section: string(probes.DoSendfile), UID: uid},
+			{Section: string(probes.DoSendfileRet), KProbeMaxActive: maxActive, UID: uid},
 		},
 	}
 
@@ -82,10 +82,10 @@ func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Ma
 	// tracer.
 	if !runtimeTracer {
 		mgr.Probes = append(mgr.Probes,
-			&manager.Probe{Section: string(probes.TCPRetransmitPre470), MatchFuncName: "^tcp_retransmit_skb$"},
-			&manager.Probe{Section: string(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$"},
-			&manager.Probe{Section: string(probes.UDPRecvMsgPre410), MatchFuncName: "^udp_recvmsg$"},
-			&manager.Probe{Section: string(probes.TCPSendMsgPre410), MatchFuncName: "^tcp_sendmsg$"},
+			&manager.Probe{Section: string(probes.TCPRetransmitPre470), MatchFuncName: "^tcp_retransmit_skb$", UID: uid},
+			&manager.Probe{Section: string(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$", UID: uid},
+			&manager.Probe{Section: string(probes.UDPRecvMsgPre410), MatchFuncName: "^udp_recvmsg$", UID: uid},
+			&manager.Probe{Section: string(probes.TCPSendMsgPre410), MatchFuncName: "^tcp_sendmsg$", UID: uid},
 		)
 	}
 

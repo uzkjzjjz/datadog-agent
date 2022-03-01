@@ -105,7 +105,7 @@ func New(config *config.Config, constants []manager.ConstantEditor) (connection.
 		closedChannelSize = config.ClosedChannelSize
 	}
 	perfHandlerTCP := ddebpf.NewPerfHandler(closedChannelSize)
-	m := newManager(perfHandlerTCP, runtimeTracer)
+	m := newManager(perfHandlerTCP, runtimeTracer, config.UID)
 	setupDumpHandler(m)
 
 	// exclude all non-enabled probes to ensure we don't run into problems with unsupported probe types
@@ -120,6 +120,7 @@ func New(config *config.Config, constants []manager.ConstantEditor) (connection.
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					Section: string(probeName),
+					UID:     config.UID,
 				},
 			})
 	}
