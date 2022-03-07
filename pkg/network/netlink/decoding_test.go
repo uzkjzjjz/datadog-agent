@@ -98,6 +98,8 @@ func loadDumpData(b *testing.B) ([]netlink.Message, error) {
 	b.Cleanup(func() { testutil.TeardownDNAT(b) })
 	testutil.SetupDNAT(b)
 	testMessageDump(b, f, net.ParseIP("1.1.1.1"), net.ParseIP("2.2.2.2"))
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(b, err)
 
 	var messages []netlink.Message
 	sizeBuffer := make([]byte, 4)
