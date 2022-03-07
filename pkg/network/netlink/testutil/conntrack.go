@@ -13,12 +13,13 @@ import (
 	"testing"
 
 	nettestutil "github.com/DataDog/datadog-agent/pkg/network/testutil"
+	"github.com/stretchr/testify/require"
 )
 
 // SetupDNAT sets up a NAT translation from:
 // * 2.2.2.2 to 1.1.1.1 (OUTPUT Chain)
 // * 3.3.3.3 to 1.1.1.1 (PREROUTING Chain)
-func SetupDNAT(t *testing.T) {
+func SetupDNAT(t require.TestingT) {
 	cmds := []string{
 		"ip link add dummy1 type dummy",
 		"ip address add 1.1.1.1 broadcast + dev dummy1",
@@ -30,7 +31,7 @@ func SetupDNAT(t *testing.T) {
 }
 
 // TeardownDNAT cleans up the resources created by SetupDNAT
-func TeardownDNAT(t *testing.T) {
+func TeardownDNAT(t require.TestingT) {
 	cmds := []string{
 		// tear down the testing interface, and iptables rule
 		"ip link del dummy1",

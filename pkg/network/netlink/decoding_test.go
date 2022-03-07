@@ -17,6 +17,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/DataDog/datadog-agent/pkg/network/netlink/testutil"
 	"github.com/mdlayher/netlink"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,7 +87,7 @@ func BenchmarkDecodeMultipleMessages(b *testing.B) {
 	}
 }
 
-func loadDumpData(b require.TestingT) ([]netlink.Message, error) {
+func loadDumpData(b *testing.B) ([]netlink.Message, error) {
 	f, err := ioutil.TempFile("", "message_dump")
 	if err != nil {
 		return nil, err
@@ -94,6 +95,8 @@ func loadDumpData(b require.TestingT) ([]netlink.Message, error) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
+	b.Cleanup(func() { testutil.TeardownDNAT(b) })
+	testutil.SetupDNAT(b)
 	testMessageDump(b, f, net.ParseIP("1.1.1.1"), net.ParseIP("2.2.2.2"))
 
 	var messages []netlink.Message

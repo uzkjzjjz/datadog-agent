@@ -8,15 +8,22 @@ package testutil
 import (
 	"os/exec"
 	"strings"
-	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+type tHelper interface {
+	Helper()
+}
 
 // RunCommands runs each command in cmds individually and returns the output
 // as a []string, with each element corresponding to the respective command.
 // If ignoreErrors is true, it will fail the test via t.Fatal immediately upon error.
 // Otherwise, the output on errors will be logged via t.Log.
-func RunCommands(t *testing.T, cmds []string, ignoreErrors bool) []string {
-	t.Helper()
+func RunCommands(t require.TestingT, cmds []string, ignoreErrors bool) []string {
+	if v, ok := t.(tHelper); ok {
+		v.Helper()
+	}
 	var output []string
 
 	for _, c := range cmds {
@@ -25,7 +32,8 @@ func RunCommands(t *testing.T, cmds []string, ignoreErrors bool) []string {
 		out, err := c.CombinedOutput()
 		output = append(output, string(out))
 		if err != nil && !ignoreErrors {
-			t.Fatalf("%s returned %s: %s", c, err, out)
+			t.Errorf("%s returned %s: %s", c, err, out)
+			t.FailNow()
 			return nil
 		}
 	}
