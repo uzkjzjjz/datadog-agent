@@ -35,7 +35,6 @@ end
 
 if node['dd-system-probe-check']['bench']
   remote_directory ::File.join(base_dir, "main") do
-    only_if { ::File.directory?('main') }
     source 'main'
     mode '755'
     files_mode '755'
