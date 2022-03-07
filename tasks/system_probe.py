@@ -6,7 +6,7 @@ import re
 import shutil
 import sys
 import tempfile
-import csv
+import platform
 
 from subprocess import check_output
 
@@ -36,7 +36,8 @@ TEST_PACKAGES_LIST = ["./pkg/ebpf/...", "./pkg/network/...", "./pkg/collector/co
 TEST_PACKAGES = " ".join(TEST_PACKAGES_LIST)
 
 is_windows = sys.platform == "win32"
-
+ARCH = platform.machine()
+DEFAULT_VAGRANT_PROVIDER = "virtualbox" if ARCH == "x86_64" else "vmware_desktop"
 
 @task
 def build(
@@ -235,7 +236,7 @@ def kitchen_prepare(ctx, windows=is_windows, output=KITCHEN_ARTIFACT_DIR):
 
 
 @task
-def kitchen_test(ctx, target=None, arch="x86_64", vagrant_provider="virtualbox", testfiles="system-probe-test"):
+def kitchen_test(ctx, target=None, arch=ARCH, vagrant_provider=DEFAULT_VAGRANT_PROVIDER, testfiles="system-probe-test"):
     """
     Run tests (locally) using chef kitchen against an array of different platforms.
     * Make sure to run `inv -e system-probe.kitchen-prepare` using the agent-development VM;
@@ -245,10 +246,10 @@ def kitchen_test(ctx, target=None, arch="x86_64", vagrant_provider="virtualbox",
     # Retrieve a list of all available vagrant images
     images = {}
     with open(os.path.join(KITCHEN_DIR, "platforms.json"), 'r') as f:
-        for platform, by_provider in json.load(f).items():
+        for plat, by_provider in json.load(f).items():
             if "vagrant" in by_provider and arch in by_provider["vagrant"]:
                 for image in by_provider["vagrant"][arch]:
-                    images[image] = platform
+                    images[image] = plat
 
     if not (target in images):
         print(
