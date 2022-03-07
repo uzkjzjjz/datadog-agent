@@ -20,7 +20,7 @@ def check_output(output, wait_thr)
 end
 
 def regression_output(r)
-  out = ""
+  out = "REGRESSIONS\n"
   r.each do |hdr, lines|
     out += hdr
     lines.each { |l| out += l + "\n" }
@@ -48,8 +48,12 @@ Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
         end
       end
 
-      print "MAIN\n"
       maindir = File.join('/tmp/system-probe/main', pkg)
+      if not Dir.exist?(maindir) do
+        next
+      end
+
+      print "MAIN\n"
       Dir.chdir(maindir) do
         mf = File.join(maindir, 'testsuite')
         if not File.exist?(mf) then
@@ -64,9 +68,7 @@ Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
         end
       end
 
-      print "REGRESSIONS\n"
       regressions = {}
-
       Open3.popen2e({}, "sudo", "-E", "/tmp/system-probe/benchstat", main_results_path, head_results_path) do |_, output, wait_thr|
         header_line = nil
         section_headers = nil

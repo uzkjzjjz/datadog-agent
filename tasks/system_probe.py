@@ -146,10 +146,10 @@ def test(
         clang_format(ctx)
         clang_tidy(ctx)
 
-    if not skip_object_files and not windows:
-        build_object_files(ctx, parallel_build=parallel_build)
-
-    generate_cgo_types(ctx, windows=windows)
+    if not skip_object_files:
+        generate_cgo_types(ctx, windows=windows)
+        if not windows:
+            build_object_files(ctx, parallel_build=parallel_build)
 
     build_tags = [NPM_TAG]
     if not windows:
@@ -235,18 +235,18 @@ def kitchen_prepare(ctx, windows=is_windows, output=KITCHEN_ARTIFACT_DIR):
 
 
 @task
-def kitchen_test(ctx, target=None, arch="x86_64"):
+def kitchen_test(ctx, target=None, arch="x86_64", vagrant_provider="virtualbox", testfiles="system-probe-test"):
     """
     Run tests (locally) using chef kitchen against an array of different platforms.
     * Make sure to run `inv -e system-probe.kitchen-prepare` using the agent-development VM;
-    * Then we recommend to run `inv -e system-probe.kitchen-test` directly from your (macOS) machine;
+    * Then we recommend running `inv -e system-probe.kitchen-test` directly from your (macOS) machine;
     """
 
     # Retrieve a list of all available vagrant images
     images = {}
     with open(os.path.join(KITCHEN_DIR, "platforms.json"), 'r') as f:
         for platform, by_provider in json.load(f).items():
-            if "vagrant" in by_provider:
+            if "vagrant" in by_provider and arch in by_provider["vagrant"]:
                 for image in by_provider["vagrant"][arch]:
                     images[image] = platform
 
@@ -258,8 +258,8 @@ def kitchen_test(ctx, target=None, arch="x86_64"):
 
     with ctx.cd(KITCHEN_DIR):
         ctx.run(
-            f"inv kitchen.genconfig --platform {images[target]} --osversions {target} --provider vagrant --testfiles system-probe-test",
-            env={"KITCHEN_VAGRANT_PROVIDER": "virtualbox"},
+            f"inv kitchen.genconfig --platform {images[target]} --osversions {target} --arch {arch} --provider vagrant --testfiles {testfiles} --platformfile=platforms.json",
+            env={"KITCHEN_VAGRANT_PROVIDER": vagrant_provider},
         )
         ctx.run("kitchen test")
 
