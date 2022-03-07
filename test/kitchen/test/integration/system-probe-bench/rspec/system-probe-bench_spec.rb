@@ -49,7 +49,7 @@ Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
       end
 
       maindir = File.join('/tmp/system-probe/main', pkg)
-      if not Dir.exist?(maindir) do
+      if not Dir.exist?(maindir) then
         next
       end
 
@@ -57,7 +57,7 @@ Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
       Dir.chdir(maindir) do
         mf = File.join(maindir, 'testsuite')
         if not File.exist?(mf) then
-          break
+          next
         end
 
         Open3.popen2e({"DD_SYSTEM_PROBE_BPF_DIR"=>"/tmp/system-probe/main/pkg/ebpf/bytecode/build"}, "sudo", "-E", mf, "-test.v", "-test.run=^$", "-test.benchmem", "-test.bench=.") do |_, output, wait_thr|
