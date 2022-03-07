@@ -143,7 +143,7 @@ func (pm *procPidMapper) refreshMapping(cacheValidity time.Duration) {
 				return nil
 			}
 
-			pid, err := strconv.ParseInt(de.Name(), 10, 64)
+			pid, err := strconv.ParseInt(de.Name(), 10, 32)
 			if err != nil {
 				return godirwalk.SkipThis
 			}
