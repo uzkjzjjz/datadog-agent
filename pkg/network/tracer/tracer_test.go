@@ -482,6 +482,60 @@ func TestUDPSendAndReceive(t *testing.T) {
 	require.True(t, incoming.IntraHost)
 }
 
+func TestUDPReceiveCount(t *testing.T) {
+	config := testConfig()
+	config.BPFDebug = true
+	tr, err := NewTracer(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Stop()
+
+	server := NewUDPServerOnAddress("", func(buf []byte, n int) []byte {
+		return genPayload(serverMessageSize)
+	})
+
+	doneChan := make(chan struct{})
+	err = server.Run(doneChan, clientMessageSize)
+	require.NoError(t, err)
+	defer close(doneChan)
+
+	laddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:12345")
+	require.NoError(t, err)
+	raddr, err := net.ResolveUDPAddr("udp", server.address)
+	require.NoError(t, err)
+
+	c, err := net.DialUDP("udp", laddr, raddr)
+	require.NoError(t, err)
+	defer c.Close()
+
+	_, err = c.Write(genPayload(clientMessageSize))
+	require.NoError(t, err)
+
+	_, err = c.Read(make([]byte, serverMessageSize))
+	require.NoError(t, err)
+
+	connections := getConnections(t, tr)
+	for _, c := range connections.Conns {
+		t.Log(c)
+	}
+
+	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)
+	require.True(t, ok)
+
+	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
+	require.True(t, ok)
+
+	require.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes))
+	require.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes))
+	require.True(t, outgoing.IntraHost)
+
+	// make sure the inverse values are seen for the other message
+	require.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes))
+	require.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes))
+	require.True(t, incoming.IntraHost)
+}
+
 func TestUDPDisabled(t *testing.T) {
 	// Enable BPF-based system probe with UDP disabled
 	config := testConfig()
