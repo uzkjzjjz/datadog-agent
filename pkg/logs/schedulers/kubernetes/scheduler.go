@@ -107,6 +107,10 @@ func New() schedulers.Scheduler {
 		return &Scheduler{}
 	}
 
+	return new()
+}
+
+func new() *Scheduler {
 	collectAll := coreConfig.Datadog.GetBool("logs_config.container_collect_all")
 	scheduled := make(chan []integration.Config, 1)
 	unscheduled := make(chan []integration.Config, 1)

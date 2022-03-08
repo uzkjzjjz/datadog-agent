@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
@@ -27,193 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestGetSource(t *testing.T) {
-	scheduler := getScheduler(true)
-	container := kubelet.ContainerStatus{
-		Name:  "foo",
-		Image: "bar",
-		ID:    "boo",
-	}
-	pod := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "fuz",
-			Namespace: "buu",
-			UID:       "baz",
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{container},
-		},
-		Spec: kubelet.Spec{
-			Containers: []kubelet.ContainerSpec{{
-				Name:  "foo",
-				Image: "bar",
-			}},
-		},
-	}
-
-	source, err := scheduler.getSource(pod, container)
-	assert.Nil(t, err)
-	assert.Equal(t, config.FileType, source.Config.Type)
-	assert.Equal(t, "buu/fuz/foo", source.Name)
-	assert.Equal(t, "/var/log/pods/buu_fuz_baz/foo/*.log", filepath.ToSlash(source.Config.Path))
-	assert.Equal(t, "boo", source.Config.Identifier)
-	assert.Equal(t, "bar", source.Config.Source)
-	assert.Equal(t, "bar", source.Config.Service)
-}
-
-func TestGetSourceShouldBeOverridenByAutoDiscoveryAnnotation(t *testing.T) {
-	scheduler := getScheduler(true)
-	container := kubelet.ContainerStatus{
-		Name:  "foo",
-		Image: "bar",
-		ID:    "boo",
-	}
-	pod := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "fuz",
-			Namespace: "buu",
-			UID:       "baz",
-			Annotations: map[string]string{
-				"ad.datadoghq.com/foo.logs": `[{"source":"any_source","service":"any_service","tags":["tag1","tag2"]}]`,
-			},
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{container},
-		},
-	}
-
-	source, err := scheduler.getSource(pod, container)
-	assert.Nil(t, err)
-	assert.Equal(t, config.FileType, source.Config.Type)
-	assert.Equal(t, "buu/fuz/foo", source.Name)
-	assert.Equal(t, "/var/log/pods/buu_fuz_baz/foo/*.log", filepath.ToSlash(source.Config.Path))
-	assert.Equal(t, "boo", source.Config.Identifier)
-	assert.Equal(t, "any_source", source.Config.Source)
-	assert.Equal(t, "any_service", source.Config.Service)
-	assert.True(t, contains(source.Config.Tags, "tag1", "tag2"))
-}
-
-func TestGetSourceShouldFailWithInvalidAutoDiscoveryAnnotation(t *testing.T) {
-	scheduler := getScheduler(true)
-	container := kubelet.ContainerStatus{
-		Name:  "foo",
-		Image: "bar",
-		ID:    "boo",
-	}
-	pod := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "fuz",
-			Namespace: "buu",
-			UID:       "baz",
-			Annotations: map[string]string{
-				// missing [ ]
-				"ad.datadoghq.com/foo.logs": `{"source":"any_source","service":"any_service","tags":["tag1","tag2"]}`,
-			},
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{container},
-		},
-	}
-
-	source, err := scheduler.getSource(pod, container)
-	assert.NotNil(t, err)
-	assert.Nil(t, source)
-}
-
-func TestGetSourceAddContainerdParser(t *testing.T) {
-	scheduler := getScheduler(true)
-	container := kubelet.ContainerStatus{
-		Name:  "foo",
-		Image: "bar",
-		ID:    "boo",
-	}
-	pod := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "fuz",
-			Namespace: "buu",
-			UID:       "baz",
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{container},
-		},
-	}
-
-	source, err := scheduler.getSource(pod, container)
-	assert.Nil(t, err)
-	assert.Equal(t, config.FileType, source.Config.Type)
-}
-
-func TestContainerCollectAll(t *testing.T) {
-	schedulerCollectAll := getScheduler(true)
-	schedulerCollectAllDisabled := getScheduler(false)
-	containerFoo := kubelet.ContainerStatus{
-		Name:  "fooName",
-		Image: "fooImage",
-		ID:    "docker://fooID",
-	}
-	containerBar := kubelet.ContainerStatus{
-		Name:  "barName",
-		Image: "barImage",
-		ID:    "docker://barID",
-	}
-	containerBaz := kubelet.ContainerStatus{
-		Name:  "bazName",
-		Image: "bazImage",
-		ID:    "containerd://bazID",
-	}
-	podFoo := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "podName",
-			Namespace: "podNamespace",
-			UID:       "podUIDFoo",
-			Annotations: map[string]string{
-				"ad.datadoghq.com/fooName.logs": `[{"source":"any_source","service":"any_service"}]`,
-			},
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{containerFoo, containerBar},
-		},
-	}
-	podBar := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "podName",
-			Namespace: "podNamespace",
-			UID:       "podUIDBarr",
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{containerFoo, containerBar},
-		},
-	}
-	podBaz := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{
-			Name:      "podName",
-			Namespace: "podNamespace",
-			UID:       "podUIDBaz",
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{containerBaz},
-		},
-	}
-
-	source, err := schedulerCollectAll.getSource(podFoo, containerFoo)
-	assert.Nil(t, err)
-	assert.Equal(t, "fooID", source.Config.Identifier)
-	source, err = schedulerCollectAll.getSource(podBar, containerBar)
-	assert.Nil(t, err)
-	assert.Equal(t, "barID", source.Config.Identifier)
-
-	source, err = schedulerCollectAllDisabled.getSource(podFoo, containerFoo)
-	assert.Nil(t, err)
-	assert.Equal(t, "fooID", source.Config.Identifier)
-	source, err = schedulerCollectAllDisabled.getSource(podBar, containerBar)
-	assert.Equal(t, errCollectAllDisabled, err)
-	assert.Nil(t, source)
-
-	source, err = schedulerCollectAll.getSource(podBaz, containerBaz)
-	assert.Nil(t, err)
-	assert.Equal(t, "bazID", source.Config.Identifier)
-}
 
 func TestGetPath(t *testing.T) {
 	scheduler := getScheduler(true)
@@ -227,9 +41,6 @@ func TestGetPath(t *testing.T) {
 			Name:      "fuz",
 			Namespace: "buu",
 			UID:       "baz",
-		},
-		Status: kubelet.Status{
-			Containers: []kubelet.ContainerStatus{container},
 		},
 	}
 
@@ -267,6 +78,7 @@ func TestGetPath(t *testing.T) {
 	assert.Equal(t, filepath.Join(basePath, podDirectory, "foo_*.log"), path)
 }
 
+// Test that getSource correctly assigns the Service and Source fields
 func TestGetSourceServiceNameOrder(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -488,7 +300,7 @@ func TestRetryGettingKubeUtilSuccess(t *testing.T) {
 	require.NotNil(t, s.getKubeUtil(retryAFewTimes))
 }
 
-func TestRetry(t *testing.T) {
+func TestRetryService(t *testing.T) {
 	containerName := "fooName"
 	containerType := "docker"
 	containerID := "123456789abcdefoo"
@@ -498,7 +310,7 @@ func TestRetry(t *testing.T) {
 	mgr := &schedulers.MockSourceManager{}
 	l := &Scheduler{
 		collectAll:         true,
-		kubeutil:           dummyKubeUtil{shouldRetry: true},
+		kubeutil:           dummyKubeUtil{shouldRetryGetPod: true},
 		pendingRetries:     make(map[string]*retryOps),
 		retryOperations:    make(chan *retryOps),
 		serviceNameFunc:    func(n, e string) string { return serviceName },
@@ -514,12 +326,27 @@ func TestRetry(t *testing.T) {
 	assert.Equal(t, containerType, ops.service.Type)
 	assert.Equal(t, containerID, ops.service.Identifier)
 
-	l.kubeutil = dummyKubeUtil{
-		name:        containerName,
-		id:          containerID,
-		image:       imageName,
-		shouldRetry: false,
+	status := kubelet.ContainerStatus{
+		Name:  containerName,
+		Image: imageName,
+		ID:    containerID,
+		Ready: true,
+		State: kubelet.ContainerState{},
 	}
+	spec := kubelet.ContainerSpec{
+		Name:  containerName,
+		Image: imageName,
+	}
+	pod := kubelet.Pod{
+		Metadata: kubelet.PodMetadata{},
+		Spec: kubelet.Spec{
+			Containers: []kubelet.ContainerSpec{{
+				Name:  containerName,
+				Image: imageName,
+			}},
+		},
+	}
+	l.kubeutil = dummyKubeUtil{status: status, spec: spec, pod: pod}
 
 	mu := sync.Mutex{}
 	mu.Lock()
@@ -532,6 +359,7 @@ func TestRetry(t *testing.T) {
 	mu.Lock()
 
 	require.Equal(t, 1, len(mgr.Events))
+	require.True(t, mgr.Events[0].Add)
 	source := mgr.Events[0].Source
 
 	assert.Equal(t, 1, len(l.sourcesByContainer))
@@ -544,47 +372,358 @@ func TestRetry(t *testing.T) {
 	assert.Equal(t, 1, len(l.sourcesByContainer))
 }
 
+func TestScheduleConfig(t *testing.T) {
+	makeScheduler := func() (*Scheduler, *dummyKubeUtil, *schedulers.MockSourceManager) {
+		sch := new()
+		kubeutil := &dummyKubeUtil{}
+		sch.kubeutil = kubeutil
+		mgr := &schedulers.MockSourceManager{}
+		sch.mgr = mgr
+		return sch, kubeutil, mgr
+	}
+
+	emptyLogsConfig := []byte("{}")
+	serviceID := "evergiven://abcd1234"
+	taggerEntity := "container_id://abcd1234"
+
+	t.Run("failure/not a log config", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/logs excluded", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{LogsConfig: emptyLogsConfig, LogsExcluded: true})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/not a service", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{
+			LogsConfig: emptyLogsConfig,
+			ServiceID:  serviceID,
+			Provider:   "mysql",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/bad tagger entity", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: "INVALID",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/wrong tagger entity type", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: "ecs_task://foo",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/bad service ID", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    "INVALID",
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/source already exists", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.sourcesByContainer[serviceID] = &config.LogSource{}
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/GetPodForEntityID fails", func(t *testing.T) {
+		sch, ku, mgr := makeScheduler()
+		ku.shouldFailGetPod = true
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/GetStatusForContainerID fails", func(t *testing.T) {
+		sch, ku, mgr := makeScheduler()
+		ku.shouldFailGetStatus = true
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/Invalid annotations", func(t *testing.T) {
+		sch, ku, mgr := makeScheduler()
+		sch.collectAll = true
+		ku.status = kubelet.ContainerStatus{
+			Name:  "foo",
+			Image: "bar",
+			ID:    "boo",
+		}
+		ku.pod = kubelet.Pod{
+			Metadata: kubelet.PodMetadata{
+				Name:      "fuz",
+				Namespace: "buu",
+				UID:       "baz",
+				Annotations: map[string]string{
+					// missing [ ]
+					"ad.datadoghq.com/foo.logs": `{"source":"any_source","service":"any_service","tags":["tag1","tag2"]}`,
+				},
+			},
+		}
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("success/un-annotated container", func(t *testing.T) {
+		setup := func(cca bool) (*Scheduler, *dummyKubeUtil, *schedulers.MockSourceManager) {
+			sch, ku, mgr := makeScheduler()
+			sch.collectAll = cca
+			ku.status = kubelet.ContainerStatus{
+				Name:  "foo",
+				Image: "bar",
+				ID:    "boo",
+			}
+			ku.spec = kubelet.ContainerSpec{
+				Name:  "foo",
+				Image: "bar",
+			}
+			ku.pod = kubelet.Pod{
+				Metadata: kubelet.PodMetadata{
+					Name:      "fuz",
+					Namespace: "buu",
+					UID:       "baz",
+				},
+			}
+			return sch, ku, mgr
+		}
+		t.Run("container_collect_all enabled", func(t *testing.T) {
+			sch, _, mgr := setup(true)
+			sch.schedule(integration.Config{
+				LogsConfig:   emptyLogsConfig,
+				ServiceID:    serviceID,
+				TaggerEntity: taggerEntity,
+			})
+			require.Equal(t, 1, len(mgr.Events))
+			require.True(t, mgr.Events[0].Add)
+			src := mgr.Events[0].Source
+			require.Equal(t, config.FileType, src.Config.Type)
+			require.Equal(t, "buu/fuz/foo", src.Name)
+			assert.Equal(t, "/var/log/pods/buu_fuz_baz/foo/*.log", filepath.ToSlash(src.Config.Path))
+			require.Equal(t, "boo", src.Config.Identifier)
+			require.Equal(t, "bar", src.Config.Source)
+			require.Equal(t, "bar", src.Config.Service)
+		})
+
+		t.Run("container_collect_all disabled", func(t *testing.T) {
+			sch, _, mgr := setup(false)
+			sch.schedule(integration.Config{
+				LogsConfig:   emptyLogsConfig,
+				ServiceID:    serviceID,
+				TaggerEntity: taggerEntity,
+			})
+			require.Equal(t, 0, len(mgr.Events))
+		})
+	})
+
+	t.Run("success/container_collect_all overridden by AD annotations", func(t *testing.T) {
+		sch, ku, mgr := makeScheduler()
+		sch.collectAll = true
+		ku.status = kubelet.ContainerStatus{
+			Name:  "foo",
+			Image: "bar",
+			ID:    "boo",
+		}
+		ku.pod = kubelet.Pod{
+			Metadata: kubelet.PodMetadata{
+				Name:      "fuz",
+				Namespace: "buu",
+				UID:       "baz",
+				Annotations: map[string]string{
+					"ad.datadoghq.com/foo.logs": `[{"source":"custom_src","service":"custom_svc","tags":["tag1","tag2"]}]`,
+				},
+			},
+		}
+		sch.schedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 1, len(mgr.Events))
+		require.True(t, mgr.Events[0].Add)
+		src := mgr.Events[0].Source
+		require.Equal(t, config.FileType, src.Config.Type)
+		require.Equal(t, "buu/fuz/foo", src.Name)
+		require.Equal(t, "/var/log/pods/buu_fuz_baz/foo/*.log", filepath.ToSlash(src.Config.Path))
+		require.Equal(t, "boo", src.Config.Identifier)
+		require.Equal(t, "custom_src", src.Config.Source)
+		require.Equal(t, "custom_svc", src.Config.Service)
+		require.ElementsMatch(t, []string{"tag1", "tag2"}, src.Config.Tags)
+	})
+}
+
+func TestUnscheduleConfig(t *testing.T) {
+	makeScheduler := func() (*Scheduler, *dummyKubeUtil, *schedulers.MockSourceManager) {
+		sch := new()
+		kubeutil := &dummyKubeUtil{}
+		sch.kubeutil = kubeutil
+		mgr := &schedulers.MockSourceManager{}
+		sch.mgr = mgr
+		return sch, kubeutil, mgr
+	}
+
+	emptyLogsConfig := []byte("{}")
+	serviceID := "evergiven://abcd1234"
+	taggerEntity := "container_id://abcd1234"
+
+	t.Run("failure/not a log config", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/logs excluded", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{LogsConfig: emptyLogsConfig, LogsExcluded: true})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/not a service", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{
+			LogsConfig: emptyLogsConfig,
+			ServiceID:  serviceID,
+			Provider:   "mysql",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/bad tagger entity", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: "INVALID",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/wrong tagger entity type", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: "ecs_task://foo",
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/bad service ID", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    "INVALID",
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/source not found", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+	})
+
+	t.Run("failure/source being retried", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.pendingRetries[serviceID] = &retryOps{removalScheduled: false}
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 0, len(mgr.Events))
+		require.True(t, true, sch.pendingRetries[serviceID].removalScheduled)
+	})
+
+	t.Run("success/source exists", func(t *testing.T) {
+		sch, _, mgr := makeScheduler()
+		sch.sourcesByContainer[serviceID] = &config.LogSource{}
+		sch.unschedule(integration.Config{
+			LogsConfig:   emptyLogsConfig,
+			ServiceID:    serviceID,
+			TaggerEntity: taggerEntity,
+		})
+		require.Equal(t, 1, len(mgr.Events))
+		require.False(t, mgr.Events[0].Add)
+		require.Equal(t, 0, len(sch.sourcesByContainer))
+	})
+}
+
 type dummyKubeUtil struct {
+	shouldFailGetStatus bool
+	status              kubelet.ContainerStatus
+
+	shouldFailGetSpec bool
+	spec              kubelet.ContainerSpec
+
+	shouldRetryGetPod bool
+	shouldFailGetPod  bool
+	pod               kubelet.Pod
+
+	// embed a nil interface for all of the other methods not defined here
 	kubelet.KubeUtilInterface
-	name        string
-	image       string
-	id          string
-	shouldRetry bool
 }
 
 func (d dummyKubeUtil) GetStatusForContainerID(pod *kubelet.Pod, containerID string) (kubelet.ContainerStatus, error) {
-	status := kubelet.ContainerStatus{
-		Name:  d.name,
-		Image: d.image,
-		ID:    d.id,
-		Ready: true,
-		State: kubelet.ContainerState{},
+	if d.shouldFailGetStatus {
+		return kubelet.ContainerStatus{}, fmt.Errorf("uhoh")
 	}
-	return status, nil
+	return d.status, nil
 }
 
 func (d dummyKubeUtil) GetSpecForContainerName(pod *kubelet.Pod, containerName string) (kubelet.ContainerSpec, error) {
-	spec := kubelet.ContainerSpec{
-		Name:  d.name,
-		Image: d.image,
+	if d.shouldFailGetSpec {
+		return kubelet.ContainerSpec{}, fmt.Errorf("uhoh")
 	}
-	return spec, nil
+	return d.spec, nil
 }
 
 func (d dummyKubeUtil) GetPodForEntityID(ctx context.Context, entityID string) (*kubelet.Pod, error) {
-	if d.shouldRetry {
+	if d.shouldRetryGetPod {
 		return nil, errors.NewRetriable("dummy error", fmt.Errorf("retriable error"))
 	}
-	pod := &kubelet.Pod{
-		Metadata: kubelet.PodMetadata{},
-		Spec: kubelet.Spec{
-			Containers: []kubelet.ContainerSpec{{
-				Name:  d.name,
-				Image: d.image,
-			}},
-		},
+	if d.shouldFailGetPod {
+		return nil, fmt.Errorf("uhoh")
 	}
-	return pod, nil
+	return &d.pod, nil
 }
 
 func getScheduler(collectAll bool) *Scheduler {
@@ -594,20 +733,6 @@ func getScheduler(collectAll bool) *Scheduler {
 		kubeutil:        k,
 		serviceNameFunc: func(string, string) string { return "" },
 	}
-}
-
-// contains returns true if the list contains all the items.
-func contains(list []string, items ...string) bool {
-	m := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		m[item] = struct{}{}
-	}
-	for _, elt := range list {
-		if _, exists := m[elt]; !exists {
-			return false
-		}
-	}
-	return true
 }
 
 func fastRetrier() *retry.Retrier {
