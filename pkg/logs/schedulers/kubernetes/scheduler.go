@@ -71,11 +71,11 @@ type Scheduler struct {
 	// collectAll reflects the logs_config.container_collect_all config
 	collectAll bool
 
-	// addServices carries new services, as discovered via AD
-	addedServices chan *service.Service
+	// scheduled carries configs scheduled by the AD MetaScheduler
+	scheduled chan []integration.Config
 
-	// addServices carries services removed, as discovered via AD
-	removedServices chan *service.Service
+	// unscheduled carries configs uns heduled byt he AD MetaScheduler
+	unscheduled chan []integration.Config
 
 	// sourcesByContainer holds the sources created by this scheduler, keyed by
 	// the service ID.
@@ -108,19 +108,22 @@ func New() schedulers.Scheduler {
 	}
 
 	collectAll := coreConfig.Datadog.GetBool("logs_config.container_collect_all")
-
+	scheduled := make(chan []integration.Config, 1)
+	unscheduled := make(chan []integration.Config, 1)
 	sch := &Scheduler{
+		listener: adlistener.NewADListener("logs-agent Kubernetes scheduler",
+			func(configs []integration.Config) { scheduled <- configs },
+			func(configs []integration.Config) { unscheduled <- configs }),
 		stop:               make(chan struct{}),
 		stopped:            make(chan struct{}),
 		collectAll:         collectAll,
-		addedServices:      make(chan *service.Service, 1),
-		removedServices:    make(chan *service.Service, 1),
+		scheduled:          scheduled,
+		unscheduled:        unscheduled,
 		sourcesByContainer: make(map[string]*config.LogSource),
 		retryOperations:    make(chan *retryOps),
 		pendingRetries:     make(map[string]*retryOps),
 		serviceNameFunc:    util.ServiceNameFromTags,
 	}
-	sch.listener = adlistener.NewADListener("logs-agent Kubernetes scheduler", sch.Schedule, sch.Unschedule)
 	return sch
 }
 
@@ -158,10 +161,14 @@ func (s *Scheduler) run() {
 	// the need to synchronize data structures.
 	for {
 		select {
-		case service := <-s.addedServices:
-			s.addSource(service)
-		case service := <-s.removedServices:
-			s.removeSource(service)
+		case configs := <-s.scheduled:
+			for _, config := range configs {
+				s.schedule(config)
+			}
+		case configs := <-s.unscheduled:
+			for _, config := range configs {
+				s.unschedule(config)
+			}
 		case ops := <-s.retryOperations:
 			s.addSource(ops.service)
 		case <-s.stop:
@@ -190,74 +197,6 @@ func (s *Scheduler) getKubeUtil(getter kubeUtilGetter) kubelet.KubeUtilInterface
 		case <-s.stop:
 			return nil
 		}
-	}
-}
-
-// Schedule is called from the AD MetaScheduler when new configs are available.
-func (s *Scheduler) Schedule(configs []integration.Config) {
-	for _, config := range configs {
-		if !config.IsLogConfig() {
-			continue
-		}
-		if config.HasFilter(containers.LogsFilter) {
-			continue
-		}
-
-		// if this is not a service config, ignore it, as the AD logs scheduler will
-		// handle it
-		if config.Provider != "" || config.ServiceID == "" {
-			continue
-		}
-
-		entityType, _, err := s.parseEntity(config.TaggerEntity)
-		if err != nil {
-			log.Warnf("Invalid service: %v", err)
-			continue
-		}
-		// logs only consider container services
-		if entityType != containers.ContainerEntityName {
-			continue
-		}
-		service, err := s.toService(config)
-		if err != nil {
-			log.Warnf("Invalid service: %v", err)
-			continue
-		}
-
-		s.addedServices <- service
-	}
-}
-
-// Unschedule removes all the sources and services matching the integration configs.
-func (s *Scheduler) Unschedule(configs []integration.Config) {
-	for _, config := range configs {
-		if !config.IsLogConfig() || config.HasFilter(containers.LogsFilter) {
-			continue
-		}
-
-		// if this is not a service config, ignore it, as the AD logs scheduler will
-		// handle it
-		if config.Provider != "" || config.ServiceID == "" {
-			continue
-		}
-
-		// new service to remove
-		entityType, _, err := s.parseEntity(config.TaggerEntity)
-		if err != nil {
-			log.Warnf("Invalid service: %v", err)
-			continue
-		}
-		// logs only consider container services
-		if entityType != containers.ContainerEntityName {
-			continue
-		}
-		service, err := s.toService(config)
-		if err != nil {
-			log.Warnf("Invalid service: %v", err)
-			continue
-		}
-
-		s.removedServices <- service
 	}
 }
 
@@ -325,6 +264,41 @@ func (s *Scheduler) delayRetry(ops *retryOps) {
 	}()
 }
 
+// schedule handles configs scheduled by the AD MetaScheduler.  It is called in
+// the run() goroutine and can access scheduler data structures without
+// locking.
+func (s *Scheduler) schedule(config integration.Config) {
+	if !config.IsLogConfig() {
+		return
+	}
+	if config.HasFilter(containers.LogsFilter) {
+		return
+	}
+
+	// if this is not a service config, ignore it, as the AD logs scheduler will
+	// handle it
+	if config.Provider != "" || config.ServiceID == "" {
+		return
+	}
+
+	entityType, _, err := s.parseEntity(config.TaggerEntity)
+	if err != nil {
+		log.Warnf("Invalid service: %v", err)
+		return
+	}
+	// logs only consider container services
+	if entityType != containers.ContainerEntityName {
+		return
+	}
+	service, err := s.toService(config)
+	if err != nil {
+		log.Warnf("Invalid service: %v", err)
+		return
+	}
+
+	s.addSource(service)
+}
+
 // addSource creates a new log-source from a service by resolving the
 // pod linked to the entityID of the service
 func (s *Scheduler) addSource(svc *service.Service) {
@@ -377,6 +351,39 @@ func (s *Scheduler) addSource(svc *service.Service) {
 		}
 		delete(s.pendingRetries, svc.GetEntityID())
 	}
+}
+
+// unschedule handles configs unscheduled by the AD MetaScheduler.  It is
+// called in the run() goroutine and can access scheduler data structures
+// without locking.
+func (s *Scheduler) unschedule(config integration.Config) {
+	if !config.IsLogConfig() || config.HasFilter(containers.LogsFilter) {
+		return
+	}
+
+	// if this is not a service config, ignore it, as the AD logs scheduler will
+	// handle it
+	if config.Provider != "" || config.ServiceID == "" {
+		return
+	}
+
+	// new service to remove
+	entityType, _, err := s.parseEntity(config.TaggerEntity)
+	if err != nil {
+		log.Warnf("Invalid service: %v", err)
+		return
+	}
+	// logs only consider container services
+	if entityType != containers.ContainerEntityName {
+		return
+	}
+	service, err := s.toService(config)
+	if err != nil {
+		log.Warnf("Invalid service: %v", err)
+		return
+	}
+
+	s.removeSource(service)
 }
 
 // removeSource removes a new log-source from a service
