@@ -37,11 +37,13 @@ const (
 
 var tuplePool = sync.Pool{
 	New: func() interface{} {
-		return new(ConnTuple)
+		return new(conntrackKey)
 	},
 }
 
 type conntrackTelemetry C.conntrack_telemetry_t
+
+type conntrackKey C.conntrack_key_t
 
 type ebpfConntracker struct {
 	m            *manager.Manager
@@ -159,14 +161,14 @@ func (e *ebpfConntracker) processEvent(ev netlink.Event) {
 	}
 }
 
-func (e *ebpfConntracker) addTranslation(src *ConnTuple, dst *ConnTuple) error {
+func (e *ebpfConntracker) addTranslation(src *conntrackKey, dst *conntrackKey) error {
 	if err := e.ctMap.Update(unsafe.Pointer(src), unsafe.Pointer(dst), ebpf.UpdateNoExist); err != nil && !errors.Is(err, ebpf.ErrKeyExist) {
 		return err
 	}
 	return nil
 }
 
-func formatKey(netns uint32, tuple *ct.IPTuple) *ConnTuple {
+func formatKey(netns uint32, tuple *ct.IPTuple) *conntrackKey {
 	var proto network.ConnectionType
 	switch *tuple.Proto.Number {
 	case unix.IPPROTO_TCP:
@@ -177,24 +179,27 @@ func formatKey(netns uint32, tuple *ct.IPTuple) *ConnTuple {
 		return nil
 	}
 
-	return newConnTuple(0,
-		netns,
-		util.AddressFromNetIP(*tuple.Src),
-		util.AddressFromNetIP(*tuple.Dst),
-		*tuple.Proto.SrcPort,
-		*tuple.Proto.DstPort,
-		proto)
+	return &conntrackKey{
+		tup: *newConnTuple(
+			util.AddressFromNetIP(*tuple.Src),
+			util.AddressFromNetIP(*tuple.Dst),
+			*tuple.Proto.SrcPort,
+			*tuple.Proto.DstPort,
+			proto),
+		netns: C.__u32(netns),
+	}
 }
 
 func (e *ebpfConntracker) GetTranslationForConn(stats network.ConnectionStats) *network.IPTranslation {
 	start := time.Now()
-	src := tuplePool.Get().(*ConnTuple)
+	src := tuplePool.Get().(*conntrackKey)
 	defer tuplePool.Put(src)
 
-	if err := toConnTupleFromConnectionStats(src, &stats); err != nil {
+	tup := ConnTuple(src.tup)
+	if err := toConnTupleFromConnectionStats(&tup, &stats); err != nil {
 		return nil
 	}
-	//src.pid = 0
+	src.netns = C.__u32(stats.NetNS)
 	log.Tracef("looking up in conntrack: %s", src)
 
 	dst := e.get(src)
@@ -206,15 +211,15 @@ func (e *ebpfConntracker) GetTranslationForConn(stats network.ConnectionStats) *
 	atomic.AddInt64(&e.stats.gets, 1)
 	atomic.AddInt64(&e.stats.getTotalTime, time.Now().Sub(start).Nanoseconds())
 	return &network.IPTranslation{
-		ReplSrcIP:   dst.SourceAddress(),
-		ReplDstIP:   dst.DestAddress(),
-		ReplSrcPort: uint16(dst.sport),
-		ReplDstPort: uint16(dst.dport),
+		ReplSrcIP:   ConnTuple(dst.tup).SourceAddress(),
+		ReplDstIP:   ConnTuple(dst.tup).DestAddress(),
+		ReplSrcPort: ConnTuple(dst.tup).SourcePort(),
+		ReplDstPort: ConnTuple(dst.tup).DestPort(),
 	}
 }
 
-func (e *ebpfConntracker) get(src *ConnTuple) *ConnTuple {
-	dst := tuplePool.Get().(*ConnTuple)
+func (e *ebpfConntracker) get(src *conntrackKey) *conntrackKey {
+	dst := tuplePool.Get().(*conntrackKey)
 	if err := e.ctMap.Lookup(unsafe.Pointer(src), unsafe.Pointer(dst)); err != nil {
 		if !errors.Is(err, ebpf.ErrKeyNotExist) {
 			log.Warnf("error looking up connection in ebpf conntrack map: %s", err)
@@ -225,7 +230,7 @@ func (e *ebpfConntracker) get(src *ConnTuple) *ConnTuple {
 	return dst
 }
 
-func (e *ebpfConntracker) delete(key *ConnTuple) {
+func (e *ebpfConntracker) delete(key *conntrackKey) {
 	if err := e.ctMap.Delete(unsafe.Pointer(key)); err != nil {
 		if errors.Is(err, ebpf.ErrKeyNotExist) {
 			log.Tracef("connection does not exist in ebpf conntrack map: %s", key)
@@ -237,13 +242,14 @@ func (e *ebpfConntracker) delete(key *ConnTuple) {
 
 func (e *ebpfConntracker) DeleteTranslation(stats network.ConnectionStats) {
 	start := time.Now()
-	key := tuplePool.Get().(*ConnTuple)
+	key := tuplePool.Get().(*conntrackKey)
 	defer tuplePool.Put(key)
 
-	if err := toConnTupleFromConnectionStats(key, &stats); err != nil {
+	tup := ConnTuple(key.tup)
+	if err := toConnTupleFromConnectionStats(&tup, &stats); err != nil {
 		return
 	}
-	//key.pid = 0
+	key.netns = C.__u32(stats.NetNS)
 
 	dst := e.get(key)
 	e.delete(key)

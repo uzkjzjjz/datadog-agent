@@ -31,6 +31,18 @@
 
 static const __u64 ENABLED = 1;
 
+static __always_inline bool is_tcp_enabled() {
+    __u64 val = 0;
+    LOAD_CONSTANT("tcp_enabled", val);
+    return val == ENABLED;
+}
+
+static __always_inline bool is_udp_enabled() {
+    __u64 val = 0;
+    LOAD_CONSTANT("udp_enabled", val);
+    return val == ENABLED;
+}
+
 static __always_inline bool dns_stats_enabled() {
     __u64 val = 0;
     LOAD_CONSTANT("dns_stats_enabled", val);
@@ -665,9 +677,11 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
         return 0;
     }
     set_direction(cs, CONN_DIRECTION_INCOMING);
+    set_pid(cs, bpf_get_current_pid_tgid() >> 32);
     set_netns_from_sock(cs, sk);
-    add_tcp_port_binding(t.sport, cs->netns);
     update_timestamp(cs);
+
+    add_tcp_port_binding(t.sport, cs->netns);
 
     log_debug("kretprobe/inet_csk_accept: sport: %u, dport: %u\n", t.sport, t.dport);
     return 0;
@@ -684,7 +698,7 @@ int kprobe__inet_csk_listen_stop(struct pt_regs* ctx) {
 
     u32 netns = get_netns_from_sock(sk);
     delete_tcp_port_binding(lport, netns);
-    log_debug("kprobe/inet_csk_listen_stop: net ns: %u, lport: %u\n", netns, lport);
+    log_debug("kprobe/inet_csk_listen_stop: netns: %u, lport: %u\n", netns, lport);
     return 0;
 }
 
@@ -821,8 +835,84 @@ int kretprobe__inet6_bind(struct pt_regs* ctx) {
 
 //endregion
 
+SEC("socket/traffic_stats")
+int socket__traffic_stats(struct __sk_buff* skb) {
+    skb_info_t skb_info;
+    if (!read_conn_tuple_skb(skb, &skb_info)) {
+        return 0;
+    }
+    // TODO remove this test-only check
+    if (skb_info.tup.sport == 22 || skb_info.tup.dport == 22) {
+        return 0;
+    }
+    if (skb->pkt_type != PACKET_OUTGOING) {
+        flip_tuple(&skb_info.tup);
+    }
+
+    conn_direction_t dir = CONN_DIRECTION_UNKNOWN;
+    conn_stats_ts_t *cs = NULL;
+    u32 size = skb->len - skb_info.data_off;
+
+    switch (skb_info.tup.metadata & CONN_TYPE_MASK) {
+    case CONN_TYPE_TCP:
+        if (!is_tcp_enabled()) {
+            return 0;
+        }
+        log_debug("TCP size=%u pkt_type=%u flags=%x\n", size, skb->pkt_type, skb_info.tcp_flags);
+        if (skb_info.tcp_flags & TCPHDR_RST) {
+            return 0;
+        }
+        if (skb_info.tcp_flags & TCPHDR_SYN) {
+            if (skb_info.tcp_flags & TCPHDR_ACK) {
+                log_debug("SYN-ACK\n");
+                dir = skb->pkt_type == PACKET_OUTGOING ? CONN_DIRECTION_INCOMING : CONN_DIRECTION_OUTGOING;
+            } else {
+                log_debug("SYN\n");
+                dir = skb->pkt_type == PACKET_OUTGOING ? CONN_DIRECTION_OUTGOING : CONN_DIRECTION_INCOMING;
+            }
+        }
+        if (skb_info.tcp_flags & TCPHDR_FIN) {
+            cs = get_conn_stats(&skb_info.tup);
+            if (cs == NULL) {
+                // we aren't already tracking this connection, so ignore it to prevent re-creation of closed conns
+                return 0;
+            }
+        }
+        break;
+
+    case CONN_TYPE_UDP:
+        if (!is_udp_enabled()) {
+            return 0;
+        }
+        log_debug("UDP size=%u pkt_type=%u\n", size, skb->pkt_type);
+        break;
+    }
+
+    if (cs == NULL) {
+        cs = upsert_conn_stats(&skb_info.tup);
+        if (cs == NULL) {
+            return 0;
+        }
+    }
+
+    if (skb->pkt_type == PACKET_OUTGOING) {
+        add_sent_bytes(&skb_info.tup, cs, size);
+        add_sent_packets(cs, 1);
+    } else {
+        add_recv_bytes(&skb_info.tup, cs, size);
+        add_recv_packets(cs, 1);
+    }
+
+    if (dir != CONN_DIRECTION_UNKNOWN) {
+        set_direction(cs, dir);
+    } else {
+        infer_direction(&skb_info.tup, cs);
+    }
+    update_timestamp(cs);
+
+    print_ip(skb_info.tup.saddr_h, skb_info.tup.saddr_l, skb_info.tup.sport, skb_info.tup.metadata);
     print_ip(skb_info.tup.daddr_h, skb_info.tup.daddr_l, skb_info.tup.dport, skb_info.tup.metadata);
-    log_debug("dir=%d\n", dir);
+    log_debug("dir=%u\n", cs->direction);
 
     return 0;
 }

@@ -12,7 +12,7 @@
 static void update_state_transitions(tcp_stats_t *ts, u16 transitions);
 
 static __always_inline int get_proto(conn_tuple_t *t) {
-    return (t->metadata & CONN_TYPE_TCP) ? CONN_TYPE_TCP : CONN_TYPE_UDP;
+    return t->metadata & CONN_TYPE_MASK;
 }
 
 static __always_inline void cleanup_conn(conn_tuple_t *tup) {
@@ -30,6 +30,7 @@ static __always_inline void cleanup_conn(conn_tuple_t *tup) {
         bpf_map_delete_elem(&tcp_stats, &(conn.tup));
 
         if (ts) {
+            log_debug("store tcp stats in batch\n");
             conn.tcp_stats = *ts;
         }
 
@@ -41,6 +42,7 @@ static __always_inline void cleanup_conn(conn_tuple_t *tup) {
     bpf_map_delete_elem(&conn_stats, &(conn.tup));
 
     if (cst) {
+        log_debug("store conn stats in batch\n");
         conn.conn_stats = *cst;
     }
     conn.conn_stats.timestamp = bpf_ktime_get_ns();
@@ -50,6 +52,7 @@ static __always_inline void cleanup_conn(conn_tuple_t *tup) {
     if (batch_ptr == NULL) {
         return;
     }
+    log_debug("batching closed conn: cpu=%u pos=%u\n", cpu, batch_ptr->len);
 
     // TODO: Can we turn this into a macro based on TCP_CLOSED_BATCH_SIZE?
     switch (batch_ptr->len) {

@@ -39,23 +39,23 @@ int kprobe___nf_conntrack_hash_insert(struct pt_regs* ctx) {
     u32 netns = get_netns(&ct->ct_net);
     log_debug("kprobe/__nf_conntrack_hash_insert: netns: %u, status: %x\n", netns, status);
 
-    conn_tuple_t orig_conn = {};
-    if (!conntrack_tuple_to_conn_tuple(&orig_conn, &orig)) {
+    conn_tuple_t orig_conn_tup = {};
+    if (!conntrack_tuple_to_conn_tuple(&orig_conn_tup, &orig)) {
         return 0;
     }
-    orig_conn.netns = netns;
+    conntrack_key_t orig_conn = { .tup = orig_conn_tup, .netns = netns };
 
     log_debug("orig\n");
-    print_translation(&orig_conn);
+    print_translation(&orig_conn_tup);
 
-    conn_tuple_t reply_conn = {};
-    if (!conntrack_tuple_to_conn_tuple(&reply_conn, &reply)) {
+    conn_tuple_t reply_conn_tup = {};
+    if (!conntrack_tuple_to_conn_tuple(&reply_conn_tup, &reply)) {
         return 0;
     }
-    reply_conn.netns = netns;
+    conntrack_key_t reply_conn = { .tup = reply_conn_tup, .netns = netns };
 
     log_debug("reply\n");
-    print_translation(&reply_conn);
+    print_translation(&reply_conn_tup);
 
     bpf_map_update_elem(&conntrack, &orig_conn, &reply_conn, BPF_ANY);
     bpf_map_update_elem(&conntrack, &reply_conn, &orig_conn, BPF_ANY);

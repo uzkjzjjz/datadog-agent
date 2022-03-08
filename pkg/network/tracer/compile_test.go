@@ -11,6 +11,7 @@ import (
 )
 
 func TestTracerCompile(t *testing.T) {
+	t.SkipNow()
 	cfg := config.New()
 	cfg.BPFDebug = true
 	cflags := getCFlags(cfg)
@@ -19,6 +20,7 @@ func TestTracerCompile(t *testing.T) {
 }
 
 func TestConntrackCompile(t *testing.T) {
+	t.SkipNow()
 	cfg := config.New()
 	cfg.BPFDebug = true
 	cflags := getCFlags(cfg)

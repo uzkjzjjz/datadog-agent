@@ -16,6 +16,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DataDog/datadog-agent/pkg/process/procutil"
+
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
@@ -91,6 +93,8 @@ type Tracer struct {
 
 	sysctlUDPConnTimeout       *sysctl.Int
 	sysctlUDPConnStreamTimeout *sysctl.Int
+
+	closeFilterFn func()
 }
 
 const (
@@ -138,11 +142,6 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		return nil, fmt.Errorf("invalid probe configuration: %v", err)
 	}
 
-	enableSocketFilter := config.DNSInspection && !pre410Kernel
-	if enableSocketFilter {
-		enabledProbes[probes.SocketDnsFilter] = struct{}{}
-	}
-
 	mgrOptions := manager.Options{
 		// Extend RLIMIT_MEMLOCK (8) size
 		// On some systems, the default for RLIMIT_MEMLOCK may be as low as 64 bytes.
@@ -187,9 +186,21 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 			return nil, fmt.Errorf("error guessing offsets: %s", err)
 		}
 
-		if enableSocketFilter && config.CollectDNSStats {
+		if _, dnsEnabled := enabledProbes[probes.SocketDnsFilter]; dnsEnabled && config.CollectDNSStats {
 			mgrOptions.ConstantEditors = append(mgrOptions.ConstantEditors, manager.ConstantEditor{
 				Name:  "dns_stats_enabled",
+				Value: uint64(1),
+			})
+		}
+		if config.CollectTCPConns {
+			mgrOptions.ConstantEditors = append(mgrOptions.ConstantEditors, manager.ConstantEditor{
+				Name:  "tcp_enabled",
+				Value: uint64(1),
+			})
+		}
+		if config.CollectUDPConns {
+			mgrOptions.ConstantEditors = append(mgrOptions.ConstantEditors, manager.ConstantEditor{
+				Name:  "udp_enabled",
 				Value: uint64(1),
 			})
 		}
@@ -225,6 +236,16 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 	reverseDNS, err := newReverseDNS(config, m, pre410Kernel)
 	if err != nil {
 		return nil, fmt.Errorf("error enabling DNS traffic inspection: %s", err)
+	}
+
+	filter, _ := m.GetProbe(manager.ProbeIdentificationPair{Section: string(probes.SocketTrafficStats)})
+	if filter == nil {
+		return nil, fmt.Errorf("error retrieving traffic socket filter")
+	}
+
+	closeFilterFn, err := filterpkg.HeadlessSocketFilter(config.ProcRoot, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error enabling traffic inspection: %s", err)
 	}
 
 	err = initializePortBindingMaps(config, m)
@@ -268,6 +289,7 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		sysctlUDPConnTimeout:       sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout", time.Minute),
 		sysctlUDPConnStreamTimeout: sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout_stream", time.Minute),
 		gwLookup:                   newGatewayLookup(config, m),
+		closeFilterFn:              closeFilterFn,
 	}
 
 	tr.batchManager, err = tr.initPerfPolling(perfHandlerTCP)
@@ -491,6 +513,7 @@ func (t *Tracer) shouldSkipConnection(conn *network.ConnectionStats) bool {
 }
 
 func (t *Tracer) storeClosedConn(cs *network.ConnectionStats) {
+	log.Debugf("closed conn: %s", cs)
 	if t.shouldSkipConnection(cs) {
 		atomic.AddInt64(&t.skippedConns, 1)
 		return
@@ -509,6 +532,7 @@ func (t *Tracer) Stop() {
 	close(t.stop)
 	t.reverseDNS.Close()
 	_ = t.m.Stop(manager.CleanAll)
+	t.closeFilterFn()
 	t.perfHandler.Stop()
 	t.httpMonitor.Stop()
 	close(t.flushIdle)

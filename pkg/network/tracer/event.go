@@ -175,19 +175,19 @@ func toConnTuple(ct *ConnTuple, saddr, daddr util.Address, sport, dport uint16, 
 	return nil
 }
 
-func (t *ConnTuple) isTCP() bool {
+func (t ConnTuple) isTCP() bool {
 	return t.Type() == network.TCP
 }
 
-func (t *ConnTuple) isUDP() bool {
+func (t ConnTuple) isUDP() bool {
 	return t.Type() == network.UDP
 }
 
-func (t *ConnTuple) isIPv4() bool {
+func (t ConnTuple) isIPv4() bool {
 	return t.Family() == network.AFINET
 }
 
-func (t *ConnTuple) SourceAddress() util.Address {
+func (t ConnTuple) SourceAddress() util.Address {
 	if t.isIPv4() {
 		return util.V4Address(uint32(t.saddr_l))
 	}
@@ -195,15 +195,15 @@ func (t *ConnTuple) SourceAddress() util.Address {
 }
 
 // SourceEndpoint returns the source address in the ip:port format (for example, "192.0.2.1:25", "[2001:db8::1]:80")
-func (t *ConnTuple) SourceEndpoint() string {
+func (t ConnTuple) SourceEndpoint() string {
 	return net.JoinHostPort(t.SourceAddress().String(), strconv.Itoa(int(t.sport)))
 }
 
-func (t *ConnTuple) SourcePort() uint16 {
+func (t ConnTuple) SourcePort() uint16 {
 	return uint16(t.sport)
 }
 
-func (t *ConnTuple) DestAddress() util.Address {
+func (t ConnTuple) DestAddress() util.Address {
 	if t.isIPv4() {
 		return util.V4Address(uint32(t.daddr_l))
 	}
@@ -211,15 +211,15 @@ func (t *ConnTuple) DestAddress() util.Address {
 }
 
 // DestEndpoint returns the destination address in the ip:port format (for example, "192.0.2.1:25", "[2001:db8::1]:80")
-func (t *ConnTuple) DestEndpoint() string {
+func (t ConnTuple) DestEndpoint() string {
 	return net.JoinHostPort(t.DestAddress().String(), strconv.Itoa(int(t.dport)))
 }
 
-func (t *ConnTuple) DestPort() uint16 {
+func (t ConnTuple) DestPort() uint16 {
 	return uint16(t.dport)
 }
 
-func (t *ConnTuple) String() string {
+func (t ConnTuple) String() string {
 	return fmt.Sprintf(
 		"[%s%s] [%s ⇄ %s]",
 		t.Type(),

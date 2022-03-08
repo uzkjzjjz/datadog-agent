@@ -40,28 +40,36 @@ func (c *Config) EnabledProbes(runtimeTracer bool) (map[probes.ProbeName]struct{
 	}
 
 	if c.CollectUDPConns {
-		enabled[probes.UDPRecvMsgReturn] = struct{}{}
+		//enabled[probes.UDPRecvMsgReturn] = struct{}{}
 		enabled[probes.UDPDestroySock] = struct{}{}
 		enabled[probes.UDPDestroySockReturn] = struct{}{}
-		enabled[probes.IPMakeSkb] = struct{}{}
+		//enabled[probes.IPMakeSkb] = struct{}{}
 		enabled[probes.InetBind] = struct{}{}
 		enabled[probes.InetBindRet] = struct{}{}
 
 		if c.CollectIPv6Conns {
-			if !runtimeTracer && kv < kernel.VersionCode(4, 7, 0) {
-				enabled[probes.IP6MakeSkbPre470] = struct{}{}
-			} else {
-				enabled[probes.IP6MakeSkb] = struct{}{}
-			}
-
+			//	if !runtimeTracer && kv < kernel.VersionCode(4, 7, 0) {
+			//		enabled[probes.IP6MakeSkbPre470] = struct{}{}
+			//	} else {
+			//		enabled[probes.IP6MakeSkb] = struct{}{}
+			//	}
+			//
 			enabled[probes.Inet6Bind] = struct{}{}
 			enabled[probes.Inet6BindRet] = struct{}{}
 		}
 
-		if !runtimeTracer && pre410Kernel {
-			enabled[probes.UDPRecvMsgPre410] = struct{}{}
-		} else {
-			enabled[probes.UDPRecvMsg] = struct{}{}
+		//if !runtimeTracer && pre410Kernel {
+		//	enabled[probes.UDPRecvMsgPre410] = struct{}{}
+		//} else {
+		//	enabled[probes.UDPRecvMsg] = struct{}{}
+		//}
+	}
+
+	if !pre410Kernel {
+		enabled[probes.SocketTrafficStats] = struct{}{}
+
+		if c.DNSInspection {
+			enabled[probes.SocketDnsFilter] = struct{}{}
 		}
 	}
 

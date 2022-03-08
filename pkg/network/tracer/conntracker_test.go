@@ -29,7 +29,7 @@ func TestConntrackers(t *testing.T) {
 		create func(*config.Config) (netlink.Conntracker, error)
 	}{
 		{"netlink", setupNetlinkConntracker},
-		{"eBPF", setupEBPFConntracker},
+		//{"eBPF", setupEBPFConntracker},
 	}
 	for _, conntracker := range conntrackers {
 		t.Run(conntracker.name, func(t *testing.T) {

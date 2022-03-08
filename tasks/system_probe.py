@@ -50,6 +50,7 @@ def build(
     arch="x64",
     embedded_path=DATADOG_AGENT_EMBEDDED_PATH,
     bundle_ebpf=False,
+    skip_object_files=False,
 ):
     """
     Build the system_probe
@@ -83,7 +84,7 @@ def build(
                 maj_ver=maj_ver, min_ver=min_ver, patch_ver=patch_ver, target_arch=windres_target
             )
         )
-    else:
+    elif not skip_object_files:
         # Only build ebpf files on unix
         build_object_files(ctx, bundle_ebpf=bundle_ebpf)
 

@@ -84,6 +84,7 @@ const (
 	// SocketHTTPFilter is the socket probe for HTTP
 	SocketHTTPFilter ProbeName = "socket/http_filter"
 
+	SocketTrafficStats ProbeName = "socket/traffic_stats"
 
 	// ConntrackHashInsert is the probe for new conntrack entries
 	ConntrackHashInsert ProbeName = "kprobe/__nf_conntrack_hash_insert"

@@ -198,7 +198,7 @@ func TestTCPSendAndReceive(t *testing.T) {
 	assert.Equal(t, 10*clientMessageSize, int(conn.MonotonicSentBytes))
 	assert.Equal(t, 10*serverMessageSize, int(conn.MonotonicRecvBytes))
 	assert.Equal(t, 0, int(conn.MonotonicRetransmits))
-	//assert.Equal(t, os.Getpid(), int(conn.Pid))
+	assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, addrPort(server.address), int(conn.DPort))
 	assert.Equal(t, network.OUTGOING, conn.Direction)
 	assert.True(t, conn.IntraHost)
@@ -362,14 +362,14 @@ func TestTCPRemoveEntries(t *testing.T) {
 		time.Sleep(time.Second)
 	})
 
-	// Wait a bit for the first connection to be considered as timeouting
+	// Wait a bit for the first connection to be considered timing out
 	time.Sleep(1 * time.Second)
 
 	// Create a new client
 	c2, err := net.DialTimeout("tcp", server.address, 1*time.Second)
 	require.NoError(t, err)
 
-	// Send a messages
+	// Send a message
 	_, err = c2.Write(genPayload(clientMessageSize))
 	require.NoError(t, err)
 	defer c2.Close()
@@ -386,7 +386,7 @@ func TestTCPRemoveEntries(t *testing.T) {
 	tcpMp, err := tr.getMap(probes.TcpStatsMap)
 	require.NoError(t, err)
 
-	key, err := connTupleFromConn(c, 0, 0)
+	key, err := connTupleFromConn(c)
 	require.NoError(t, err)
 	stats := new(TCPStats)
 	err = tcpMp.Lookup(unsafe.Pointer(key), unsafe.Pointer(stats))
@@ -463,11 +463,13 @@ func TestTCPRetransmit(t *testing.T) {
 	assert.LessOrEqual(t, int(conn.MonotonicSentBytes), 100*clientMessageSize)
 	//assert.Equal(t, 100*clientMessageSize, int(conn.MonotonicSentBytes))
 	assert.True(t, int(conn.MonotonicRetransmits) > 0)
-	//assert.Equal(t, os.Getpid(), int(conn.Pid))
+	assert.Equal(t, os.Getpid(), int(conn.Pid))
 	assert.Equal(t, addrPort(server.address), int(conn.DPort))
 }
 
 func TestTCPRetransmitSharedSocket(t *testing.T) {
+	t.Skip("this test requires PID to be part of tuple key")
+
 	// Enable BPF-based system probe
 	tr, err := NewTracer(testConfig())
 	require.NoError(t, err)
@@ -845,6 +847,7 @@ func TestUDPPeekCount(t *testing.T) {
 	require.Equal(t, len(msg), int(incoming.MonotonicRecvBytes))
 	require.True(t, incoming.IntraHost)
 }
+
 func TestUDPDisabled(t *testing.T) {
 	// Enable BPF-based system probe with UDP disabled
 	config := testConfig()
@@ -1201,18 +1204,11 @@ func removeConnection(t *testing.T, tr *Tracer, c *network.ConnectionStats) {
 	tcpMp, err := tr.getMap(probes.TcpStatsMap)
 	require.NoError(t, err)
 
-	tuple := []*ConnTuple{
-		{
-			//pid:      _Ctype_uint(c.Pid),
-			saddr_l: _Ctype_ulonglong(nativeEndian.Uint32(c.Source.Bytes())),
-			daddr_l: _Ctype_ulonglong(nativeEndian.Uint32(c.Dest.Bytes())),
-			sport:   _Ctype_ushort(c.SPort),
-			dport:   _Ctype_ushort(c.DPort),
-			//netns:    _Ctype_uint(c.NetNS),
-			metadata: 1, // TCP/IPv4
-		},
-	}
+	tup := &ConnTuple{}
+	err = toConnTupleFromConnectionStats(tup, c)
+	require.NoError(t, err)
 
+	tuple := []*ConnTuple{tup}
 	tr.removeEntries(mp, tcpMp, tuple)
 }
 
@@ -1233,6 +1229,7 @@ func findConnection(l, r net.Addr, c *network.Connections) (*network.ConnectionS
 func searchConnections(c *network.Connections, predicate func(network.ConnectionStats) bool) []network.ConnectionStats {
 	var results []network.ConnectionStats
 	for _, conn := range c.Conns {
+		log.Debugf("%s", conn)
 		if predicate(conn) {
 			results = append(results, conn)
 		}
@@ -2170,6 +2167,9 @@ func testConfig() *config.Config {
 	if os.Getenv(runtimeCompilationEnvVar) != "" {
 		cfg.EnableRuntimeCompiler = true
 		cfg.AllowPrecompiledFallback = false
+	}
+	if os.Getenv("BPF_DEBUG") != "" {
+		cfg.BPFDebug = true
 	}
 	return cfg
 }

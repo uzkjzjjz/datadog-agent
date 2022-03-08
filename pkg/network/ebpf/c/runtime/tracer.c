@@ -61,8 +61,7 @@ static __always_inline __u16 read_sport(struct sock* skp) {
  * Reads values into a `conn_tuple_t` from a `sock`. Any values that are already set in conn_tuple_t
  * are not overwritten. Returns 1 success, 0 otherwise.
  */
-static __always_inline int read_conn_tuple_partial(conn_tuple_t* t, struct sock* skp, u64 pid_tgid, metadata_mask_t type) {
-    t->pid = pid_tgid >> 32;
+static __always_inline int read_conn_tuple_partial(conn_tuple_t* t, struct sock* skp, metadata_mask_t type) {
     t->metadata = type;
 
     // Retrieve network namespace id first since addresses and ports may not be available for unconnected UDP
@@ -139,9 +138,9 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t* t, struct sock*
 /**
  * Reads values into a `conn_tuple_t` from a `sock`. Initializes all values in conn_tuple_t to `0`. Returns 1 success, 0 otherwise.
  */
-static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, u64 pid_tgid, metadata_mask_t type) {
+static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, metadata_mask_t type) {
     __builtin_memset(t, 0, sizeof(conn_tuple_t));
-    return read_conn_tuple_partial(t, skp, pid_tgid, type);
+    return read_conn_tuple_partial(t, skp, type);
 }
 
 static __always_inline void handle_tcp_stats(conn_tuple_t* t, struct sock* skp) {
@@ -181,7 +180,8 @@ int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
 
     handle_tcp_stats(&t, skp);
     get_tcp_segment_counts(skp, &packets_in, &packets_out);
-    return handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    update_conn_stats(&t, size, 0, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    return 0;
 }
 
 SEC("kprobe/tcp_cleanup_rbuf")
@@ -203,7 +203,8 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs* ctx) {
         return 0;
     }
 
-    return handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    update_conn_stats(&t, 0, copied, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
+    return 0;
 }
 
 SEC("kprobe/tcp_close")
@@ -286,7 +287,7 @@ int kprobe__ip6_make_skb(struct pt_regs* ctx) {
     }
 
     log_debug("kprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
-    handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT);
+    update_conn_stats(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT);
     increment_telemetry_count(udp_send_processed);
 
     return 0;
@@ -325,7 +326,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
     }
 
     log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
-    handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT);
+    update_conn_stats(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT);
     increment_telemetry_count(udp_send_processed);
 
     return 0;
@@ -403,7 +404,7 @@ int kretprobe__udp_recvmsg(struct pt_regs* ctx) {
     }
 
     log_debug("kretprobe/udp_recvmsg: pid_tgid: %d, return: %d\n", pid_tgid, copied);
-    handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN, 0, 1, PACKET_COUNT_INCREMENT);
+    update_conn_stats(&t, 0, copied, CONN_DIRECTION_UNKNOWN, 0, 1, PACKET_COUNT_INCREMENT);
 
     return 0;
 }
@@ -460,13 +461,13 @@ int kretprobe__inet_csk_accept(struct pt_regs* ctx) {
         return 0;
     }
     handle_tcp_stats(&t, sk);
-    handle_message(&t, 0, 0, CONN_DIRECTION_INCOMING, 0, 0, PACKET_COUNT_NONE);
+    update_conn_stats(&t, 0, 0, CONN_DIRECTION_INCOMING, 0, 0, PACKET_COUNT_NONE);
 
     port_binding_t pb = {};
     pb.netns = t.netns;
     pb.port = t.sport;
     __u8 state = PORT_LISTENING;
-    bpf_map_update_elem(&port_bindings, &pb, &state, BPF_NOEXIST);
+    bpf_map_update_elem(&tcp_port_bindings, &pb, &state, BPF_NOEXIST);
 
     log_debug("kretprobe/inet_csk_accept: netns: %u, sport: %u, dport: %u\n", t.netns, t.sport, t.dport);
     return 0;
@@ -484,7 +485,7 @@ int kprobe__inet_csk_listen_stop(struct pt_regs* ctx) {
     port_binding_t t = { .netns = 0, .port = 0 };
     t.netns = get_netns(&skp->sk_net);
     t.port = lport;
-    bpf_map_delete_elem(&port_bindings, &t);
+    bpf_map_delete_elem(&tcp_port_bindings, &t);
 
     log_debug("kprobe/inet_csk_listen_stop: net ns: %u, lport: %u\n", t.netns, t.port);
     return 0;
