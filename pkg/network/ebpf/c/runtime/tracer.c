@@ -206,6 +206,7 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
     struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
     size_t size = (size_t)PT_REGS_PARM5(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
+    log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
 
     size = size - sizeof(struct udphdr);
 
@@ -231,7 +232,6 @@ int kprobe__ip_make_skb(struct pt_regs* ctx) {
         }
     }
 
-    log_debug("kprobe/ip_send_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
     handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT);
     increment_telemetry_count(udp_send_processed);
 
@@ -255,7 +255,7 @@ static __always_inline int handle_udp_recvmsg(struct pt_regs* ctx, struct bpf_ma
     struct msghdr* msg = (struct msghdr*)PT_REGS_PARM2(ctx);
     int flags = (int)PT_REGS_PARM5(ctx);
 #endif
-    log_debug("kprobe/udp_recvmsg: flags: %x\n", flags);
+    log_debug("kprobe/udp_recvmsg: sk=%llx, flags: %x\n", sk, flags);
     if (flags & MSG_PEEK) {
         return 0;
     }
@@ -296,7 +296,7 @@ static __always_inline int handle_ret_udp_recvmsg(struct pt_regs* ctx, struct bp
         return 0;
     }
 
-    log_debug("kretprobe/udp_recvmsg: ret=%d\n", copied);
+    log_debug("kretprobe/udp_recvmsg: sk=%llx, ret=%d\n", st->sk, copied);
 
     conn_tuple_t t = {};
     __builtin_memset(&t, 0, sizeof(conn_tuple_t));
@@ -311,7 +311,7 @@ static __always_inline int handle_ret_udp_recvmsg(struct pt_regs* ctx, struct bp
         return 0;
     }
 
-    log_debug("kretprobe/udp_recvmsg: pid_tgid: %d, return: %d\n", pid_tgid, copied);
+    log_debug("kretprobe/udp_recvmsg: sk=%llx, pid_tgid: %d, return: %d\n", st->sk, pid_tgid, copied);
     handle_message(&t, 0, copied, CONN_DIRECTION_UNKNOWN, 0, 1, PACKET_COUNT_INCREMENT);
 
     return 0;
@@ -467,7 +467,7 @@ static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* 
     }
 
     if (addr == NULL) {
-        log_debug("sys_enter_bind: could not read sockaddr, sock=%llx, tid=%u\n", sock, tid);
+        log_debug("sys_enter_bind: could not read sockaddr, sock=%llx tid=%u\n", sock, tid);
         return 0;
     }
 
@@ -480,9 +480,11 @@ static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* 
         bpf_probe_read(&sin_port, sizeof(u16), &(((struct sockaddr_in6*)addr)->sin6_port));
     }
 
+    struct sock *sk = NULL;
+    bpf_probe_read(&sk, sizeof(struct sock *), &sock->sk);
     sin_port = bpf_ntohs(sin_port);
     if (sin_port == 0) {
-        log_debug("ERR(sys_enter_bind): sin_port is 0\n");
+        log_debug("ERR(sys_enter_bind): sin_port is 0 sk=%llx\n", sk);
         return 0;
     }
 
@@ -490,8 +492,9 @@ static __always_inline int sys_enter_bind(struct socket* sock, struct sockaddr* 
     bind_syscall_args_t args = {};
     args.port = sin_port;
 
+
     bpf_map_update_elem(&pending_bind, &tid, &args, BPF_ANY);
-    log_debug("sys_enter_bind: started a bind on UDP port=%d sock=%llx tid=%u\n", sin_port, sock, tid);
+    log_debug("sys_enter_bind: started a bind on UDP port=%d sk=%llx tid=%u\n", sin_port, sk, tid);
 
     return 0;
 }
@@ -518,20 +521,17 @@ int kprobe__inet6_bind(struct pt_regs* ctx) {
 
 static __always_inline int sys_exit_bind(__s64 ret) {
     __u64 tid = bpf_get_current_pid_tgid();
+    log_debug("sys_exit_bind: tid=%u, ret=%d\n", tid, ret);
 
     // bail if this bind() is not the one we're instrumenting
     bind_syscall_args_t* args;
     args = bpf_map_lookup_elem(&pending_bind, &tid);
-
-    log_debug("sys_exit_bind: tid=%u, ret=%d\n", tid, ret);
-
-    if (args == NULL) {
+    if (!args) {
         log_debug("sys_exit_bind: was not a UDP bind, will not process\n");
         return 0;
     }
 
     bpf_map_delete_elem(&pending_bind, &tid);
-
     if (ret != 0) {
         return 0;
     }

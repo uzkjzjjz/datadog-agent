@@ -493,6 +493,76 @@ func testUDPSendAndReceive(t *testing.T, addr string) {
 	}
 }
 
+func TestUDPReceiveCount(t *testing.T) {
+	t.Run("v4", func(t *testing.T) {
+		testUDPReceiveCount(t, "127.0.0.1:12345", "udp4")
+	})
+	t.Run("v6", func(t *testing.T) {
+		testUDPReceiveCount(t, "[::1]:12345", "udp6")
+	})
+}
+
+func testUDPReceiveCount(t *testing.T, addr string, udpnet string) {
+	cfg := testConfig()
+	tr, err := NewTracer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Stop()
+
+	server := &UDPServer{
+		address: ":23456",
+		network: udpnet,
+		onMessage: func(b []byte, n int) []byte {
+			return genPayload(serverMessageSize)
+		},
+	}
+
+	doneChan := make(chan struct{})
+	err = server.Run(doneChan, clientMessageSize)
+	require.NoError(t, err)
+	defer close(doneChan)
+
+	laddr, err := net.ResolveUDPAddr(udpnet, addr)
+	require.NoError(t, err)
+	raddr, err := net.ResolveUDPAddr(udpnet, server.address)
+	require.NoError(t, err)
+
+	c, err := net.DialUDP(udpnet, laddr, raddr)
+	require.NoError(t, err)
+	defer c.Close()
+
+	_, err = c.Write(genPayload(clientMessageSize))
+	require.NoError(t, err)
+
+	_, err = c.Read(make([]byte, serverMessageSize))
+	require.NoError(t, err)
+
+	connections := getConnections(t, tr)
+	for _, c := range connections.Conns {
+		t.Log(c)
+	}
+
+	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)
+	if assert.True(t, ok, "unable to find incoming connection") {
+		assert.Equal(t, network.INCOMING, incoming.Direction)
+
+		// make sure the inverse values are seen for the other message
+		assert.Equal(t, serverMessageSize, int(incoming.MonotonicSentBytes), "incoming sent")
+		assert.Equal(t, clientMessageSize, int(incoming.MonotonicRecvBytes), "incoming recv")
+		assert.True(t, incoming.IntraHost, "incoming intrahost")
+	}
+
+	outgoing, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
+	if assert.True(t, ok, "unable to find outgoing connection") {
+		assert.Equal(t, network.OUTGOING, outgoing.Direction)
+
+		assert.Equal(t, clientMessageSize, int(outgoing.MonotonicSentBytes), "outgoing sent")
+		assert.Equal(t, serverMessageSize, int(outgoing.MonotonicRecvBytes), "outgoing recv")
+		assert.True(t, outgoing.IntraHost, "outgoing intrahost")
+	}
+}
+
 func TestUDPDisabled(t *testing.T) {
 	// Enable BPF-based system probe with UDP disabled
 	config := testConfig()
