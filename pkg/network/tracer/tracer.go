@@ -51,13 +51,13 @@ func init() {
 }
 
 type Tracer struct {
-	m            *manager.Manager
-	config       *config.Config
-	state        network.State
-	conntracker  netlink.Conntracker
-	reverseDNS   network.ReverseDNS
-	httpMonitor  *http.Monitor
-	batchManager *Batcher
+	m                *manager.Manager
+	config           *config.Config
+	state            network.State
+	conntracker      netlink.Conntracker
+	reverseDNS       network.ReverseDNS
+	httpMonitor      *http.Monitor
+	connBatchManager *ConnBatcher
 
 	flushIdle     chan chan struct{}
 	stop          chan struct{}
@@ -242,7 +242,7 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 			})
 	}
 
-	connBatcher, err := NewBatcher(Conn{}, "conn_t", defaultClosedChannelSize, 5, 128)
+	connBatcher, err := NewConnBatcher()
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func NewTracer(config *config.Config) (*Tracer, error) {
 		sysctlUDPConnTimeout:       sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout", time.Minute),
 		sysctlUDPConnStreamTimeout: sysctl.NewInt(config.ProcRoot, "net/netfilter/nf_conntrack_udp_timeout_stream", time.Minute),
 		gwLookup:                   newGatewayLookup(config, runtimeTracer, m),
-		batchManager:               connBatcher,
+		connBatchManager:           connBatcher,
 	}
 
 	err = tr.initPerfPolling()
@@ -498,7 +498,7 @@ func (t *Tracer) populateExpvarStats() error {
 
 // initPerfPolling starts the listening on perf buffer events to grab closed connections
 func (t *Tracer) initPerfPolling() error {
-	if err := t.batchManager.Start(); err != nil {
+	if err := t.connBatchManager.Start(); err != nil {
 		return fmt.Errorf("error starting perf map: %s", err)
 	}
 
@@ -507,7 +507,7 @@ func (t *Tracer) initPerfPolling() error {
 		ticker := time.NewTicker(5 * time.Minute)
 		for {
 			select {
-			case connObj, ok := <-t.batchManager.Objects():
+			case connObj, ok := <-t.connBatchManager.Objects():
 				if !ok {
 					return
 				}
@@ -517,8 +517,7 @@ func (t *Tracer) initPerfPolling() error {
 				if !ok {
 					return
 				}
-				objs := t.batchManager.PendingObjects()
-				for _, connObj := range objs {
+				for connObj := range t.connBatchManager.PendingObjects() {
 					t.readConnection(connObj)
 				}
 				close(done)
@@ -537,13 +536,7 @@ func (t *Tracer) initPerfPolling() error {
 	return nil
 }
 
-func (t *Tracer) readConnection(connObj interface{}) {
-	ct, valid := connObj.(*Conn)
-	if !valid {
-		log.Warnf("connection object not able to be cast to `Conn`. type: %T", connObj)
-		return
-	}
-
+func (t *Tracer) readConnection(ct *Conn) {
 	tup := ConnTuple(ct.tup)
 	cst := ConnStatsWithTimestamp(ct.conn_stats)
 	tst := TCPStats(ct.tcp_stats)
@@ -584,7 +577,7 @@ func (t *Tracer) Stop() {
 	close(t.stop)
 	t.reverseDNS.Close()
 	_ = t.m.Stop(manager.CleanAll)
-	t.batchManager.Stop()
+	t.connBatchManager.Stop()
 	t.httpMonitor.Stop()
 	close(t.flushIdle)
 	t.conntracker.Close()

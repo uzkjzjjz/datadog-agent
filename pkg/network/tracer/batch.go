@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
@@ -25,6 +26,11 @@ type batchNotification struct {
 	len    uint8
 }
 
+type BatchTelemetry struct {
+	PerfReceived int64
+	PerfLost     int64
+}
+
 type Batcher struct {
 	typ           reflect.Type
 	cName         string
@@ -41,10 +47,13 @@ type Batcher struct {
 	offsetMap *ebpf.Map
 	perfMap   *manager.PerfMap
 
+	// lock protects lastOffset
 	lock sync.Mutex
+
+	telemetry BatchTelemetry
 }
 
-func NewBatcher(outType interface{}, cTypeName string, channelSize int, batchSize uint32, batchesPerCPU uint32) (*Batcher, error) {
+func NewBatcher(outType reflect.Type, cTypeName string, channelSize int, batchSize uint32, batchesPerCPU uint32) (*Batcher, error) {
 	cpus, err := kernel.PossibleCPUs()
 	if err != nil {
 		return nil, err
@@ -56,12 +65,12 @@ func NewBatcher(outType interface{}, cTypeName string, channelSize int, batchSiz
 	}
 
 	return &Batcher{
-		typ:           reflect.TypeOf(outType),
+		typ:           outType,
 		cName:         cTypeName,
 		batchSize:     batchSize,
 		batchesPerCPU: batchesPerCPU,
 		cpuCount:      cpus,
-		objChan:       make(chan interface{}),
+		objChan:       make(chan interface{}, channelSize),
 		handler:       ddebpf.NewPerfHandler(channelSize),
 		lastOffset:    offsets,
 	}, nil
@@ -137,27 +146,44 @@ func (b *Batcher) Objects() <-chan interface{} {
 	return b.objChan
 }
 
-func (b *Batcher) PendingObjects() []interface{} {
-	var objs []interface{}
-	cb := new(batchCpu)
-	for cpu := 0; cpu < b.cpuCount; cpu++ {
-		if err := b.offsetMap.Lookup(unsafe.Pointer(&cpu), unsafe.Pointer(cb)); err != nil {
-			log.Errorf("[%s] error reading offset map for cpu %d: %s", b.cName, cpu, err)
-			continue
+func (b *Batcher) PendingObjects() <-chan interface{} {
+	ch := make(chan interface{})
+
+	go func() {
+		defer close(ch)
+
+		b.lock.Lock()
+		defer b.lock.Unlock()
+
+		cb := new(batchCpu)
+		for cpu := 0; cpu < b.cpuCount; cpu++ {
+			if err := b.offsetMap.Lookup(unsafe.Pointer(&cpu), unsafe.Pointer(cb)); err != nil {
+				log.Errorf("[%s] error reading offset map for cpu %d: %s", b.cName, cpu, err)
+				continue
+			}
+			if cb.len > 0 {
+				//log.Debugf("[%s] reading pending objects for cpu %d, offset %d, len %d", b.cName, cpu, cb.offset, cb.len)
+				for _, o := range b.readBatch(cb.offset, cb.len, cpu) {
+					ch <- o
+				}
+			}
 		}
-		//log.Debugf("[%s] reading pending objects for cpu %d, offset %d, len %d", b.cName, cpu, cb.offset, cb.len)
-		if cb.len > 0 {
-			objs = append(objs, b.readBatch(cb.offset, cb.len, cpu)...)
-		}
-	}
-	//log.Debugf("[%s] read %d pending objects", b.cName, len(objs))
-	return objs
+	}()
+
+	return ch
 }
 
 func (b *Batcher) Stop() {
 	_ = b.perfMap.Stop(manager.CleanAll)
 	b.handler.Stop()
 	b.m = nil
+}
+
+func (b *Batcher) GetStats() BatchTelemetry {
+	return BatchTelemetry{
+		PerfReceived: atomic.LoadInt64(&b.telemetry.PerfReceived),
+		PerfLost:     atomic.LoadInt64(&b.telemetry.PerfLost),
+	}
 }
 
 func (b *Batcher) reader() {
@@ -167,33 +193,38 @@ func (b *Batcher) reader() {
 			if !ok {
 				return
 			}
+			atomic.AddInt64(&b.telemetry.PerfReceived, 1)
 			note := toBatchNotification(batchData.Data)
-			ex := b.expectedOffset(batchData.CPU)
-			if note.offset != ex {
-				// TODO this should be guarded by the mutex
-				// skipped one or more objects?!
-				// TODO read skipped batches
-				// this can happen if we read pending objects from a batch
-				//log.Warnf("[%s] notification offset %d does not match expected offset %d for cpu %d", b.cName, note.offset, ex, batchData.CPU)
-			}
-
-			objs := b.readBatch(note.offset, note.len, batchData.CPU)
-			for _, o := range objs {
-				b.objChan <- o
-			}
+			b.readFromNotification(note, batchData.CPU)
 		case lostCount, ok := <-b.handler.LostChannel:
 			if !ok {
 				return
 			}
+			atomic.AddInt64(&b.telemetry.PerfLost, int64(lostCount))
 			log.Warnf("[%s] lost %d batch notification(s)", b.cName, lostCount)
 		}
 	}
 }
 
-func (b *Batcher) readBatch(offset uint64, len uint8, cpu int) []interface{} {
+func (b *Batcher) readFromNotification(note *batchNotification, cpu int) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	ex := b.expectedOffset(cpu)
+	// if not what we expected and also not within the same batch, due to pending reads
+	if note.offset != ex && !(ex > note.offset && ex < (note.offset+uint64(note.len))) {
+		// skipped one or more objects?!
+		// TODO read skipped objects from lastOffset[cpu]+1 to note.offset?
+		log.Warnf("[%s] notification offset %d does not match expected offset %d for cpu %d", b.cName, note.offset, ex, cpu)
+	}
+
+	objs := b.readBatch(note.offset, note.len, cpu)
+	for _, o := range objs {
+		b.objChan <- o
+	}
+}
+
+func (b *Batcher) readBatch(offset uint64, len uint8, cpu int) []interface{} {
 	//log.Tracef("[%s] readBatch cpu=%d offset=%d len=%d lastOffset=%d", b.cName, cpu, offset, len, b.lastOffset[cpu])
 	start := offset
 	end := offset + uint64(len)
@@ -202,7 +233,7 @@ func (b *Batcher) readBatch(offset uint64, len uint8, cpu int) []interface{} {
 	}
 	objs := make([]interface{}, 0, end-start)
 
-	//log.Debugf("[%s] start=%d end=%d", b.cName, start, end)
+	//log.Tracef("[%s] start=%d end=%d", b.cName, start, end)
 	for i := start; i < end; i++ {
 		o := reflect.New(b.typ)
 		err := b.objMap.Lookup(unsafe.Pointer(&i), unsafe.Pointer(o.Pointer()))
