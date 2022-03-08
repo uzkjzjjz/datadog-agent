@@ -23,7 +23,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/docker"
 	filelauncher "github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/file"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/journald"
-	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/kubernetes"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/listener"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/traps"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/launchers/windowsevent"
@@ -80,7 +79,6 @@ func NewAgent(sources *config.LogSources, services *service.Services, processing
 		services,
 		coreConfig.Datadog.GetBool("logs_config.docker_container_use_file"),
 		coreConfig.Datadog.GetBool("logs_config.docker_container_force_use_file")))
-	lnchrs.AddLauncher(kubernetes.NewLauncher(sources, services, coreConfig.Datadog.GetBool("logs_config.container_collect_all")))
 
 	return &Agent{
 		sources:                   sources,

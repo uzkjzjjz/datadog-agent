@@ -19,14 +19,15 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
+	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
 	"github.com/DataDog/datadog-agent/pkg/logs/service"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetSource(t *testing.T) {
-	launcher := getLauncher(true)
+	scheduler := getScheduler(true)
 	container := kubelet.ContainerStatus{
 		Name:  "foo",
 		Image: "bar",
@@ -49,7 +50,7 @@ func TestGetSource(t *testing.T) {
 		},
 	}
 
-	source, err := launcher.getSource(pod, container)
+	source, err := scheduler.getSource(pod, container)
 	assert.Nil(t, err)
 	assert.Equal(t, config.FileType, source.Config.Type)
 	assert.Equal(t, "buu/fuz/foo", source.Name)
@@ -60,7 +61,7 @@ func TestGetSource(t *testing.T) {
 }
 
 func TestGetSourceShouldBeOverridenByAutoDiscoveryAnnotation(t *testing.T) {
-	launcher := getLauncher(true)
+	scheduler := getScheduler(true)
 	container := kubelet.ContainerStatus{
 		Name:  "foo",
 		Image: "bar",
@@ -80,7 +81,7 @@ func TestGetSourceShouldBeOverridenByAutoDiscoveryAnnotation(t *testing.T) {
 		},
 	}
 
-	source, err := launcher.getSource(pod, container)
+	source, err := scheduler.getSource(pod, container)
 	assert.Nil(t, err)
 	assert.Equal(t, config.FileType, source.Config.Type)
 	assert.Equal(t, "buu/fuz/foo", source.Name)
@@ -92,7 +93,7 @@ func TestGetSourceShouldBeOverridenByAutoDiscoveryAnnotation(t *testing.T) {
 }
 
 func TestGetSourceShouldFailWithInvalidAutoDiscoveryAnnotation(t *testing.T) {
-	launcher := getLauncher(true)
+	scheduler := getScheduler(true)
 	container := kubelet.ContainerStatus{
 		Name:  "foo",
 		Image: "bar",
@@ -113,13 +114,13 @@ func TestGetSourceShouldFailWithInvalidAutoDiscoveryAnnotation(t *testing.T) {
 		},
 	}
 
-	source, err := launcher.getSource(pod, container)
+	source, err := scheduler.getSource(pod, container)
 	assert.NotNil(t, err)
 	assert.Nil(t, source)
 }
 
 func TestGetSourceAddContainerdParser(t *testing.T) {
-	launcher := getLauncher(true)
+	scheduler := getScheduler(true)
 	container := kubelet.ContainerStatus{
 		Name:  "foo",
 		Image: "bar",
@@ -136,14 +137,14 @@ func TestGetSourceAddContainerdParser(t *testing.T) {
 		},
 	}
 
-	source, err := launcher.getSource(pod, container)
+	source, err := scheduler.getSource(pod, container)
 	assert.Nil(t, err)
 	assert.Equal(t, config.FileType, source.Config.Type)
 }
 
 func TestContainerCollectAll(t *testing.T) {
-	launcherCollectAll := getLauncher(true)
-	launcherCollectAllDisabled := getLauncher(false)
+	schedulerCollectAll := getScheduler(true)
+	schedulerCollectAllDisabled := getScheduler(false)
 	containerFoo := kubelet.ContainerStatus{
 		Name:  "fooName",
 		Image: "fooImage",
@@ -193,27 +194,27 @@ func TestContainerCollectAll(t *testing.T) {
 		},
 	}
 
-	source, err := launcherCollectAll.getSource(podFoo, containerFoo)
+	source, err := schedulerCollectAll.getSource(podFoo, containerFoo)
 	assert.Nil(t, err)
 	assert.Equal(t, "fooID", source.Config.Identifier)
-	source, err = launcherCollectAll.getSource(podBar, containerBar)
+	source, err = schedulerCollectAll.getSource(podBar, containerBar)
 	assert.Nil(t, err)
 	assert.Equal(t, "barID", source.Config.Identifier)
 
-	source, err = launcherCollectAllDisabled.getSource(podFoo, containerFoo)
+	source, err = schedulerCollectAllDisabled.getSource(podFoo, containerFoo)
 	assert.Nil(t, err)
 	assert.Equal(t, "fooID", source.Config.Identifier)
-	source, err = launcherCollectAllDisabled.getSource(podBar, containerBar)
+	source, err = schedulerCollectAllDisabled.getSource(podBar, containerBar)
 	assert.Equal(t, errCollectAllDisabled, err)
 	assert.Nil(t, source)
 
-	source, err = launcherCollectAll.getSource(podBaz, containerBaz)
+	source, err = schedulerCollectAll.getSource(podBaz, containerBaz)
 	assert.Nil(t, err)
 	assert.Equal(t, "bazID", source.Config.Identifier)
 }
 
 func TestGetPath(t *testing.T) {
-	launcher := getLauncher(true)
+	scheduler := getScheduler(true)
 	container := kubelet.ContainerStatus{
 		Name:  "foo",
 		Image: "bar",
@@ -236,7 +237,7 @@ func TestGetPath(t *testing.T) {
 
 	// v1.14+ (default)
 	podDirectory := "buu_fuz_baz"
-	path := launcher.getPath(basePath, pod, container)
+	path := scheduler.getPath(basePath, pod, container)
 	assert.Equal(t, filepath.Join(basePath, podDirectory, "foo", "*.log"), path)
 
 	// v1.10 - v1.13
@@ -246,7 +247,7 @@ func TestGetPath(t *testing.T) {
 	err = os.MkdirAll(filepath.Join(basePath, podDirectory, containerDirectory), 0777)
 	assert.Nil(t, err)
 
-	path = launcher.getPath(basePath, pod, container)
+	path = scheduler.getPath(basePath, pod, container)
 	assert.Equal(t, filepath.Join(basePath, podDirectory, "foo", "*.log"), path)
 
 	// v1.9
@@ -260,22 +261,8 @@ func TestGetPath(t *testing.T) {
 	_, err = os.Create(filepath.Join(basePath, podDirectory, logFile))
 	assert.Nil(t, err)
 
-	path = launcher.getPath(basePath, pod, container)
+	path = scheduler.getPath(basePath, pod, container)
 	assert.Equal(t, filepath.Join(basePath, podDirectory, "foo_*.log"), path)
-}
-
-// contains returns true if the list contains all the items.
-func contains(list []string, items ...string) bool {
-	m := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		m[item] = struct{}{}
-	}
-	for _, elt := range list {
-		if _, exists := m[elt]; !exists {
-			return false
-		}
-	}
-	return true
 }
 
 func TestGetSourceServiceNameOrder(t *testing.T) {
@@ -385,7 +372,7 @@ func TestGetSourceServiceNameOrder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := &Launcher{
+			l := &Scheduler{
 				collectAll:      true,
 				kubeutil:        kubelet.NewKubeUtil(),
 				serviceNameFunc: tt.sFunc,
@@ -454,7 +441,7 @@ func TestGetShortImageName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := getLauncher(true)
+			l := getScheduler(true)
 
 			got, err := l.getShortImageName(tt.pod, tt.containerName)
 			if got != tt.wantImageName {
@@ -475,17 +462,16 @@ func TestRetry(t *testing.T) {
 	imageName := "fooImage"
 	serviceName := "fooService"
 
-	l := &Launcher{
+	mgr := &schedulers.MockSourceManager{}
+	l := &Scheduler{
 		collectAll:         true,
 		kubeutil:           dummyKubeUtil{shouldRetry: true},
 		pendingRetries:     make(map[string]*retryOps),
 		retryOperations:    make(chan *retryOps),
 		serviceNameFunc:    func(n, e string) string { return serviceName },
-		sources:            config.NewLogSources(),
+		mgr:                mgr,
 		sourcesByContainer: make(map[string]*config.LogSource),
 	}
-
-	sourceOutputChan := l.sources.GetAddedForType(config.FileType)
 
 	service := service.NewService(containerType, containerID)
 	l.addSource(service)
@@ -509,10 +495,11 @@ func TestRetry(t *testing.T) {
 		l.addSource(ops.service)
 		mu.Unlock()
 	}()
-
-	source := <-sourceOutputChan
 	// Ensure l.addSource is completely done
 	mu.Lock()
+
+	require.Equal(t, 1, len(mgr.Events))
+	source := mgr.Events[0].Source
 
 	assert.Equal(t, 1, len(l.sourcesByContainer))
 
@@ -567,11 +554,25 @@ func (d dummyKubeUtil) GetPodForEntityID(ctx context.Context, entityID string) (
 	return pod, nil
 }
 
-func getLauncher(collectAll bool) *Launcher {
+func getScheduler(collectAll bool) *Scheduler {
 	k := kubelet.NewKubeUtil()
-	return &Launcher{
+	return &Scheduler{
 		collectAll:      collectAll,
 		kubeutil:        k,
 		serviceNameFunc: func(string, string) string { return "" },
 	}
+}
+
+// contains returns true if the list contains all the items.
+func contains(list []string, items ...string) bool {
+	m := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		m[item] = struct{}{}
+	}
+	for _, elt := range list {
+		if _, exists := m[elt]; !exists {
+			return false
+		}
+	}
+	return true
 }
