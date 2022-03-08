@@ -261,15 +261,21 @@ static __always_inline int handle_udp_recvmsg(struct pt_regs* ctx, struct bpf_ma
     }
 
     u64 pid_tgid = bpf_get_current_pid_tgid();
-    udp_recv_sock_t t = { .sk = NULL, .msg = NULL };
+    udp_recv_sock_t st = { .sk = NULL, .msg = NULL };
     if (sk) {
-        bpf_probe_read(&t.sk, sizeof(t.sk), &sk);
+        conn_tuple_t t = {};
+        __builtin_memset(&t, 0, sizeof(conn_tuple_t));
+        if (!read_conn_tuple_partial(&t, sk, pid_tgid, CONN_TYPE_UDP)) {
+            log_debug("ERR(kprobe/udp_recvmsg): error reading conn tuple, pid_tgid=%d\n", pid_tgid);
+        }
+        log_debug("kprobe/udp_recvmsg: src=%x:%d\n", t.saddr_l, t.sport);
+        bpf_probe_read(&st.sk, sizeof(st.sk), &sk);
     }
     if (msg) {
-        bpf_probe_read(&t.msg, sizeof(t.msg), &msg);
+        bpf_probe_read(&st.msg, sizeof(st.msg), &msg);
     }
 
-    bpf_map_update_elem(udp_sock_map, &pid_tgid, &t, BPF_ANY);
+    bpf_map_update_elem(udp_sock_map, &pid_tgid, &st, BPF_ANY);
     return 0;
 }
 

@@ -331,9 +331,11 @@ static __always_inline int handle_ret_udp_recvmsg(int copied, struct bpf_map_def
     conn_tuple_t t = {};
     __builtin_memset(&t, 0, sizeof(conn_tuple_t));
     if (st->msg) {
+        log_debug("kretprobe/udp_recvmsg: reading sockaddr\n");
         struct sockaddr *sap = NULL;
         bpf_probe_read(&sap, sizeof(sap), &(st->msg->msg_name));
         sockaddr_to_addr(sap, &t.daddr_h, &t.daddr_l, &t.dport, &t.metadata);
+        log_debug("kretprobe/udp_recvmsg: read sockaddr: dst=%d port=%d\n", t.daddr_l, t.dport);
     }
 
     if (!read_conn_tuple_partial(&t, st->sk, pid_tgid, CONN_TYPE_UDP)) {

@@ -39,6 +39,9 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t* t, struct sock*
         if (t->saddr_l == 0) {
             bpf_probe_read(&t->saddr_l, sizeof(__be32), &skp->sk_rcv_saddr);
         }
+        if (t->saddr_l == 0) {
+            bpf_probe_read(&t->saddr_l, sizeof(__be32), &inet_sk(skp)->inet_saddr);
+        }
         if (t->daddr_l == 0) {
             bpf_probe_read(&t->daddr_l, sizeof(__be32), &skp->sk_daddr);
         }

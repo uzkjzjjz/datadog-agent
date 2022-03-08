@@ -54,7 +54,7 @@ var (
 const runtimeCompilationEnvVar = "DD_TESTS_RUNTIME_COMPILED"
 
 func TestMain(m *testing.M) {
-	log.SetupLogger(seelog.Default, "warn")
+	log.SetupLogger(seelog.Default, "debug")
 	cfg := testConfig()
 	if cfg.EnableRuntimeCompiler {
 		fmt.Println("RUNTIME COMPILER ENABLED")
@@ -935,16 +935,23 @@ func (s *TCPServer) Run(done chan struct{}) error {
 type UDPServer struct {
 	network   string
 	address   string
+	lc        *net.ListenConfig
 	onMessage func(b []byte, n int) []byte
 }
 
 func (s *UDPServer) Run(done chan struct{}, payloadSize int) error {
-	network := "udp"
+	udpnet := "udp"
 	if s.network != "" {
-		network = s.network
+		udpnet = s.network
 	}
 
-	ln, err := net.ListenPacket(network, s.address)
+	var err error
+	var ln net.PacketConn
+	if s.lc != nil {
+		ln, err = s.lc.ListenPacket(context.Background(), udpnet, s.address)
+	} else {
+		ln, err = net.ListenPacket(udpnet, s.address)
+	}
 	if err != nil {
 		return err
 	}
@@ -1619,6 +1626,7 @@ func TestRuntimeCompilerEnvironmentVar(t *testing.T) {
 
 func testConfig() *config.Config {
 	cfg := config.New()
+	cfg.EnableConntrack = false
 	if os.Getenv("BPF_DEBUG") != "" {
 		cfg.BPFDebug = true
 	}
