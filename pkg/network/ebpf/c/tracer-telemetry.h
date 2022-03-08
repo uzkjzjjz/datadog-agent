@@ -49,21 +49,21 @@ static __always_inline void sockaddr_to_addr(struct sockaddr *sa, u64 *addr_h, u
         return;
     }
 
-    u16 family = 0;
-    bpf_probe_read(&family, sizeof(family), &sa->sa_family);
+    struct sockaddr sa = {};
+    bpf_probe_read(&sa, sizeof(sa), sap);
 
     struct sockaddr_in *sin;
     struct sockaddr_in6 *sin6;
-    switch (family) {
+
+    switch (sa.sa_family) {
     case AF_INET:
         *metadata |= CONN_V4;
         sin = (struct sockaddr_in *)sa;
         if (addr_l) {
-            bpf_probe_read(addr_l, sizeof(__be32), &(sin->sin_addr.s_addr));
+            *addr_l = (u64)sin->sin_addr.s_addr;
         }
         if (port) {
-            bpf_probe_read(port, sizeof(__be16), &sin->sin_port);
-            *port = bpf_ntohs(*port);
+            *port = bpf_ntohs(sin->sin_port);
         }
         break;
     case AF_INET6:
@@ -74,12 +74,12 @@ static __always_inline void sockaddr_to_addr(struct sockaddr *sa, u64 *addr_h, u
             bpf_probe_read(addr_l, sizeof(u64), &(sin6->sin6_addr.s6_addr[8]));
         }
         if (port) {
-            bpf_probe_read(port, sizeof(u16), &sin6->sin6_port);
-            *port = bpf_ntohs(*port);
+            *port = bpf_ntohs(sin6->sin6_port);
         }
         break;
     default:
         log_debug("ERR(sockaddr_to_addr): invalid family: %u\n", family);
+		break;
     }
 }
 
