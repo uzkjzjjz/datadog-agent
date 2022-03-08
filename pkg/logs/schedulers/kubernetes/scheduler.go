@@ -27,6 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/DataDog/datadog-agent/pkg/util/retry"
 	"github.com/cenkalti/backoff"
 )
 
@@ -43,6 +44,10 @@ type retryOps struct {
 	backoff          backoff.BackOff
 	removalScheduled bool
 }
+
+// kubeUtilGetter is the type of kubelet.GetKubeUtilWithRetrier, here so that
+// tests can substitute a fake version.
+type kubeUtilGetter func() (kubelet.KubeUtilInterface, *retry.Retrier)
 
 // Scheduler monitors for new and removed services (containers).  It consults
 // the corresponding pods for AD annotations, parsing them if found and
@@ -76,7 +81,7 @@ type Scheduler struct {
 	// the service ID.
 	sourcesByContainer map[string]*config.LogSource
 
-	// kubeutil is the active interface to kubelet
+	// kubeutil is the active interface to kubelet.  This is set in the `run()` goroutine.
 	kubeutil kubelet.KubeUtilInterface
 
 	// retryOperations carries services for which addSource should be retried after failure.
@@ -102,12 +107,6 @@ func New() schedulers.Scheduler {
 		return &Scheduler{}
 	}
 
-	kubeutil, err := kubelet.GetKubeUtil()
-	if err != nil {
-		log.Errorf("KubeUtil not available, failed to create kubernetes log scheduler", err)
-		return &Scheduler{}
-	}
-
 	collectAll := coreConfig.Datadog.GetBool("logs_config.container_collect_all")
 
 	sch := &Scheduler{
@@ -117,7 +116,6 @@ func New() schedulers.Scheduler {
 		addedServices:      make(chan *service.Service, 1),
 		removedServices:    make(chan *service.Service, 1),
 		sourcesByContainer: make(map[string]*config.LogSource),
-		kubeutil:           kubeutil,
 		retryOperations:    make(chan *retryOps),
 		pendingRetries:     make(map[string]*retryOps),
 		serviceNameFunc:    util.ServiceNameFromTags,
@@ -150,6 +148,12 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) run() {
 	defer func() { close(s.stopped) }()
 
+	s.kubeutil = s.getKubeUtil(nil)
+	if s.kubeutil == nil {
+		// the scheduler has been stopped, so bail out
+		return
+	}
+
 	// handle adding/removing services and retries in the same loop, avoiding
 	// the need to synchronize data structures.
 	for {
@@ -163,6 +167,28 @@ func (s *Scheduler) run() {
 		case <-s.stop:
 			log.Info("Kubernetes log scheduler stopped")
 			return
+		}
+	}
+}
+
+// getKubeUtil gets a KubeUtil instance, retrying as necessary.  If s.stop is closed,
+// it will return nil.
+func (s *Scheduler) getKubeUtil(getter kubeUtilGetter) kubelet.KubeUtilInterface {
+	if getter == nil {
+		getter = kubelet.GetKubeUtilWithRetrier
+	}
+	for {
+		kubeutil, retrier := getter()
+		if kubeutil != nil {
+			return kubeutil
+		}
+
+		retryAfter := time.After(time.Until(retrier.NextRetry()))
+
+		select {
+		case <-retryAfter:
+		case <-s.stop:
+			return nil
 		}
 	}
 }

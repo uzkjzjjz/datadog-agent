@@ -16,12 +16,14 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
 	"github.com/DataDog/datadog-agent/pkg/logs/service"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
+	"github.com/DataDog/datadog-agent/pkg/util/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -455,6 +457,37 @@ func TestGetShortImageName(t *testing.T) {
 	}
 }
 
+func TestRetryGettingKubeUtilStops(t *testing.T) {
+	s := &Scheduler{stop: make(chan struct{})}
+
+	retryForever := func() (kubelet.KubeUtilInterface, *retry.Retrier) {
+		return nil, fastRetrier()
+	}
+
+	got := make(chan kubelet.KubeUtilInterface)
+	go func() {
+		got <- s.getKubeUtil(retryForever)
+	}()
+
+	close(s.stop)
+	require.Nil(t, <-got)
+}
+
+func TestRetryGettingKubeUtilSuccess(t *testing.T) {
+	s := &Scheduler{stop: make(chan struct{})}
+
+	var tries int
+	retryAFewTimes := func() (kubelet.KubeUtilInterface, *retry.Retrier) {
+		tries++
+		if tries > 3 {
+			return dummyKubeUtil{}, nil
+		}
+		return nil, fastRetrier()
+	}
+
+	require.NotNil(t, s.getKubeUtil(retryAFewTimes))
+}
+
 func TestRetry(t *testing.T) {
 	containerName := "fooName"
 	containerType := "docker"
@@ -575,4 +608,14 @@ func contains(list []string, items ...string) bool {
 		}
 	}
 	return true
+}
+
+func fastRetrier() *retry.Retrier {
+	retr := &retry.Retrier{}
+	retr.SetupRetrier(&retry.Config{
+		Strategy:          retry.Backoff,
+		InitialRetryDelay: 1 * time.Millisecond,
+		MaxRetryDelay:     1 * time.Millisecond,
+	})
+	return retr
 }
