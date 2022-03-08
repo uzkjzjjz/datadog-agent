@@ -3,6 +3,9 @@
 
 package ebpf
 
+type In6Addr struct {
+	U [16]byte
+}
 type Tuple struct {
 	Sport     uint16
 	Dport     uint16
@@ -22,19 +25,36 @@ type SocketInfo struct {
 	Pad_cgo_0 [5]byte
 }
 type FlowStats struct {
-	Last_update uint64
-	Sent_bytes  uint64
-	Recv_bytes  uint64
+	Last_update  uint64
+	Sent_bytes   uint64
+	Recv_bytes   uint64
+	Sent_packets uint64
+	Recv_packets uint64
 }
 type UDPFlow struct {
 	Tup Tuple
 	Sk  uint64
 }
-
 type UDPCloseEvent struct {
 	Sk     uint64
 	Skinfo SocketInfo
 }
-type In6Addr struct {
-	U [16]byte
+type TCPFlow struct {
+	Sk uint64
+}
+type TCPConnStats struct {
+	Retransmits       uint32
+	Rtt               uint32
+	Rtt_var           uint32
+	State_transitions uint16
+	Pad_cgo_0         [2]byte
+}
+type TCPFlowStats struct {
+	Tup        Tuple
+	Flow_stats FlowStats
+	Tcp_stats  TCPConnStats
+}
+type TCPCloseEvent struct {
+	Sk     uint64
+	Skinfo SocketInfo
 }

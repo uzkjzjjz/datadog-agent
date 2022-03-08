@@ -3,6 +3,7 @@
 
 #include "sock.h"
 #include "types.h"
+#include "tcp.h"
 
 SEC("kprobe/security_sk_free")
 int kprobe__security_sk_free(struct pt_regs* ctx) {
@@ -15,12 +16,30 @@ int kprobe__security_sk_free(struct pt_regs* ctx) {
 
 #ifdef FEATURE_UDP_ENABLED
     if (skinfo->protocol == IPPROTO_UDP) {
-        udp_close_event_t evt = {
+         udp_close_event_t evt = {
             .sk = (__u64)sk,
             .skinfo = *skinfo,
         };
         if (bpf_perf_event_output(ctx, &udp_close_event, BPF_F_CURRENT_CPU, &evt, sizeof(evt))) {
             log_debug("udp close send error: sk=%llx\n", sk);
+        }
+    }
+#endif
+
+#ifdef FEATURE_TCP_ENABLED
+    if (skinfo->protocol == IPPROTO_TCP) {
+        tcp_flow_t flow = { .sk = (u64)sk };
+        tcp_flow_stats_t *stats = get_tcp_stats(&flow);
+        if (stats) {
+            stats->tcp_stats.state_transitions |= (1 << TCP_CLOSE);
+        }
+
+        tcp_close_event_t evt = {
+            .sk = (__u64)sk,
+            .skinfo = *skinfo,
+        };
+        if (bpf_perf_event_output(ctx, &tcp_close_event, BPF_F_CURRENT_CPU, &evt, sizeof(evt))) {
+            log_debug("tcp close send error: sk=%llx\n", sk);
         }
     }
 #endif

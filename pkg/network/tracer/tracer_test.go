@@ -54,7 +54,7 @@ var (
 const runtimeCompilationEnvVar = "DD_TESTS_RUNTIME_COMPILED"
 
 func TestMain(m *testing.M) {
-	log.SetupLogger(seelog.Default, "warn")
+	log.SetupLogger(seelog.Default, "debug")
 	cfg := testConfig()
 	if cfg.EnableRuntimeCompiler {
 		fmt.Println("RUNTIME COMPILER ENABLED")
@@ -170,6 +170,9 @@ func TestTCPSendAndReceive(t *testing.T) {
 	doneChan := make(chan struct{})
 	err = server.Run(doneChan)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		doneChan <- struct{}{}
+	})
 
 	c, err := net.DialTimeout("tcp", server.address, 50*time.Millisecond)
 	if err != nil {
@@ -197,6 +200,9 @@ func TestTCPSendAndReceive(t *testing.T) {
 
 	// Iterate through active connections until we find connection created above, and confirm send + recv counts
 	connections := getConnections(t, tr)
+	for _, c := range connections.Conns {
+		t.Log(c)
+	}
 
 	conn, ok := findConnection(c.LocalAddr(), c.RemoteAddr(), connections)
 	require.True(t, ok)
@@ -207,8 +213,6 @@ func TestTCPSendAndReceive(t *testing.T) {
 	assert.Equal(t, addrPort(server.address), int(conn.DPort))
 	assert.Equal(t, network.OUTGOING, conn.Direction)
 	assert.True(t, conn.IntraHost)
-
-	doneChan <- struct{}{}
 }
 
 func TestPreexistingConnectionDirection(t *testing.T) {
@@ -471,6 +475,9 @@ func TestUDPSendAndReceive(t *testing.T) {
 
 	// Iterate through active connections until we find connection created above, and confirm send + recv counts
 	connections := getConnections(t, tr)
+	for _, c := range connections.Conns {
+		t.Log(c)
+	}
 	pid := uint32(os.Getpid())
 
 	incoming, ok := findConnection(c.RemoteAddr(), c.LocalAddr(), connections)

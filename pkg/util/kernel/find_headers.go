@@ -136,7 +136,7 @@ func validateHeaderDirs(hv Version, dirs []string) error {
 			return fmt.Errorf("error validating headers version: %w", err)
 		}
 		if dirv != hv {
-			return fmt.Errorf("header version %s does not match host version %s", dirv, hv)
+			return fmt.Errorf("header version %s in %s does not match host version %s", dirv, d, hv)
 		}
 
 		// as long as one directory passes, validate the entire set
@@ -210,7 +210,7 @@ func getDefaultHeaderDirs() []string {
 		fmt.Sprintf(kernelModulesPath, hi.KernelVersion),
 		fmt.Sprintf(debKernelModulesPath, hi.KernelVersion),
 		fmt.Sprintf(cosKernelModulesPath, hi.KernelVersion),
-		fedoraKernelModulesPath,
+		//fedoraKernelModulesPath,
 	}
 	return dirs
 }

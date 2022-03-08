@@ -29,15 +29,15 @@ struct bpf_map_def SEC("maps/udp_close_event") udp_close_event = {
 };
 
 SEC("kprobe/udp_init_sock")
-int kprobe__udp_init_sock(struct pt_regs* ctx) {
-    struct sock* sk = (struct sock*)PT_REGS_PARM1(ctx);
+int kprobe__udp_init_sock(struct pt_regs *ctx) {
+    struct sock* sk = (struct sock *)PT_REGS_PARM1(ctx);
     log_debug("kprobe/udp_init_sock: sk=%llx\n", sk);
     socket_info_t *skinfo = bpf_map_lookup_elem(&open_socks, &sk);
     if (skinfo) {
         return 0;
     }
 
-    add_open_sock(sk, IPPROTO_UDP, CONN_DIRECTION_OUTGOING);
+    add_open_sock(sk, IPPROTO_UDP, CONN_DIRECTION_UNKNOWN);
     return 0;
 }
 

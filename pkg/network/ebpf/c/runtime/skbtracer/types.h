@@ -4,6 +4,8 @@
 #include <linux/types.h>
 #include <linux/in6.h>
 
+#define EIGNOREPROTO 255
+
 enum conn_direction {
     CONN_DIRECTION_UNKNOWN = 0,
     CONN_DIRECTION_INCOMING,
@@ -32,6 +34,8 @@ typedef struct {
     __u64   last_update;
     __u64   sent_bytes;
     __u64   recv_bytes;
+    __u64   sent_packets;
+    __u64   recv_packets;
 } flow_stats_t;
 
 typedef struct {
@@ -40,8 +44,32 @@ typedef struct {
 } udp_flow_t;
 
 typedef struct {
+    __u64 sk;
+} tcp_flow_t;
+
+typedef struct {
+    __u32   retransmits;
+    __u32   rtt;
+    __u32   rtt_var;
+
+    // Bit mask containing all TCP state transitions tracked by our tracer
+    __u16   state_transitions;
+} tcp_stats_t;
+
+typedef struct {
+    tuple_t tup;
+    flow_stats_t flow_stats;
+    tcp_stats_t tcp_stats;
+} tcp_flow_stats_t;
+
+typedef struct {
     __u64           sk;
     socket_info_t   skinfo;
 } udp_close_event_t;
+
+typedef struct {
+    __u64           sk;
+    socket_info_t   skinfo;
+} tcp_close_event_t;
 
 #endif

@@ -310,7 +310,8 @@ func BeautifyKey(key string) string {
 // ConnectionSummary returns a string summarizing a connection
 func ConnectionSummary(c *ConnectionStats, names map[util.Address][]string) string {
 	str := fmt.Sprintf(
-		"[%s%s] [PID: %d] [%v:%d ⇄ %v:%d] ",
+		"%x [%s%s] [PID: %d] [%v:%d ⇄ %v:%d] ",
+		c.ID,
 		c.Type,
 		c.Family,
 		c.Pid,
@@ -329,10 +330,10 @@ func ConnectionSummary(c *ConnectionStats, names map[util.Address][]string) stri
 		)
 	}
 
-	str += fmt.Sprintf("(%s) %s sent (+%s), %s received (+%s)",
+	str += fmt.Sprintf("(%s) %s sent (+%s) %d packets (+%d), %s received (+%s) %d packets (+%d)",
 		c.Direction,
-		humanize.Bytes(c.MonotonicSentBytes), humanize.Bytes(c.LastSentBytes),
-		humanize.Bytes(c.MonotonicRecvBytes), humanize.Bytes(c.LastRecvBytes),
+		humanize.Bytes(c.MonotonicSentBytes), humanize.Bytes(c.LastSentBytes), c.MonotonicSentPackets, c.LastSentPackets,
+		humanize.Bytes(c.MonotonicRecvBytes), humanize.Bytes(c.LastRecvBytes), c.MonotonicRecvPackets, c.LastRecvPackets,
 	)
 
 	if c.Type == TCP {

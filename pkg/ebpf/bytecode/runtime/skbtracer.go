@@ -3,4 +3,4 @@
 
 package runtime
 
-var Skbtracer = NewRuntimeAsset("skbtracer.c", "e9e8b0e6445be450d6c6b10167bd1c1b26e66a23e31999b33dcc98dede383042")
+var Skbtracer = NewRuntimeAsset("skbtracer.c", "5b7caa42c373710110f05fcbad0f3966277a2172dcff7712ae855fd5302a1691")

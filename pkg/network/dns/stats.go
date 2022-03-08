@@ -177,7 +177,7 @@ func (d *dnsStatKeeper) GetAndResetAllStats() StatsByKeyByNameByType {
 	defer d.mux.Unlock()
 	ret := d.stats // No deep copy needed since `d.stats` gets reset
 	d.stats = make(StatsByKeyByNameByType)
-	log.Debugf("[DNS Stats] Number of processed stats: %d, Number of dropped stats: %d", d.numStats, d.droppedStats)
+	log.Tracef("[DNS Stats] Number of processed stats: %d, Number of dropped stats: %d", d.numStats, d.droppedStats)
 	atomic.StoreInt32(&d.lastNumStats, int32(d.numStats))
 	atomic.StoreInt32(&d.lastDroppedStats, int32(d.droppedStats))
 	d.numStats = 0

@@ -17,20 +17,37 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	// maxActive configures the maximum number of instances of the kretprobe-probed functions handled simultaneously.
+	// This value should be enough for typical workloads (e.g. some amount of processes blocked on the `accept` syscall).
+	maxActive = 128
+)
+
 var mainProbes = map[string]string{
 	// TCP/UDP recv
 	"kprobe/security_sock_rcv_skb": "kprobe__security_sock_rcv_skb",
 	// TCP/UDP send
 	"tracepoint/net/net_dev_queue": "tracepoint__net_dev_queue",
-	// UDP socket create
-	"kprobe/udp_init_sock": "kprobe__udp_init_sock",
 	// TCP/UDP socket destroy
 	"kprobe/security_sk_free": "kprobe__security_sk_free",
-	// TCP/UDP socket bind
-	//"kprobe/security_socket_bind": "kprobe__security_socket_bind",
+	// UDP socket create
+	"kprobe/udp_init_sock": "kprobe__udp_init_sock",
+	// TCP socket create
+	"kprobe/tcp_init_sock": "kprobe__tcp_init_sock",
+	// TCP outgoing socket labeling
+	"kprobe/tcp_connect": "kprobe__tcp_connect",
+	// TCP retransmit notification
+	"kprobe/tcp_retransmit_skb": "kprobe__tcp_retransmit_skb",
+	// TCP state change
+	"kprobe/tcp_set_state": "kprobe__tcp_set_state",
 }
 
-func newManager(cfg *config.Config, buf io.ReaderAt, udpClosedFunc ebpf.PerfFunc) (*manager.Manager, error) {
+var returnProbes = map[string]string{
+	// TCP incoming socket labeling
+	"kretprobe/inet_csk_accept": "kretprobe__inet_csk_accept",
+}
+
+func newManager(cfg *config.Config, buf io.ReaderAt, udpClosedFunc, tcpClosedFunc ebpf.PerfFunc) (*manager.Manager, error) {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: "open_socks"},
@@ -47,6 +64,18 @@ func newManager(cfg *config.Config, buf io.ReaderAt, udpClosedFunc ebpf.PerfFunc
 				PerfRingBufferSize: 8 * os.Getpagesize(),
 				Watermark:          1,
 				DataHandler:        udpClosedFunc,
+				LostHandler:        nil,
+			},
+		})
+	}
+	if cfg.CollectTCPConns {
+		mgr.Maps = append(mgr.Maps, &manager.Map{Name: "tcp_stats"})
+		mgr.PerfMaps = append(mgr.PerfMaps, &manager.PerfMap{
+			Map: manager.Map{Name: "tcp_close_event"},
+			PerfMapOptions: manager.PerfMapOptions{
+				PerfRingBufferSize: 8 * os.Getpagesize(),
+				Watermark:          1,
+				DataHandler:        tcpClosedFunc,
 				LostHandler:        nil,
 			},
 		})
@@ -71,18 +100,45 @@ func newManager(cfg *config.Config, buf io.ReaderAt, udpClosedFunc ebpf.PerfFunc
 	return mgr, nil
 }
 
-func pip(section string) manager.ProbeIdentificationPair {
-	return manager.ProbeIdentificationPair{
-		EBPFSection:  section,
-		EBPFFuncName: mainProbes[section],
+func kprobePip(section string) (manager.ProbeIdentificationPair, bool) {
+	if fn, ok := mainProbes[section]; ok {
+		return manager.ProbeIdentificationPair{
+			EBPFSection:  section,
+			EBPFFuncName: fn,
+		}, true
 	}
+	return manager.ProbeIdentificationPair{}, false
+}
+
+func kretprobePip(section string) (manager.ProbeIdentificationPair, bool) {
+	if fn, ok := returnProbes[section]; ok {
+		return manager.ProbeIdentificationPair{
+			EBPFSection:  section,
+			EBPFFuncName: fn,
+		}, true
+	}
+	return manager.ProbeIdentificationPair{}, false
 }
 
 func configProbes(cfg *config.Config, m *manager.Manager, mgrOptions *manager.Options) error {
 	for k := range mainProbes {
-		m.Probes = append(m.Probes, &manager.Probe{
-			ProbeIdentificationPair: pip(k),
-		})
+		if pi, ok := kprobePip(k); ok {
+			m.Probes = append(m.Probes, &manager.Probe{
+				ProbeIdentificationPair: pi,
+			})
+		} else {
+			return fmt.Errorf("no kprobe function name available for section %s", k)
+		}
+	}
+	for k := range returnProbes {
+		if pi, ok := kretprobePip(k); ok {
+			m.Probes = append(m.Probes, &manager.Probe{
+				ProbeIdentificationPair: pi,
+				KProbeMaxActive:         maxActive,
+			})
+		} else {
+			return fmt.Errorf("no kretprobe function name available for section %s", k)
+		}
 	}
 
 	enabledProbes, err := enabledProbes(cfg)

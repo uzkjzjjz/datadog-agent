@@ -7,16 +7,34 @@
 #include <uapi/linux/ipv6.h>
 #include <uapi/linux/udp.h>
 #include <uapi/linux/tcp.h>
+#include <uapi/linux/if_ether.h>
 
 #include "types.h"
 
 // returns the data length of the skb or a negative value in case of an error
 static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
+    // TODO get L4 protocol from skb->sk->sk_protocol bitfield so we can filter out non-TCP/UDP early
+    // TODO requires tricks to read bitfield
+    u16 l3_proto = 0;
+    bpf_probe_read_kernel(&l3_proto, sizeof(l3_proto), &skb->protocol);
+    if (
+        l3_proto != bpf_htons(ETH_P_IP)
+#ifdef FEATURE_IPV6_ENABLED
+        && l3_proto != bpf_htons(ETH_P_IPV6)
+#endif
+    ) {
+        return -EIGNOREPROTO;
+    }
+
     unsigned char *head;
     int ret = bpf_probe_read_kernel(&head, sizeof(head), &skb->head);
-    if (ret || !head) {
+    if (ret) {
         log_debug("ERR reading head\n");
         return ret;
+    }
+    if (!head) {
+        log_debug("ERR reading head\n");
+        return -1;
     }
     u16 net_head;
     ret = bpf_probe_read_kernel(&net_head, sizeof(net_head), &skb->network_header);
@@ -35,10 +53,9 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
     int trans_len = 0;
     if (iph.version == 4) {
         if (iph.protocol != IPPROTO_UDP && iph.protocol != IPPROTO_TCP) {
-            log_debug("ERR reading ipv4 hdr\n");
-            return 0;
+            return -EIGNOREPROTO;
         }
-        trans_len = iph.tot_len - (iph.ihl * 4);
+        trans_len = bpf_ntohs(iph.tot_len) - (iph.ihl * 4);
         tup->protocol = iph.protocol;
         tup->family = AF_INET;
         bpf_probe_read_kernel(&tup->saddr, sizeof(__be32), &iph.saddr);
@@ -48,9 +65,11 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
     else if (iph.version == 6) {
         struct ipv6hdr ip6h = {};
         ret = bpf_probe_read_kernel(&ip6h, sizeof(ip6h), (struct ipv6hdr *)(head + net_head));
-        if (ret || (ip6h.nexthdr != IPPROTO_UDP && ip6h.nexthdr != IPPROTO_TCP)) {
-            log_debug("ERR reading ipv6 hdr\n");
+        if (ret) {
             return ret;
+        }
+        if (ip6h.nexthdr != IPPROTO_UDP && ip6h.nexthdr != IPPROTO_TCP) {
+            return -EIGNOREPROTO;
         }
         trans_len = bpf_ntohs(ip6h.payload_len) - sizeof(struct ipv6hdr);
         tup->protocol = ip6h.nexthdr;
@@ -60,7 +79,7 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
     }
 #endif
     else {
-        return 0;
+        return -EIGNOREPROTO;
     }
 
     u16 trans_head;
@@ -101,17 +120,7 @@ static __always_inline int sk_buff_to_tuple(struct sk_buff *skb, tuple_t *tup) {
     }
 #endif
 
-    return 0;
-}
-
-static __always_inline void flip_tuple(tuple_t *tup) {
-    struct in6_addr tmpaddr = tup->saddr;
-    tup->saddr = tup->daddr;
-    tup->daddr = tmpaddr;
-
-    u16 tmpport = tup->sport;
-    tup->sport = tup->dport;
-    tup->dport = tmpport;
+    return -EIGNOREPROTO;
 }
 
 #endif

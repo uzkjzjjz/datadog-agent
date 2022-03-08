@@ -29,6 +29,7 @@ type tracer struct {
 	callback func([]network.ConnectionStats)
 
 	udpStatsMap  *ebpf.Map
+	tcpStatsMap  *ebpf.Map
 	openSocksMap *ebpf.Map
 
 	cfg *config.Config
@@ -43,7 +44,7 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 	tr := &tracer{
 		cfg: cfg,
 	}
-	tr.m, err = newManager(cfg, buf, tr.udpClosed)
+	tr.m, err = newManager(cfg, buf, tr.udpClosed, tr.tcpClosed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init ebpf manager: %w", err)
 	}
@@ -53,6 +54,13 @@ func New(cfg *config.Config) (connection.Tracer, error) {
 		if err != nil {
 			_ = tr.m.Stop(manager.CleanAll)
 			return nil, fmt.Errorf("unable to find udp_stats map: %w", err)
+		}
+	}
+	if cfg.CollectTCPConns {
+		tr.tcpStatsMap, _, err = tr.m.GetMap("tcp_stats")
+		if err != nil {
+			_ = tr.m.Stop(manager.CleanAll)
+			return nil, fmt.Errorf("unable to find tcp_stats map: %w", err)
 		}
 	}
 
@@ -78,8 +86,8 @@ func (t *tracer) Stop() {
 }
 
 func (t *tracer) GetConnections(buffer *network.ConnectionBuffer, filter func(*network.ConnectionStats) bool) error {
-	flow, stats, skinfo := &netebpf.UDPFlow{}, &netebpf.FlowStats{}, &netebpf.SocketInfo{}
 	if t.udpStatsMap != nil {
+		flow, stats, skinfo := &netebpf.UDPFlow{}, &netebpf.FlowStats{}, &netebpf.SocketInfo{}
 		entries := t.udpStatsMap.Iterate()
 		for entries.Next(unsafe.Pointer(flow), unsafe.Pointer(stats)) {
 			if err := t.openSocksMap.Lookup(unsafe.Pointer(&flow.Sk), unsafe.Pointer(skinfo)); err != nil {
@@ -87,7 +95,26 @@ func (t *tracer) GetConnections(buffer *network.ConnectionBuffer, filter func(*n
 				continue
 			}
 
-			c := toConn(flow.Sk, &flow.Tup, skinfo, stats)
+			c := toConn(flow.Sk, &flow.Tup, skinfo, stats, nil)
+			if filter != nil && filter(&c) {
+				*buffer.Next() = c
+			}
+		}
+		if err := entries.Err(); err != nil {
+			return err
+		}
+	}
+
+	if t.tcpStatsMap != nil {
+		flow, stats, skinfo := &netebpf.TCPFlow{}, &netebpf.TCPFlowStats{}, &netebpf.SocketInfo{}
+		entries := t.tcpStatsMap.Iterate()
+		for entries.Next(unsafe.Pointer(flow), unsafe.Pointer(stats)) {
+			if err := t.openSocksMap.Lookup(unsafe.Pointer(&flow.Sk), unsafe.Pointer(skinfo)); err != nil {
+				log.Warnf("error looking up open sock %x: %s", flow.Sk, err)
+				continue
+			}
+
+			c := toConn(flow.Sk, &stats.Tup, skinfo, &stats.Flow_stats, &stats.Tcp_stats)
 			if filter != nil && filter(&c) {
 				*buffer.Next() = c
 			}
@@ -104,6 +131,10 @@ func (t *tracer) FlushPending() {
 }
 
 func (t *tracer) Remove(conn *network.ConnectionStats) error {
+	if conn.ID == 0 {
+		return fmt.Errorf("invalid connection id")
+	}
+
 	if conn.Type == network.UDP {
 		flow := netebpf.UDPFlow{
 			Sk: conn.ID,
@@ -118,6 +149,11 @@ func (t *tracer) Remove(conn *network.ConnectionStats) error {
 		copy(flow.Tup.Daddr.U[:], conn.Dest.Bytes())
 
 		return t.udpStatsMap.Delete(unsafe.Pointer(&flow))
+	}
+
+	if conn.Type == network.TCP {
+		flow := netebpf.TCPFlow{Sk: conn.ID}
+		return t.tcpStatsMap.Delete(unsafe.Pointer(&flow))
 	}
 
 	return nil
@@ -146,7 +182,7 @@ func (t *tracer) udpClosed(_ int, data []byte, _ *manager.PerfMap, _ *manager.Ma
 	for entries.Next(unsafe.Pointer(flow), unsafe.Pointer(stats)) {
 		// TODO improve this so we don't have to iterate to find matching flows for the socket
 		if flow.Sk == evt.Sk {
-			c := toConn(flow.Sk, &flow.Tup, &evt.Skinfo, stats)
+			c := toConn(flow.Sk, &flow.Tup, &evt.Skinfo, stats, nil)
 			log.Debugf("UDP closed conn: %s", c)
 			conns = append(conns, c)
 			// do not delete here, since we don't want to delete while iterating
@@ -154,20 +190,37 @@ func (t *tracer) udpClosed(_ int, data []byte, _ *manager.PerfMap, _ *manager.Ma
 		}
 	}
 	if entries.Err() != nil {
-		log.Warnf("error iterating over UDP flows: %w", entries.Err())
+		log.Warnf("error iterating over UDP flows: %s", entries.Err())
 		return
 	}
 	if len(conns) > 0 {
 		for _, f := range flows {
 			if err := t.udpStatsMap.Delete(unsafe.Pointer(&f)); err != nil {
-				log.Warnf("error deleting UDP flow from eBPF map: %w", err)
+				log.Warnf("error deleting UDP flow from eBPF map: %s", err)
 			}
 		}
 		t.callback(conns)
 	}
 }
 
-func toConn(sk uint64, tuple *netebpf.Tuple, skinfo *netebpf.SocketInfo, stats *netebpf.FlowStats) network.ConnectionStats {
+func (t *tracer) tcpClosed(_ int, data []byte, _ *manager.PerfMap, _ *manager.Manager) {
+	evt := (*netebpf.TCPCloseEvent)(unsafe.Pointer(&data[0]))
+	log.Debugf("TCP closed event: sk=%x", evt.Sk)
+
+	flow := &netebpf.TCPFlow{Sk: evt.Sk}
+	stats := &netebpf.TCPFlowStats{}
+	if err := t.tcpStatsMap.Lookup(unsafe.Pointer(flow), unsafe.Pointer(stats)); err != nil {
+		// this sock may not have triggered any stats collection, so perfectly OK to not be in this map
+		return
+	}
+	if err := t.tcpStatsMap.Delete(unsafe.Pointer(flow)); err != nil {
+		log.Warnf("error deleting TCP flow from eBPF map: %s", err)
+	}
+	t.callback([]network.ConnectionStats{toConn(flow.Sk, &stats.Tup, &evt.Skinfo, &stats.Flow_stats, &stats.Tcp_stats)})
+
+}
+
+func toConn(sk uint64, tuple *netebpf.Tuple, skinfo *netebpf.SocketInfo, stats *netebpf.FlowStats, tcpStats *netebpf.TCPConnStats) network.ConnectionStats {
 	conn := network.ConnectionStats{
 		ID:                      sk,
 		Pid:                     skinfo.Tgid,
@@ -176,8 +229,8 @@ func toConn(sk uint64, tuple *netebpf.Tuple, skinfo *netebpf.SocketInfo, stats *
 		Direction:               network.ConnectionDirection(skinfo.Direction),
 		MonotonicSentBytes:      stats.Sent_bytes,
 		MonotonicRecvBytes:      stats.Recv_bytes,
-		MonotonicSentPackets:    0,
-		MonotonicRecvPackets:    0,
+		MonotonicSentPackets:    stats.Sent_packets,
+		MonotonicRecvPackets:    stats.Recv_packets,
 		MonotonicRetransmits:    0,
 		RTT:                     0,
 		RTTVar:                  0,
@@ -190,13 +243,13 @@ func toConn(sk uint64, tuple *netebpf.Tuple, skinfo *netebpf.SocketInfo, stats *
 		IsAssured:               false,
 	}
 
-	//if tcpStats != nil {
-	//	conn.MonotonicRetransmits = tcpStats.Retransmits
-	//	conn.RTT = tcpStats.Rtt
-	//	conn.RTTVar = tcpStats.Rtt_var
-	//	conn.MonotonicTCPEstablished = uint32(tcpStats.State_transitions >> netebpf.Established & 1)
-	//	conn.MonotonicTCPClosed = uint32(tcpStats.State_transitions >> netebpf.Close & 1)
-	//}
+	if tcpStats != nil {
+		conn.MonotonicRetransmits = tcpStats.Retransmits
+		conn.RTT = tcpStats.Rtt
+		conn.RTTVar = tcpStats.Rtt_var
+		conn.MonotonicTCPEstablished = uint32(tcpStats.State_transitions >> netebpf.Established & 1)
+		conn.MonotonicTCPClosed = uint32(tcpStats.State_transitions >> netebpf.Close & 1)
+	}
 
 	if conn.Family == network.AFINET {
 		conn.Source = util.V4AddressFromBytes(tuple.Saddr.U[:net.IPv4len])

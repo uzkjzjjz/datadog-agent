@@ -12,10 +12,13 @@ package ebpf
 */
 import "C"
 
+type In6Addr C.struct_in6_addr
 type Tuple C.tuple_t
 type SocketInfo C.socket_info_t
 type FlowStats C.flow_stats_t
 type UDPFlow C.udp_flow_t
-
 type UDPCloseEvent C.udp_close_event_t
-type In6Addr C.struct_in6_addr
+type TCPFlow C.tcp_flow_t
+type TCPConnStats C.tcp_stats_t
+type TCPFlowStats C.tcp_flow_stats_t
+type TCPCloseEvent C.tcp_close_event_t

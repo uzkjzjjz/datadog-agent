@@ -255,6 +255,7 @@ func (ns *networkState) StoreClosedConnections(closed []ConnectionStats) {
 
 // StoreClosedConnection stores the given connection for every client
 func (ns *networkState) storeClosedConnections(conns []ConnectionStats) {
+	log.Debugf("storing %d connections", len(conns))
 	for _, client := range ns.clients {
 		for _, c := range conns {
 			key, err := c.ByteKey(ns.buf)

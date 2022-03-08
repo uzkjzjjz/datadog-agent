@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <net/sock.h>
+#include <net/ipv6.h>
 
 #include "bpf_helpers.h"
 #include "types.h"

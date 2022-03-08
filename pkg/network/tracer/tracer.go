@@ -284,6 +284,7 @@ func runOffsetGuessing(config *config.Config, buf bytecode.AssetReader) ([]manag
 }
 
 func (t *Tracer) storeClosedConnections(connections []network.ConnectionStats) {
+	log.Debugf("received %d unfiltered connections", len(connections))
 	var rejected int
 	for i := range connections {
 		cs := &connections[i]
@@ -684,6 +685,11 @@ func newHTTPMonitor(supported bool, c *config.Config, tracer connection.Tracer, 
 	}
 	// Shared with the HTTP program
 	sockFDMap := tracer.GetMap(string(probes.SockByPidFDMap))
+	if sockFDMap == nil {
+		log.Errorf("cannot enable HTTP monitoring without %s ebpf map", probes.SockByPidFDMap)
+		return nil
+	}
+
 	monitor, err := http.NewMonitor(c, offsets, sockFDMap)
 	if err != nil {
 		log.Errorf("could not instantiate http monitor: %s", err)

@@ -648,14 +648,14 @@ def build_object_files(ctx, parallel_build):
 @task
 def generate_runtime_files(ctx):
     runtime_compiler_files = [
-        "./pkg/collector/corechecks/ebpf/probe/oom_kill.go",
-        "./pkg/collector/corechecks/ebpf/probe/tcp_queue_length.go",
-        "./pkg/network/http/compile.go",
-        "./pkg/network/tracer/compile.go",
-        "./pkg/network/tracer/connection/kprobe/compile.go",
-        "./pkg/network/tracer/connection/altkprobe/compile.go",
-        "./pkg/security/probe/compile.go",
+        # "./pkg/collector/corechecks/ebpf/probe/oom_kill.go",
+        # "./pkg/collector/corechecks/ebpf/probe/tcp_queue_length.go",
+        # "./pkg/network/http/compile.go",
+        # "./pkg/network/tracer/compile.go",
+        # "./pkg/network/tracer/connection/kprobe/compile.go",
+        # "./pkg/network/tracer/connection/altkprobe/compile.go",
         "./pkg/network/tracer/connection/skb/compile.go",
+        # "./pkg/security/probe/compile.go",
     ]
     for f in runtime_compiler_files:
         ctx.run(f"go generate -mod=mod -tags {BPF_TAG} {f}")

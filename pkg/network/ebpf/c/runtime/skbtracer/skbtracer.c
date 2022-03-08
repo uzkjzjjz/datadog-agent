@@ -4,6 +4,7 @@
 
 #include "recv.h"
 #include "udp.h"
+#include "tcp.h"
 #include "inet.h"
 #include "port.h"
 
