@@ -9,6 +9,9 @@ package flare
 
 import (
 	"path/filepath"
+
+	"github.com/DataDog/datadog-agent/pkg/metadata/host"
+	"github.com/DataDog/datadog-agent/pkg/process/util"
 )
 
 func zipLinuxKernelSymbols(tempDir, hostname string) error {
@@ -17,6 +20,10 @@ func zipLinuxKernelSymbols(tempDir, hostname string) error {
 
 func zipLinuxKrobeEvents(tempDir, hostname string) error {
 	return zipFile("/sys/kernel/debug/tracing/kprobe_events", filepath.Join(tempDir, hostname, "kprobe_events"))
+}
+
+func zipLinuxKprobeProfile(tempDir, hostname string) error {
+	return zipFile("/sys/kernel/debug/tracing/kprobe_profile", filepath.Join(tempDir, hostname, "kprobe_profile"))
 }
 
 func zipLinuxPid1MountInfo(tempDir, hostname string) error {
@@ -29,4 +36,32 @@ func zipLinuxTracingAvailableEvents(tempDir, hostname string) error {
 
 func zipLinuxTracingAvailableFilterFunctions(tempDir, hostname string) error {
 	return zipFile("/sys/kernel/debug/tracing/available_filter_functions", filepath.Join(tempDir, hostname, "available_filter_functions"))
+}
+
+func zipLinuxKernelConfig(tempDir, hostname string) error {
+	// path -> content is gzipped
+	paths := map[string]bool{
+		util.HostProc("/config.gz"): true,
+		"/boot/config":              false,
+	}
+
+	hi := host.GetStatusInformation()
+	if hi.KernelVersion != "" {
+		paths["/boot/config-"+hi.KernelVersion] = false
+	}
+
+	var err error
+	for p, gzipped := range paths {
+		out := filepath.Join(tempDir, hostname, "kernel_config")
+		if gzipped {
+			err = zipGzippedFile(p, out)
+		} else {
+			err = zipFile(p, out)
+		}
+		// return on first success
+		if err == nil {
+			return nil
+		}
+	}
+	return err
 }

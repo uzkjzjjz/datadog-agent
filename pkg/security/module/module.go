@@ -478,6 +478,11 @@ func (m *Module) GetStats() map[string]interface{} {
 	return debug
 }
 
+func (m *Module) GetStatus() map[string]interface{} {
+	debug := map[string]interface{}{}
+	return debug
+}
+
 // GetProbe returns the module's probe
 func (m *Module) GetProbe() *sprobe.Probe {
 	return m.probe

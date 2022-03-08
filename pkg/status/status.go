@@ -242,6 +242,24 @@ func GetAndFormatSecurityAgentStatus(runtimeStatus, complianceStatus map[string]
 	return []byte(st), nil
 }
 
+// GetAndFormatSystemProbeStatus gets and formats the system-probe status
+func GetAndFormatSystemProbeStatus(status map[string]interface{}) ([]byte, error) {
+	s, err := GetStatus()
+	if err != nil {
+		return nil, err
+	}
+	statusJSON, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	st, err := FormatSystemProbeStatus(statusJSON)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(st), nil
+}
+
 // getDCAPartialConfig returns config parameters of interest for the status page.
 func getDCAPartialConfig() map[string]string {
 	conf := make(map[string]string)

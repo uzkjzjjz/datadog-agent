@@ -88,6 +88,14 @@ func GetStats() map[string]interface{} {
 	return l.stats
 }
 
+// GetStatus returns the status from all modules, namespaced by their names
+func GetStatus() map[string]interface{} {
+	l.Lock()
+	defer l.Unlock()
+
+	return nil
+}
+
 // RestartModule triggers a module restart
 func RestartModule(factory Factory) error {
 	l.Lock()

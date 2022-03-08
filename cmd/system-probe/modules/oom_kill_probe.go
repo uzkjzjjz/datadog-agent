@@ -57,3 +57,7 @@ func (o *oomKillModule) GetStats() map[string]interface{} {
 		"last_check": atomic.LoadInt64(&o.lastCheck),
 	}
 }
+
+func (o *oomKillModule) GetStatus() map[string]interface{} {
+	return map[string]interface{}{}
+}

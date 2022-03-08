@@ -66,6 +66,10 @@ func (nt *networkTracer) GetStats() map[string]interface{} {
 	return stats
 }
 
+func (nt *networkTracer) GetStatus() map[string]interface{} {
+	return map[string]interface{}{}
+}
+
 // Register all networkTracer endpoints
 func (nt *networkTracer) Register(httpMux *module.Router) error {
 	var runCounter uint64

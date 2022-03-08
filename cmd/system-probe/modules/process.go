@@ -57,6 +57,10 @@ func (t *process) GetStats() map[string]interface{} {
 	}
 }
 
+func (t *process) GetStatus() map[string]interface{} {
+	return map[string]interface{}{}
+}
+
 // Register registers endpoints for the module to expose data
 func (t *process) Register(httpMux *module.Router) error {
 	var runCounter uint64

@@ -56,3 +56,7 @@ func (t *tcpQueueLengthModule) GetStats() map[string]interface{} {
 		"last_check": atomic.LoadInt64(&t.lastCheck),
 	}
 }
+
+func (t *tcpQueueLengthModule) GetStatus() map[string]interface{} {
+	return map[string]interface{}{}
+}

@@ -137,6 +137,19 @@ func FormatSecurityAgentStatus(data []byte) (string, error) {
 	return b.String(), nil
 }
 
+// FormatSystemProbeStatus takes a json bytestring and prints out the formatted status for system probe
+func FormatSystemProbeStatus(data []byte) (string, error) {
+	var b = new(bytes.Buffer)
+
+	stats := make(map[string]interface{})
+	json.Unmarshal(data, &stats) //nolint:errcheck
+	title := fmt.Sprintf("Datadog System Probe (v%s)", stats["version"])
+	stats["title"] = title
+	renderStatusTemplate(b, "/header.tmpl", stats)
+
+	return b.String(), nil
+}
+
 // FormatMetadataMapCLI builds the rendering in the metadataMapper template.
 func FormatMetadataMapCLI(data []byte) (string, error) {
 	var b = new(bytes.Buffer)

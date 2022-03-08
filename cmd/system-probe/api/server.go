@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/DataDog/datadog-agent/cmd/system-probe/api/agent"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/api/module"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/config"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/modules"
@@ -44,6 +45,9 @@ func StartServer(cfg *config.Config) error {
 	mux.HandleFunc("/module-restart/{module-name}", restartModuleHandler).Methods("POST")
 
 	mux.Handle("/debug/vars", http.DefaultServeMux)
+
+	a := agent.New()
+	a.SetupHandlers(mux.PathPrefix("/agent").Subrouter())
 
 	go func() {
 		err = http.Serve(conn.GetListener(), mux)

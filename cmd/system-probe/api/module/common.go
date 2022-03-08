@@ -24,6 +24,7 @@ type Factory struct {
 // Module defines the common API implemented by every System Probe Module
 type Module interface {
 	GetStats() map[string]interface{}
+	GetStatus() map[string]interface{}
 	Register(*Router) error
 	Close()
 }

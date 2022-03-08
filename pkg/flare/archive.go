@@ -8,6 +8,7 @@ package flare
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -619,28 +620,38 @@ func zipFile(originalPath, zippedPath string) error {
 		return err
 	}
 
+	return zipReader(original, zippedPath)
+}
+
+func zipGzippedFile(originalPath, zippedPath string) error {
+	original, err := os.Open(originalPath)
+	if err != nil {
+		return err
+	}
+	defer original.Close()
+
+	err = ensureParentDirsExist(zippedPath)
+	if err != nil {
+		return err
+	}
+
+	zr, err := gzip.NewReader(original)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+
+	return zipReader(zr, zippedPath)
+}
+
+func zipReader(original io.Reader, zippedPath string) error {
 	zipped, err := os.OpenFile(zippedPath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
 	defer zipped.Close()
 
-	// use read/write instead of io.Copy
-	// see: https://github.com/golang/go/issues/44272
-	buf := make([]byte, 256)
-	for {
-		n, err := original.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			break
-		}
-
-		if _, err := zipped.Write(buf[:n]); err != nil {
-			return err
-		}
-	}
+	_, err = io.Copy(zipped, original)
 	return err
 }
 
