@@ -18,7 +18,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/epforwarder"
 	"github.com/DataDog/datadog-agent/pkg/forwarder"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
-	"github.com/DataDog/datadog-agent/pkg/metricsserializer"
+
 	agentruntime "github.com/DataDog/datadog-agent/pkg/runtime"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -112,6 +112,7 @@ type AgentDemultiplexer struct {
 // DemultiplexerOptions are the options used to initialize a Demultiplexer.
 type DemultiplexerOptions struct {
 	SharedForwarderOptions         *forwarder.Options
+	UseNoopForwarder               bool
 	UseNoopEventPlatformForwarder  bool
 	UseEventPlatformForwarder      bool
 	UseOrchestratorForwarder       bool
@@ -133,7 +134,7 @@ type statsd struct {
 }
 
 type forwarders struct {
-	shared             *forwarder.DefaultForwarder
+	shared             forwarder.Forwarder
 	orchestrator       *forwarder.DefaultForwarder
 	eventPlatform      epforwarder.EventPlatformForwarder
 	containerLifecycle *forwarder.DefaultForwarder
@@ -164,9 +165,9 @@ type trigger struct {
 type flushTrigger struct {
 	trigger
 
-	flushedSeries   *[]metricsserializer.Series
-	flushedSketches *[]metricsserializer.SketchSeriesList
-	seriesSink      metricsserializer.SerieSink
+	flushedSeries   *[]metrics.Series
+	flushedSketches *[]metrics.SketchSeriesList
+	seriesSink      metrics.SerieSink
 }
 
 // DefaultDemultiplexerOptions returns the default options to initialize a Demultiplexer.
@@ -228,7 +229,12 @@ func initAgentDemultiplexer(options DemultiplexerOptions, hostname string) *Agen
 		containerLifecycleForwarder = containerlifecycle.NewForwarder()
 	}
 
-	sharedForwarder := forwarder.NewDefaultForwarder(options.SharedForwarderOptions)
+	var sharedForwarder forwarder.Forwarder
+	if options.UseNoopForwarder {
+		sharedForwarder = forwarder.NoopForwarder{}
+	} else {
+		sharedForwarder = forwarder.NewDefaultForwarder(options.SharedForwarderOptions)
+	}
 
 	// prepare the serializer
 	// ----------------------
@@ -259,7 +265,7 @@ func initAgentDemultiplexer(options DemultiplexerOptions, hostname string) *Agen
 		// its worker (process loop + flush/serialization mechanism)
 
 		statsdWorkers[i] = newTimeSamplerWorker(statsdSampler, options.FlushInterval,
-			bufferSize, metricSamplePool, agg.flushAndSerializeInParallel)
+			bufferSize, metricSamplePool, agg.flushAndSerializeInParallel, tagsStore)
 	}
 
 	// --
@@ -499,15 +505,15 @@ func (d *AgentDemultiplexer) flushToSerializer(start time.Time, waitForSerialize
 	}
 
 	logPayloads := config.Datadog.GetBool("log_payloads")
-	flushedSeries := make([]metricsserializer.Series, 0)
-	flushedSketches := make([]metricsserializer.SketchSeriesList, 0)
+	flushedSeries := make([]metrics.Series, 0)
+	flushedSketches := make([]metrics.SketchSeriesList, 0)
 
 	// only used when we're using flush/serialize in parallel feature
-	var seriesSink *metricsserializer.IterableSeries
+	var seriesSink *metrics.IterableSeries
 	var done chan struct{}
 
 	if d.aggregator.flushAndSerializeInParallel.enabled {
-		seriesSink = metricsserializer.NewIterableSeries(func(se *metrics.Serie) {
+		seriesSink = metrics.NewIterableSeries(func(se *metrics.Serie) {
 			if logPayloads {
 				log.Debugf("Flushing serie: %s", se)
 			}
@@ -563,8 +569,8 @@ func (d *AgentDemultiplexer) flushToSerializer(start time.Time, waitForSerialize
 	// collect the series and sketches that the multiple samplers may have reported
 	// ------------------------------------------------------
 
-	var series metricsserializer.Series
-	var sketches metricsserializer.SketchSeriesList
+	var series metrics.Series
+	var sketches metrics.SketchSeriesList
 
 	for _, s := range flushedSeries {
 		series = append(series, s...)
@@ -584,7 +590,7 @@ func (d *AgentDemultiplexer) flushToSerializer(start time.Time, waitForSerialize
 
 		log.Debug("Flushing the following Sketches:")
 		for _, s := range sketches {
-			log.Debugf("%s", s)
+			log.Debugf("%v", s)
 		}
 	}
 
@@ -615,7 +621,7 @@ func (d *AgentDemultiplexer) flushToSerializer(start time.Time, waitForSerialize
 // series sink.
 // Mainly meant to be executed in its own routine, sendIterableSeries is closing the `done` channel once it has returned
 // from SendIterableSeries (because the SenderStopped methods has been called on the sink).
-func (d *AgentDemultiplexer) sendIterableSeries(start time.Time, series *metricsserializer.IterableSeries, done chan<- struct{}) {
+func (d *AgentDemultiplexer) sendIterableSeries(start time.Time, series *metrics.IterableSeries, done chan<- struct{}) {
 	log.Debug("Demultiplexer: sendIterableSeries: start sending iterable series to the serializer")
 	err := d.sharedSerializer.SendIterableSeries(series)
 	// if err == nil, SenderStopped was called and it is safe to read the number of series.
@@ -776,7 +782,7 @@ func InitAndStartServerlessDemultiplexer(domainResolvers map[string]resolver.Dom
 	tagsStore := tags.NewStore(config.Datadog.GetBool("aggregator_use_tags_store"), "timesampler")
 
 	statsdSampler := NewTimeSampler(TimeSamplerID(0), bucketSize, tagsStore)
-	statsdWorker := newTimeSamplerWorker(statsdSampler, DefaultFlushInterval, bufferSize, metricSamplePool, flushAndSerializeInParallel{enabled: false})
+	statsdWorker := newTimeSamplerWorker(statsdSampler, DefaultFlushInterval, bufferSize, metricSamplePool, flushAndSerializeInParallel{enabled: false}, tagsStore)
 
 	demux := &ServerlessDemultiplexer{
 		aggregator:       aggregator,
@@ -835,8 +841,8 @@ func (d *ServerlessDemultiplexer) ForceFlushToSerializer(start time.Time, waitFo
 	d.flushLock.Lock()
 	defer d.flushLock.Unlock()
 
-	flushedSeries := make([]metricsserializer.Series, 0)
-	flushedSketches := make([]metricsserializer.SketchSeriesList, 0)
+	flushedSeries := make([]metrics.Series, 0)
+	flushedSketches := make([]metrics.SketchSeriesList, 0)
 
 	trigger := flushTrigger{
 		trigger: trigger{
@@ -851,11 +857,11 @@ func (d *ServerlessDemultiplexer) ForceFlushToSerializer(start time.Time, waitFo
 	d.statsdWorker.flushChan <- trigger
 	<-trigger.blockChan
 
-	var series metricsserializer.Series
+	var series metrics.Series
 	for _, s := range flushedSeries {
 		series = append(series, s...)
 	}
-	var sketches metricsserializer.SketchSeriesList
+	var sketches metrics.SketchSeriesList
 	for _, s := range flushedSketches {
 		sketches = append(sketches, s...)
 	}
