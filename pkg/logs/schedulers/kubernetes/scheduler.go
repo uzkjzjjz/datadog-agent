@@ -271,21 +271,21 @@ func (s *Scheduler) delayRetry(ops *retryOps) {
 // schedule handles configs scheduled by the AD MetaScheduler.  It is called in
 // the run() goroutine and can access scheduler data structures without
 // locking.
-func (s *Scheduler) schedule(config integration.Config) {
-	if !config.IsLogConfig() {
+func (s *Scheduler) schedule(cfg integration.Config) {
+	if !cfg.IsLogConfig() {
 		return
 	}
-	if config.HasFilter(containers.LogsFilter) {
+	if cfg.HasFilter(containers.LogsFilter) {
 		return
 	}
 
 	// if this is not a service config, ignore it, as the AD logs scheduler will
 	// handle it
-	if config.Provider != "" || config.ServiceID == "" {
+	if cfg.Provider != "" || cfg.ServiceID == "" {
 		return
 	}
 
-	entityType, _, err := s.parseEntity(config.TaggerEntity)
+	entityType, _, err := s.parseEntity(cfg.TaggerEntity)
 	if err != nil {
 		log.Warnf("Invalid service: %v", err)
 		return
@@ -294,13 +294,13 @@ func (s *Scheduler) schedule(config integration.Config) {
 	if entityType != containers.ContainerEntityName {
 		return
 	}
-	service, err := s.toService(config)
+	svc, err := s.toService(cfg)
 	if err != nil {
 		log.Warnf("Invalid service: %v", err)
 		return
 	}
 
-	s.addSource(service)
+	s.addSource(svc)
 }
 
 // addSource creates a new log-source from a service by resolving the
@@ -360,19 +360,19 @@ func (s *Scheduler) addSource(svc *service.Service) {
 // unschedule handles configs unscheduled by the AD MetaScheduler.  It is
 // called in the run() goroutine and can access scheduler data structures
 // without locking.
-func (s *Scheduler) unschedule(config integration.Config) {
-	if !config.IsLogConfig() || config.HasFilter(containers.LogsFilter) {
+func (s *Scheduler) unschedule(cfg integration.Config) {
+	if !cfg.IsLogConfig() || cfg.HasFilter(containers.LogsFilter) {
 		return
 	}
 
 	// if this is not a service config, ignore it, as the AD logs scheduler will
 	// handle it
-	if config.Provider != "" || config.ServiceID == "" {
+	if cfg.Provider != "" || cfg.ServiceID == "" {
 		return
 	}
 
 	// new service to remove
-	entityType, _, err := s.parseEntity(config.TaggerEntity)
+	entityType, _, err := s.parseEntity(cfg.TaggerEntity)
 	if err != nil {
 		log.Warnf("Invalid service: %v", err)
 		return
@@ -381,18 +381,18 @@ func (s *Scheduler) unschedule(config integration.Config) {
 	if entityType != containers.ContainerEntityName {
 		return
 	}
-	service, err := s.toService(config)
+	svc, err := s.toService(cfg)
 	if err != nil {
 		log.Warnf("Invalid service: %v", err)
 		return
 	}
 
-	s.removeSource(service)
+	s.removeSource(svc)
 }
 
 // removeSource removes a new log-source from a service
-func (s *Scheduler) removeSource(service *service.Service) {
-	containerID := service.GetEntityID()
+func (s *Scheduler) removeSource(svc *service.Service) {
+	containerID := svc.GetEntityID()
 	if ops, exists := s.pendingRetries[containerID]; exists {
 		// Service was added unsuccessfully and is being retried
 		ops.removalScheduled = true
