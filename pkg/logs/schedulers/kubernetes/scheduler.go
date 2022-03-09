@@ -23,7 +23,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/util"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/util/adlistener"
 	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
-	"github.com/DataDog/datadog-agent/pkg/logs/service"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -204,15 +203,6 @@ func (s *Scheduler) getKubeUtil(getter kubeUtilGetter) kubelet.KubeUtilInterface
 	}
 }
 
-// toService creates a new service for an integrationConfig.
-func (s *Scheduler) toService(config integration.Config) (*service.Service, error) {
-	provider, identifier, err := s.parseServiceID(config.ServiceID)
-	if err != nil {
-		return nil, err
-	}
-	return service.NewService(provider, identifier), nil
-}
-
 // parseEntity breaks down an entity into a service provider and a service identifier.
 func (s *Scheduler) parseEntity(entity string) (string, string, error) {
 	components := strings.Split(entity, containers.EntitySeparator)
@@ -233,8 +223,8 @@ func (s *Scheduler) parseServiceID(serviceID string) (string, string, error) {
 }
 
 func (s *Scheduler) scheduleForRetry(cfg integration.Config) {
-	containerID := cfg.ServiceID
-	ops, exists := s.pendingRetries[containerID]
+	serviceID := cfg.ServiceID
+	ops, exists := s.pendingRetries[serviceID]
 	if !exists {
 		b := &backoff.ExponentialBackOff{
 			InitialInterval:     500 * time.Millisecond,
@@ -250,7 +240,7 @@ func (s *Scheduler) scheduleForRetry(cfg integration.Config) {
 			backoff:          b,
 			removalScheduled: false,
 		}
-		s.pendingRetries[containerID] = ops
+		s.pendingRetries[serviceID] = ops
 	}
 	s.delayRetry(ops)
 }
@@ -272,53 +262,35 @@ func (s *Scheduler) delayRetry(ops *retryOps) {
 // the run() goroutine and can access scheduler data structures without
 // locking.
 func (s *Scheduler) schedule(cfg integration.Config) {
-	if !cfg.IsLogConfig() {
-		return
-	}
-	if cfg.HasFilter(containers.LogsFilter) {
+	if !s.isRelevant(cfg) {
 		return
 	}
 
-	// if this is not a service config, ignore it, as the AD logs scheduler will
-	// handle it
-	if cfg.Provider != "" || cfg.ServiceID == "" {
-		return
-	}
-
-	entityType, _, err := s.parseEntity(cfg.TaggerEntity)
+	containerRuntime, containerID, err := s.parseServiceID(cfg.ServiceID)
 	if err != nil {
-		log.Warnf("Invalid service: %v", err)
-		return
-	}
-	// logs only consider container services
-	if entityType != containers.ContainerEntityName {
-		return
-	}
-	svc, err := s.toService(cfg)
-	if err != nil {
-		log.Warnf("Invalid service: %v", err)
+		log.Warnf("Invalid serviceID: %v", err)
 		return
 	}
 
 	// If the container is already tailed, we don't do anything
 	// That shoudn't happen
-	if _, exists := s.sourcesByContainer[svc.GetEntityID()]; exists {
-		log.Warnf("A source already exist for container %v", svc.GetEntityID())
+	if _, exists := s.sourcesByContainer[cfg.ServiceID]; exists {
+		log.Warnf("A source already exist for container %v", cfg.ServiceID)
 		return
 	}
 
-	pod, err := s.kubeutil.GetPodForEntityID(context.TODO(), svc.GetEntityID())
+	pod, err := s.kubeutil.GetPodForEntityID(context.TODO(), cfg.ServiceID)
 	if err != nil {
 		if errors.IsRetriable(err) {
 			// Attempt to reschedule the source later
-			log.Debugf("Failed to fetch pod info for container %v, will retry: %v", svc.Identifier, err)
+			log.Debugf("Failed to fetch pod info for container %v, will retry: %v", containerID, err)
 			s.scheduleForRetry(cfg)
 			return
 		}
-		log.Warnf("Could not add source for container %v: %v", svc.Identifier, err)
+		log.Warnf("Could not add source for container %v: %v", containerID, err)
 		return
 	}
-	container, err := s.kubeutil.GetStatusForContainerID(pod, svc.GetEntityID())
+	container, err := s.kubeutil.GetStatusForContainerID(pod, cfg.ServiceID)
 	if err != nil {
 		log.Warn(err)
 		return
@@ -331,23 +303,23 @@ func (s *Scheduler) schedule(cfg integration.Config) {
 		return
 	}
 
-	switch svc.Type {
+	switch containerRuntime {
 	case config.DockerType:
 		source.SetSourceType(config.DockerSourceType)
 	default:
 		source.SetSourceType(config.KubernetesSourceType)
 	}
 
-	s.sourcesByContainer[svc.GetEntityID()] = source
+	s.sourcesByContainer[cfg.ServiceID] = source
 	s.mgr.AddSource(source)
 
 	// Clean-up retry logic
-	if ops, exists := s.pendingRetries[svc.GetEntityID()]; exists {
+	if ops, exists := s.pendingRetries[cfg.ServiceID]; exists {
 		if ops.removalScheduled {
 			// A removal was emitted while scheduling was being retried
 			s.unschedule(ops.cfg)
 		}
-		delete(s.pendingRetries, svc.GetEntityID())
+		delete(s.pendingRetries, cfg.ServiceID)
 	}
 }
 
@@ -355,42 +327,48 @@ func (s *Scheduler) schedule(cfg integration.Config) {
 // called in the run() goroutine and can access scheduler data structures
 // without locking.
 func (s *Scheduler) unschedule(cfg integration.Config) {
-	if !cfg.IsLogConfig() || cfg.HasFilter(containers.LogsFilter) {
+	if !s.isRelevant(cfg) {
 		return
+	}
+
+	serviceID := cfg.ServiceID
+	if ops, exists := s.pendingRetries[serviceID]; exists {
+		// Service was added unsuccessfully and is being retried
+		ops.removalScheduled = true
+		return
+	}
+	if source, exists := s.sourcesByContainer[serviceID]; exists {
+		delete(s.sourcesByContainer, serviceID)
+		s.mgr.RemoveSource(source)
+	}
+}
+
+// isRelevant returns true if this configuration is relevant for this scheduler.  That
+// means that it is a service config, contains logs config, is not filtered out, and
+// has a container tagger entity type (`container_id://..`).
+func (s *Scheduler) isRelevant(cfg integration.Config) bool {
+	if !cfg.IsLogConfig() || cfg.HasFilter(containers.LogsFilter) {
+		return false
 	}
 
 	// if this is not a service config, ignore it, as the AD logs scheduler will
 	// handle it
 	if cfg.Provider != "" || cfg.ServiceID == "" {
-		return
+		return false
 	}
 
 	// new service to remove
 	entityType, _, err := s.parseEntity(cfg.TaggerEntity)
 	if err != nil {
 		log.Warnf("Invalid service: %v", err)
-		return
+		return false
 	}
 	// logs only consider container services
 	if entityType != containers.ContainerEntityName {
-		return
-	}
-	svc, err := s.toService(cfg)
-	if err != nil {
-		log.Warnf("Invalid service: %v", err)
-		return
+		return false
 	}
 
-	containerID := svc.GetEntityID()
-	if ops, exists := s.pendingRetries[containerID]; exists {
-		// Service was added unsuccessfully and is being retried
-		ops.removalScheduled = true
-		return
-	}
-	if source, exists := s.sourcesByContainer[containerID]; exists {
-		delete(s.sourcesByContainer, containerID)
-		s.mgr.RemoveSource(source)
-	}
+	return true
 }
 
 // kubernetesIntegration represents the name of the integration.
