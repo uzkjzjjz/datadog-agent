@@ -22,7 +22,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
-	"github.com/DataDog/datadog-agent/pkg/logs/service"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
 	"github.com/stretchr/testify/assert"
@@ -306,6 +305,8 @@ func TestRetryService(t *testing.T) {
 	containerID := "123456789abcdefoo"
 	imageName := "fooImage"
 	serviceName := "fooService"
+	serviceID := fmt.Sprintf("%s://%s", containerType, containerID)
+	taggerEntity := fmt.Sprintf("%s://%s", "container_id", containerID)
 
 	mgr := &schedulers.MockSourceManager{}
 	l := &Scheduler{
@@ -318,13 +319,16 @@ func TestRetryService(t *testing.T) {
 		sourcesByContainer: make(map[string]*config.LogSource),
 	}
 
-	service := service.NewService(containerType, containerID)
-	l.addSource(service)
+	l.schedule(integration.Config{
+		LogsConfig:   []byte("{}"),
+		ServiceID:    serviceID,
+		TaggerEntity: taggerEntity,
+	})
 
 	ops := <-l.retryOperations
 
-	assert.Equal(t, containerType, ops.service.Type)
-	assert.Equal(t, containerID, ops.service.Identifier)
+	assert.Equal(t, serviceID, ops.cfg.ServiceID)
+	assert.Equal(t, taggerEntity, ops.cfg.TaggerEntity)
 
 	status := kubelet.ContainerStatus{
 		Name:  containerName,
@@ -352,10 +356,10 @@ func TestRetryService(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	go func() {
-		l.addSource(ops.service)
+		l.schedule(ops.cfg)
 		mu.Unlock()
 	}()
-	// Ensure l.addSource is completely done
+	// Ensure l.schedule is completely done
 	mu.Lock()
 
 	require.Equal(t, 1, len(mgr.Events))

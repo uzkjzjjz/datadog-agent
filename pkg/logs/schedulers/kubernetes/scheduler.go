@@ -40,7 +40,7 @@ const (
 var errCollectAllDisabled = fmt.Errorf("%s disabled", config.ContainerCollectAll)
 
 type retryOps struct {
-	service          *service.Service
+	cfg              integration.Config
 	backoff          backoff.BackOff
 	removalScheduled bool
 }
@@ -84,11 +84,11 @@ type Scheduler struct {
 	// kubeutil is the active interface to kubelet.  This is set in the `run()` goroutine.
 	kubeutil kubelet.KubeUtilInterface
 
-	// retryOperations carries services for which addSource should be retried after failure.
+	// retryOperations carries services for which schedule should be retried after failure.
 	// Values are added to this channel when they should be retried.
 	retryOperations chan *retryOps
 
-	// pendingRetries contains all addSource operations that are still being retried.
+	// pendingRetries contains all schedule operations that are still being retried.
 	pendingRetries map[string]*retryOps
 
 	// serviceNameFunc returns the standard tag 'service' corresponding to a
@@ -174,7 +174,7 @@ func (s *Scheduler) run() {
 				s.unschedule(config)
 			}
 		case ops := <-s.retryOperations:
-			s.addSource(ops.service)
+			s.schedule(ops.cfg)
 		case <-s.stop:
 			log.Info("Kubernetes log scheduler stopped")
 			return
@@ -232,8 +232,8 @@ func (s *Scheduler) parseServiceID(serviceID string) (string, string, error) {
 	return components[0], components[1], nil
 }
 
-func (s *Scheduler) scheduleServiceForRetry(svc *service.Service) {
-	containerID := svc.GetEntityID()
+func (s *Scheduler) scheduleForRetry(cfg integration.Config) {
+	containerID := cfg.ServiceID
 	ops, exists := s.pendingRetries[containerID]
 	if !exists {
 		b := &backoff.ExponentialBackOff{
@@ -246,7 +246,7 @@ func (s *Scheduler) scheduleServiceForRetry(svc *service.Service) {
 		}
 		b.Reset()
 		ops = &retryOps{
-			service:          svc,
+			cfg:              cfg,
 			backoff:          b,
 			removalScheduled: false,
 		}
@@ -258,8 +258,8 @@ func (s *Scheduler) scheduleServiceForRetry(svc *service.Service) {
 func (s *Scheduler) delayRetry(ops *retryOps) {
 	delay := ops.backoff.NextBackOff()
 	if delay == backoff.Stop {
-		log.Warnf("Unable to add source for container %v", ops.service.GetEntityID())
-		delete(s.pendingRetries, ops.service.GetEntityID())
+		log.Warnf("Unable to add source for container %v", ops.cfg.ServiceID)
+		delete(s.pendingRetries, ops.cfg.ServiceID)
 		return
 	}
 	go func() {
@@ -300,12 +300,6 @@ func (s *Scheduler) schedule(cfg integration.Config) {
 		return
 	}
 
-	s.addSource(svc)
-}
-
-// addSource creates a new log-source from a service by resolving the
-// pod linked to the entityID of the service
-func (s *Scheduler) addSource(svc *service.Service) {
 	// If the container is already tailed, we don't do anything
 	// That shoudn't happen
 	if _, exists := s.sourcesByContainer[svc.GetEntityID()]; exists {
@@ -318,7 +312,7 @@ func (s *Scheduler) addSource(svc *service.Service) {
 		if errors.IsRetriable(err) {
 			// Attempt to reschedule the source later
 			log.Debugf("Failed to fetch pod info for container %v, will retry: %v", svc.Identifier, err)
-			s.scheduleServiceForRetry(svc)
+			s.scheduleForRetry(cfg)
 			return
 		}
 		log.Warnf("Could not add source for container %v: %v", svc.Identifier, err)
@@ -350,8 +344,8 @@ func (s *Scheduler) addSource(svc *service.Service) {
 	// Clean-up retry logic
 	if ops, exists := s.pendingRetries[svc.GetEntityID()]; exists {
 		if ops.removalScheduled {
-			// A removal was emitted while addSource was being retried
-			s.removeSource(ops.service)
+			// A removal was emitted while scheduling was being retried
+			s.unschedule(ops.cfg)
 		}
 		delete(s.pendingRetries, svc.GetEntityID())
 	}
@@ -387,11 +381,6 @@ func (s *Scheduler) unschedule(cfg integration.Config) {
 		return
 	}
 
-	s.removeSource(svc)
-}
-
-// removeSource removes a new log-source from a service
-func (s *Scheduler) removeSource(svc *service.Service) {
 	containerID := svc.GetEntityID()
 	if ops, exists := s.pendingRetries[containerID]; exists {
 		// Service was added unsuccessfully and is being retried
