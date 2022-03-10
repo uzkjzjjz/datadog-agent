@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ import (
 	dderrors "github.com/DataDog/datadog-agent/pkg/errors"
 	"github.com/DataDog/datadog-agent/pkg/util/cache"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
-	"github.com/DataDog/datadog-agent/pkg/util/containers/providers"
+	"github.com/DataDog/datadog-agent/pkg/util/containers/metrics/provider"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
 )
@@ -41,8 +42,6 @@ type DockerUtil struct {
 	queryTimeout time.Duration
 	// tracks the last time we invalidate our internal caches
 	lastInvalidate time.Time
-	// networkMappings by container id
-	networkMappings map[string][]dockerNetwork
 	// image sha mapping cache
 	imageNameBySha map[string]string
 	// event subscribers and state
@@ -75,7 +74,6 @@ func (d *DockerUtil) init() error {
 
 	d.cfg = cfg
 	d.cli = cli
-	d.networkMappings = make(map[string][]dockerNetwork)
 	d.imageNameBySha = make(map[string]string)
 	d.lastInvalidate = time.Now()
 	d.eventState = newEventStreamState()
@@ -323,7 +321,7 @@ func (d *DockerUtil) InspectNoCache(ctx context.Context, id string, withSize boo
 
 // InspectSelf returns the inspect content of the container the current agent is running in
 func (d *DockerUtil) InspectSelf(ctx context.Context) (types.ContainerJSON, error) {
-	cID, err := providers.ContainerImpl().GetAgentCID()
+	cID, err := provider.GetProvider().GetMetaCollector().GetSelfContainerID()
 	if err != nil {
 		return types.ContainerJSON{}, err
 	}
@@ -367,4 +365,9 @@ func (d *DockerUtil) GetContainerStats(ctx context.Context, containerID string) 
 		return nil, fmt.Errorf("error listing containers: %s", err)
 	}
 	return containerStats, nil
+}
+
+// ContainerLogs returns a container logs reader
+func (d *DockerUtil) ContainerLogs(ctx context.Context, container string, options types.ContainerLogsOptions) (io.ReadCloser, error) {
+	return d.cli.ContainerLogs(ctx, container, options)
 }

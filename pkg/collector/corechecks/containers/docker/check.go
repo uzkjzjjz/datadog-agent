@@ -25,11 +25,12 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/tagger"
 	"github.com/DataDog/datadog-agent/pkg/tagger/collectors"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
-	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics"
+	"github.com/DataDog/datadog-agent/pkg/util/containers/metrics"
 	"github.com/DataDog/datadog-agent/pkg/util/docker"
 	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 )
 
 const (
@@ -170,7 +171,7 @@ func (d *DockerCheck) runDockerCustom(sender aggregator.Sender, du docker.Client
 	}
 
 	for _, rawContainer := range rawContainerList {
-		if rawContainer.State == containers.ContainerRunningState {
+		if rawContainer.State == string(workloadmeta.ContainerStatusRunning) {
 			containersRunning++
 		} else {
 			containersStopped++
@@ -195,7 +196,7 @@ func (d *DockerCheck) runDockerCustom(sender aggregator.Sender, du docker.Client
 			containerName = rawContainer.Names[0]
 		}
 		isContainerExcluded := d.containerFilter.IsExcluded(containerName, resolvedImageName, rawContainer.Labels[kubernetes.CriContainerNamespaceLabel])
-		isContainerRunning := rawContainer.State == containers.ContainerRunningState
+		isContainerRunning := rawContainer.State == string(workloadmeta.ContainerStatusRunning)
 		taggerEntityID := containers.BuildTaggerEntityName(rawContainer.ID)
 
 		// Compute container-images stats

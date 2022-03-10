@@ -16,11 +16,11 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/containers/generic"
-	"github.com/DataDog/datadog-agent/pkg/util/containers"
-	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics/mock"
-	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics/provider"
+	"github.com/DataDog/datadog-agent/pkg/util/containers/metrics/mock"
+	"github.com/DataDog/datadog-agent/pkg/util/containers/metrics/provider"
 	"github.com/DataDog/datadog-agent/pkg/util/pointer"
 	"github.com/DataDog/datadog-agent/pkg/util/system"
+	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 )
 
 func TestDockerNetworkExtension(t *testing.T) {
@@ -142,7 +142,7 @@ func TestDockerNetworkExtension(t *testing.T) {
 	})
 	container1RawDocker := dockerTypes.Container{
 		ID:    "kube-host-network",
-		State: containers.ContainerRunningState,
+		State: string(workloadmeta.ContainerStatusRunning),
 		HostConfig: struct {
 			NetworkMode string "json:\",omitempty\""
 		}{NetworkMode: "host"},
@@ -176,7 +176,7 @@ func TestDockerNetworkExtension(t *testing.T) {
 	})
 	container2RawDocker := dockerTypes.Container{
 		ID:    "kube-app",
-		State: containers.ContainerRunningState,
+		State: string(workloadmeta.ContainerStatusRunning),
 		HostConfig: struct {
 			NetworkMode string "json:\",omitempty\""
 		}{NetworkMode: "container:kube-app-pause"},
@@ -188,7 +188,7 @@ func TestDockerNetworkExtension(t *testing.T) {
 	// Container3 is only raw as it's excluded (pause container)
 	container3RawDocker := dockerTypes.Container{
 		ID:    "kube-app-pause",
-		State: containers.ContainerRunningState,
+		State: string(workloadmeta.ContainerStatusRunning),
 		HostConfig: struct {
 			NetworkMode string "json:\",omitempty\""
 		}{NetworkMode: "none"},
@@ -228,7 +228,7 @@ func TestDockerNetworkExtension(t *testing.T) {
 	})
 	container4RawDocker := dockerTypes.Container{
 		ID:    "docker-app",
-		State: containers.ContainerRunningState,
+		State: string(workloadmeta.ContainerStatusRunning),
 		HostConfig: struct {
 			NetworkMode string "json:\",omitempty\""
 		}{NetworkMode: "ubuntu_default"},
@@ -300,7 +300,7 @@ func TestNetworkCustomOnFailure(t *testing.T) {
 		Labels: map[string]string{
 			"io.kubernetes.pod.namespace": "kubens",
 		},
-		State:      containers.ContainerRunningState,
+		State:      string(workloadmeta.ContainerStatusRunning),
 		SizeRw:     100,
 		SizeRootFs: 200,
 	})

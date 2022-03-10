@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
 	k "github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -68,19 +67,4 @@ func makeClusterNameRFC1123Compliant(clusterName string) (string, string) {
 		return finalName, clusterName
 	}
 	return clusterName, clusterName
-}
-
-// IsAgentKubeHostNetwork returns true if the agent is running on a POD with hostNetwork
-func IsAgentKubeHostNetwork() (bool, error) {
-	ku, err := k.GetKubeUtil()
-	if err != nil {
-		return true, err
-	}
-
-	cid, err := metrics.GetProvider().GetMetaCollector().GetSelfContainerID()
-	if err != nil {
-		return false, err
-	}
-
-	return ku.IsAgentHostNetwork(context.TODO(), cid)
 }
