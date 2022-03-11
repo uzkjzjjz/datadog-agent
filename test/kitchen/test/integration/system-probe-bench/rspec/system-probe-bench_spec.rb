@@ -3,7 +3,7 @@ require 'open3'
 require 'fileutils'
 
 GOLANG_TEST_FAILURE = /FAIL:/
-TEST_RUN_COUNT = 5
+TEST_RUN_COUNT = 10
 
 def check_output(output, wait_thr, out_file)
   test_failures = []
