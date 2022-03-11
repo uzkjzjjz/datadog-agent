@@ -4,6 +4,7 @@ require 'fileutils'
 
 GOLANG_TEST_FAILURE = /FAIL:/
 TEST_RUN_COUNT = 10
+MIN_REGRESSION_DELTA = 5.0 # percent
 
 def check_output(output, wait_thr, out_file)
   test_failures = []
@@ -31,6 +32,27 @@ def regression_output(r)
     lines.each { |l| out += l }
   end
   out
+end
+
+def pkg_results_store(p, header_line, pkg, line)
+  if !p.has_key?(header_line) then
+    p[header_line] = {}
+  end
+  if !p[header_line].has_key?(pkg) then
+    p[header_line][pkg] = []
+  end
+  p[header_line][pkg].append(line.delete('\n'))
+end
+
+def pkg_results_output(p)
+  p.each do |hdr, pkg_results|
+    puts hdr
+    pkg_results.each do |pkg, lines|
+      # append package so we don't mess up the column formatting
+      lines.each { |l| puts "#{l}\t#{pkg}\n" }
+    end
+    puts "\n"
+  end
 end
 
 def run_test(basedir, pkg, results_file)
@@ -71,18 +93,17 @@ num_cpus = `nproc`.to_i
 end
 
 improvements = {}
+non_regression_changes = {}
 describe "system-probe benchmarks" do
   after(:all) do
+    if non_regression_changes.length > 0 then
+      puts "\nNON-REGRESSION CHANGES (< +#{MIN_REGRESSION_DELTA}%):\n"
+      pkg_results_output(non_regression_changes)
+      puts "\n"
+    end
     if improvements.length > 0 then
       puts "\nIMPROVEMENTS:\n"
-      improvements.each do |hdr, pkg_results|
-        puts hdr
-        pkg_results.each do |pkg, lines|
-          # append package so we don't mess up the column formatting
-          lines.each { |l| puts "#{l}\t#{pkg}\n" }
-        end
-        puts "\n"
-      end
+      pkg_results_output(improvements)
       puts "\n"
     end
   end
@@ -123,18 +144,14 @@ describe "system-probe benchmarks" do
             if data[3] != "~" then
               delta = data[3].to_f
               if delta < 0 then
-                if !improvements.has_key?(header_line) then
-                  improvements[header_line] = {}
-                end
-                if !improvements[header_line].has_key?(pkg) then
-                  improvements[header_line][pkg] = []
-                end
-                improvements[header_line][pkg].append(line.delete('\n'))
-              else
+                pkg_results_store(improvements, header_line, pkg, line)
+              elsif delta >= MIN_REGRESSION_DELTA then
                 if !regressions.has_key?(header_line) then
                   regressions[header_line] = []
                 end
                 regressions[header_line].append(line)
+              elsif delta != 0 then
+                pkg_results_store(non_regression_changes, header_line, pkg, line)
               end
             end
           end
