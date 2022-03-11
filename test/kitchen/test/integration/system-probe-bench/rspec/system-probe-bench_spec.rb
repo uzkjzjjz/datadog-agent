@@ -25,7 +25,7 @@ def check_output(output, wait_thr, out_file)
 end
 
 def regression_output(r)
-  out = "REGRESSIONS\n"
+  out = "\nREGRESSIONS:\n"
   r.each do |hdr, lines|
     out += hdr
     lines.each { |l| out += l }
@@ -70,51 +70,78 @@ num_cpus = `nproc`.to_i
   end
 end
 
-Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
-  pkg = f.delete_prefix('/tmp/system-probe/head').delete_suffix('/testsuite')
-  main_results_path = File.join('/tmp/system-probe/results', pkg, 'main.txt')
-  head_results_path = File.join('/tmp/system-probe/results', pkg, 'head.txt')
+improvements = {}
+describe "system-probe benchmarks" do
+  after(:all) do
+    if improvements.length > 0 then
+      puts "\nIMPROVEMENTS:\n"
+      improvements.each do |hdr, pkg_results|
+        puts hdr
+        pkg_results.each do |pkg, lines|
+          # append package so we don't mess up the column formatting
+          lines.each { |l| puts "#{l}\t#{pkg}\n" }
+        end
+        puts "\n"
+      end
+      puts "\n"
+    end
+  end
 
-  describe "system-probe benchmarks for #{pkg}" do
-    it 'successfully runs' do
-      TEST_RUN_COUNT.times {
-        # alternate between them for less noisy results
-        puts "MAIN\n"
-        run_test('/tmp/system-probe/main', pkg, main_results_path)
-        puts "HEAD\n"
-        run_test('/tmp/system-probe/head', pkg, head_results_path)
-      }
+  Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
+    pkg = f.delete_prefix('/tmp/system-probe/head').delete_suffix('/testsuite')
+    main_results_path = File.join('/tmp/system-probe/results', pkg, 'main.txt')
+    head_results_path = File.join('/tmp/system-probe/results', pkg, 'head.txt')
 
-      regressions = {}
-      Open3.popen2e("sudo", "-E", "/tmp/system-probe/benchstat", main_results_path, head_results_path) do |_, output, wait_thr|
-        header_line = nil
-        section_headers = nil
-        output.each_line do |line|
-          puts line
-          if line == "\n" then
-            section_headers = nil
-            next
-          end
-          if not section_headers then
-            header_line = line
-            section_headers = header_line.split("  ").map { |s| s.strip }.reject { |s| s.nil? || s.strip.empty? }
-            section_headers.append('stats')
-            #print section_headers, "\n"
-            next
-          end
+    describe "#{pkg}" do
+      it 'successfully runs' do
+        TEST_RUN_COUNT.times {
+          # alternate between them for less noisy results
+          puts "MAIN\n"
+          run_test('/tmp/system-probe/main', pkg, main_results_path)
+          puts "HEAD\n"
+          run_test('/tmp/system-probe/head', pkg, head_results_path)
+        }
 
-          data = line.split("  ").map { |s| s.strip }.reject { |s| s.nil? || s.strip.empty? }
-          #print data, "\n"
-          if data[3] != "~" then
-            if !regressions.has_key?(header_line) then
-              regressions[header_line] = []
+        regressions = {}
+        Open3.popen2e("sudo", "-E", "/tmp/system-probe/benchstat", main_results_path, head_results_path) do |_, output, wait_thr|
+          header_line = nil
+          section_headers = nil
+          output.each_line do |line|
+            puts line
+            if line == "\n" then
+              section_headers = nil
+              next
             end
-            regressions[header_line].append(line)
+            if not section_headers then
+              header_line = line
+              section_headers = header_line.split("  ").map { |s| s.strip }.reject { |s| s.nil? || s.strip.empty? }
+              section_headers.append('stats')
+              next
+            end
+
+            data = line.split("  ").map { |s| s.strip }.reject { |s| s.nil? || s.strip.empty? }
+            if data[3] != "~" then
+              delta = data[3].to_f
+              if delta < 0 then
+                if !improvements.has_key?(header_line) then
+                  improvements[header_line] = {}
+                end
+                if !improvements[header_line].has_key?(pkg) then
+                  improvements[header_line][pkg] = []
+                end
+                improvements[header_line][pkg].append(line.delete('\n'))
+              else
+                if !regressions.has_key?(header_line) then
+                  regressions[header_line] = []
+                end
+                regressions[header_line].append(line)
+              end
+            end
           end
         end
-      end
 
-      expect(regressions).to be_empty, regression_output(regressions)
+        expect(regressions).to be_empty, regression_output(regressions)
+      end
     end
   end
 end
