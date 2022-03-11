@@ -70,7 +70,7 @@ num_cpus = `nproc`.to_i
   end
 end
 
-Dir.glob('/tmp/system-probe/head/pkg/network/tracer/**/testsuite').each do |f|
+Dir.glob('/tmp/system-probe/head/**/testsuite').each do |f|
   pkg = f.delete_prefix('/tmp/system-probe/head').delete_suffix('/testsuite')
   main_results_path = File.join('/tmp/system-probe/results', pkg, 'main.txt')
   head_results_path = File.join('/tmp/system-probe/results', pkg, 'head.txt')
