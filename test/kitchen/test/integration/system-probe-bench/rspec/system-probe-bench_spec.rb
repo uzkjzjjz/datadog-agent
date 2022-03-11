@@ -41,7 +41,7 @@ def pkg_results_store(p, header_line, pkg, line)
   if !p[header_line].has_key?(pkg) then
     p[header_line][pkg] = []
   end
-  p[header_line][pkg].append(line.delete('\n'))
+  p[header_line][pkg].append(line.strip)
 end
 
 def pkg_results_output(p)
