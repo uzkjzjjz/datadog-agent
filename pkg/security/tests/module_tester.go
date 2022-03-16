@@ -252,7 +252,9 @@ func (h *testProbeHandler) HandleCustomEvent(rule *rules.Rule, event *sprobe.Cus
 		return
 	}
 
+	fmt.Printf("HANDLE: %v\n", h.customEventHandler)
 	if h.customEventHandler != nil && h.customEventHandler.callback != nil {
+		fmt.Printf("CALLBACK: %v\n", h.customEventHandler)
 		h.customEventHandler.callback(rule, event)
 	}
 }
@@ -545,6 +547,7 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 		return nil, errors.Wrap(err, "failed to init module")
 	}
 
+	fmt.Printf("SetEventHandler: %v\n", testMod.probeHandler)
 	testMod.probe.SetEventHandler(testMod.probeHandler)
 
 	if err := testMod.module.Start(); err != nil {
@@ -800,27 +803,31 @@ func (tm *testModule) GetProbeCustomEvent(tb testing.TB, action func() error, cb
 	message := make(chan ActionMessage, 1)
 
 	tm.RegisterCustomEventHandler(func(rule *rules.Rule, event *sprobe.CustomEvent) {
-		if len(eventType) > 0 {
-			if event.GetEventType() != eventType[0] {
-				return
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case msg := <-message:
-			switch msg {
-			case Continue:
-				if cb(rule, event) {
-					cancel()
-				} else {
-					message <- Continue
+		go func() {
+			fmt.Printf("Custom event: %+v\n", event)
+			if len(eventType) > 0 {
+				if event.GetEventType() != eventType[0] {
+					return
 				}
-			case Skip:
-				cancel()
 			}
-		}
+			fmt.Printf("Reload event: %+v\n", event)
+
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-message:
+				switch msg {
+				case Continue:
+					if cb(rule, event) {
+						cancel()
+					} else {
+						message <- Continue
+					}
+				case Skip:
+					cancel()
+				}
+			}
+		}()
 	})
 	defer tm.RegisterCustomEventHandler(nil)
 
@@ -828,6 +835,7 @@ func (tm *testModule) GetProbeCustomEvent(tb testing.TB, action func() error, cb
 		message <- Skip
 		return err
 	}
+	fmt.Printf("Action done\n")
 	message <- Continue
 
 	select {

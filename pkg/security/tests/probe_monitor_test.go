@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,11 +41,17 @@ func TestRulesetLoaded(t *testing.T) {
 			// This test is an exception, we should never use any t.* method in the action function (especially within a
 			// goroutine). We don't have a choice here because we're not triggering a kernel space event: the same
 			// goroutine that calls test.reloadConfiguration will eventually call the callback.
+			var wg sync.WaitGroup
+			wg.Add(1)
+
 			go func() {
 				if err := test.reloadConfiguration(); err != nil {
 					t.Errorf("failed to reload configuration: %v", err)
 				}
+				wg.Done()
 			}()
+			wg.Wait()
+
 			return nil
 		}, func(rule *rules.Rule, customEvent *sprobe.CustomEvent) bool {
 			assert.Equal(t, sprobe.RulesetLoadedRuleID, rule.ID, "wrong rule")
