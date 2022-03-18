@@ -25,7 +25,7 @@ relative_path "jmxfetch"
 
 build do
   license "BSD-3-Clause"
-  license_file "https://raw.githubusercontent.com/DataDog/jmxfetch/#{version}/LICENSE"
+  license_file "https://raw.githubusercontent.com/DataDog/jmxfetch/b6f96ecd6665d59cfd581f9e8b9775323e7dd5ee/LICENSE"
 
   mkdir jar_dir
 
