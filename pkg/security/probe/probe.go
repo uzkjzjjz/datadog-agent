@@ -653,6 +653,10 @@ func (p *Probe) handleEvent(CPU uint64, data []byte) {
 		defer p.resolvers.ProcessResolver.DeleteEntry(event.ProcessContext.Pid, event.ResolveEventTimestamp())
 	}
 
+	if event.GetEventType() == model.DNSEventType {
+		fmt.Printf("DNS_EVENT type:%s name:%s process:%s\n", model.QType(event.DNS.Type), event.DNS.Name, event.ProcessContext.Comm)
+	}
+
 	p.DispatchEvent(event, dataLen, int(CPU), p.perfMap)
 
 	// flush exited process
