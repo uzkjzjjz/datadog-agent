@@ -2,7 +2,7 @@
 docker_build_agent7_windows1809:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7
@@ -11,7 +11,7 @@ docker_build_agent7_windows1809:
 docker_build_agent7_windows1809_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7-jmx
@@ -95,7 +95,7 @@ docker_build_agent7_windows20h2_jmx:
 docker_build_agent7_windows1809_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7
@@ -104,7 +104,7 @@ docker_build_agent7_windows1809_core:
 docker_build_agent7_windows1809_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7-jmx
