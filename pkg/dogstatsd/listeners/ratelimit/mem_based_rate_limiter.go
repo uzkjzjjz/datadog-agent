@@ -52,9 +52,9 @@ func BuildMemBasedRateLimiter() (*MemBasedRateLimiter, error) {
 		log.Debugf("cgroup limits not detected: %v", err)
 	}
 
-	ballast_size := config.Datadog.GetInt("dogstatsd_mem_based_rate_limiter.memory_balast")
-	log.Infof("ballast size %vMB", ballast_size/1024/1024)
-	ballast := make([]byte, 0, ballast_size) // 9G
+	ballastSize := config.Datadog.GetInt("dogstatsd_mem_based_rate_limiter.memory_balast")
+	log.Infof("ballast size %vMB", ballastSize/1024/1024)
+	ballast := make([]byte, 0, ballastSize) // 9G
 	runtime.KeepAlive(ballast)
 
 	return NewMemBasedRateLimiter(
