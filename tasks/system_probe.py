@@ -222,7 +222,7 @@ def kitchen_prepare(ctx, windows=is_windows):
 
 
 @task
-def kitchen_test(ctx, target=None, arch="x86_64"):
+def kitchen_test(ctx, target=None, arch="x86_64", provider="virtualbox"):
     """
     Run tests (locally) using chef kitchen against an array of different platforms.
     * Make sure to run `inv -e system-probe.kitchen-prepare` using the agent-development VM;
@@ -231,9 +231,10 @@ def kitchen_test(ctx, target=None, arch="x86_64"):
 
     # Retrieve a list of all available vagrant images
     images = {}
-    with open(os.path.join(KITCHEN_DIR, "platforms.json"), 'r') as f:
+    platform_file = os.path.join(KITCHEN_DIR, "platforms.json")
+    with open(platform_file, 'r') as f:
         for platform, by_provider in json.load(f).items():
-            if "vagrant" in by_provider:
+            if "vagrant" in by_provider and arch in by_provider["vagrant"]:
                 for image in by_provider["vagrant"][arch]:
                     images[image] = platform
 
@@ -245,8 +246,8 @@ def kitchen_test(ctx, target=None, arch="x86_64"):
 
     with ctx.cd(KITCHEN_DIR):
         ctx.run(
-            f"inv kitchen.genconfig --platform {images[target]} --osversions {target} --provider vagrant --testfiles system-probe-test",
-            env={"KITCHEN_VAGRANT_PROVIDER": "virtualbox"},
+            f"inv kitchen.genconfig --platform {images[target]} --osversions {target} --provider vagrant --testfiles system-probe-test --platformfile {platform_file} --arch {arch}",
+            env={"KITCHEN_VAGRANT_PROVIDER": provider},
         )
         ctx.run("kitchen test")
 
@@ -338,17 +339,28 @@ def clang_tidy(ctx, fix=False, fail_on_issue=False):
     security_flags = list(build_flags)
     security_flags.append(f"-I{security_agent_c_dir}")
     security_flags.append("-DUSE_SYSCALL_WRAPPER=0")
-    run_tidy(ctx, files=security_files, build_flags=security_flags, fix=fix, fail_on_issue=fail_on_issue)
+    security_checks = ["-readability-function-cognitive-complexity"]
+    run_tidy(
+        ctx,
+        files=security_files,
+        build_flags=security_flags,
+        fix=fix,
+        fail_on_issue=fail_on_issue,
+        checks=security_checks,
+    )
 
 
-def run_tidy(ctx, files, build_flags, fix=False, fail_on_issue=False):
+def run_tidy(ctx, files, build_flags, fix=False, fail_on_issue=False, checks=None):
     flags = ["--quiet"]
     if fix:
         flags.append("--fix")
     if fail_on_issue:
         flags.append("--warnings-as-errors='*'")
 
-    ctx.run(f"clang-tidy {' '.join(flags)} {' '.join(files)} -- {' '.join(build_flags)}")
+    if checks is not None:
+        flags.append(f"--checks={','.join(checks)}")
+
+    ctx.run(f"clang-tidy {' '.join(flags)} {' '.join(files)} -- {' '.join(build_flags)}", warn=True)
 
 
 @task

@@ -530,4 +530,13 @@ def generate_cws_documentation(ctx, go_generate=False):
 def cws_go_generate(ctx):
     with ctx.cd("./pkg/security/secl"):
         ctx.run("go generate ./...")
+    ctx.run("cp ./pkg/security/probe/serializers_easyjson.mock ./pkg/security/probe/serializers_easyjson.go")
     ctx.run("go generate ./pkg/security/...")
+
+
+@task
+def generate_btfhub_constants(ctx, archive_path):
+    output_path = "./pkg/security/probe/constantfetch/btfhub/constants.json"
+    ctx.run(
+        f"go run ./pkg/security/probe/constantfetch/btfhub/ -archive-root {archive_path} -output {output_path}",
+    )
