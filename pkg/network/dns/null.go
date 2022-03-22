@@ -9,7 +9,8 @@
 package dns
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 // NewNullReverseDNS returns a dummy implementation of ReverseDNS
@@ -19,7 +20,7 @@ func NewNullReverseDNS() ReverseDNS {
 
 type nullReverseDNS struct{}
 
-func (nullReverseDNS) Resolve(_ []util.Address) map[util.Address][]string {
+func (nullReverseDNS) Resolve(_ []netaddr.IP) map[netaddr.IP][]*intern.Value {
 	return nil
 }
 

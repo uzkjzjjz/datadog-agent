@@ -6,9 +6,9 @@
 package dns
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/google/gopacket/layers"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 // QueryType is the DNS record type
@@ -44,7 +44,7 @@ type StatsByKeyByNameByType map[Key]map[*intern.Value]map[QueryType]Stats
 
 // ReverseDNS translates IPs to names
 type ReverseDNS interface {
-	Resolve([]util.Address) map[util.Address][]string
+	Resolve([]netaddr.IP) map[netaddr.IP][]*intern.Value
 	GetDNSStats() StatsByKeyByNameByType
 	GetStats() map[string]int64
 	Start() error
@@ -53,8 +53,8 @@ type ReverseDNS interface {
 
 // Key is an identifier for a set of DNS connections
 type Key struct {
-	ServerIP   util.Address
-	ClientIP   util.Address
+	ServerIP   netaddr.IP
+	ClientIP   netaddr.IP
 	ClientPort uint16
 	// ConnectionType will be either TCP or UDP
 	Protocol uint8

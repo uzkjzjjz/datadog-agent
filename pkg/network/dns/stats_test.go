@@ -14,12 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
-
-	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/stretchr/testify/require"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 const (
@@ -28,8 +26,8 @@ const (
 
 func getSampleDNSKey() Key {
 	return Key{
-		ServerIP:   util.AddressFromString("8.8.8.8"),
-		ClientIP:   util.AddressFromString("1.1.1.1"),
+		ServerIP:   netaddr.MustParseIP("8.8.8.8"),
+		ClientIP:   netaddr.MustParseIP("1.1.1.1"),
 		ClientPort: 1000,
 		Protocol:   syscall.IPPROTO_UDP,
 	}

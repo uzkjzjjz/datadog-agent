@@ -13,10 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"inet.af/netaddr"
+
 	"github.com/DataDog/datadog-agent/pkg/network/config"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/google/gopacket"
+	"go4.org/intern"
 )
 
 const (
@@ -109,7 +111,7 @@ func newSocketFilterSnooper(cfg *config.Config, source packetSource) (*socketFil
 }
 
 // Resolve IPs to DNS addresses
-func (s *socketFilterSnooper) Resolve(ips []util.Address) map[util.Address][]string {
+func (s *socketFilterSnooper) Resolve(ips []netaddr.IP) map[netaddr.IP][]*intern.Value {
 	return s.cache.Get(ips)
 }
 
@@ -246,7 +248,7 @@ func (s *socketFilterSnooper) getCachedTranslation() *translation {
 
 	// Recycle buffer if necessary
 	if t.ips == nil || len(t.ips) > maxIPBufferSize {
-		t.ips = make(map[util.Address]time.Time, 30)
+		t.ips = make(map[netaddr.IP]time.Time, 30)
 	}
 	for k := range t.ips {
 		delete(t.ips, k)

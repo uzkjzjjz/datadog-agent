@@ -9,6 +9,8 @@ import (
 	"math"
 	"sync"
 
+	"inet.af/netaddr"
+
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/http"
@@ -30,9 +32,9 @@ type RouteIdx struct {
 	Route model.Route
 }
 
-type ipCache map[util.Address]string
+type ipCache map[netaddr.IP]string
 
-func (ipc ipCache) Get(addr util.Address) string {
+func (ipc ipCache) Get(addr netaddr.IP) string {
 	if v, ok := ipc[addr]; ok {
 		return v
 	}
@@ -201,7 +203,7 @@ func formatAddr(addr util.Address, port uint16, ipc ipCache) *model.Addr {
 		return nil
 	}
 
-	return &model.Addr{Ip: ipc.Get(addr), Port: int32(port)}
+	return &model.Addr{Ip: ipc.Get(addr.NetaddrIP()), Port: int32(port)}
 }
 
 func formatFamily(f network.ConnectionFamily) model.ConnectionFamily {
@@ -258,8 +260,8 @@ func formatIPTranslation(ct *network.IPTranslation, ipc ipCache) *model.IPTransl
 	}
 
 	return &model.IPTranslation{
-		ReplSrcIP:   ipc.Get(ct.ReplSrcIP),
-		ReplDstIP:   ipc.Get(ct.ReplDstIP),
+		ReplSrcIP:   ipc.Get(ct.ReplSrcIP.NetaddrIP()),
+		ReplDstIP:   ipc.Get(ct.ReplDstIP.NetaddrIP()),
 		ReplSrcPort: int32(ct.ReplSrcPort),
 		ReplDstPort: int32(ct.ReplDstPort),
 	}

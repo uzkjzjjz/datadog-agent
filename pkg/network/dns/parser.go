@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/config"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 const maxIPBufferSize = 200
@@ -137,19 +137,19 @@ func (p *dnsParser) ParseInto(data []byte, t *translation, pktInfo *dnsPacketInf
 		switch layer {
 		case layers.LayerTypeIPv4:
 			if pktInfo.pktType == query {
-				pktInfo.key.ClientIP = util.AddressFromNetIP(p.ipv4Payload.SrcIP)
-				pktInfo.key.ServerIP = util.AddressFromNetIP(p.ipv4Payload.DstIP)
+				pktInfo.key.ClientIP, _ = netaddr.FromStdIP(p.ipv4Payload.SrcIP)
+				pktInfo.key.ServerIP, _ = netaddr.FromStdIP(p.ipv4Payload.DstIP)
 			} else {
-				pktInfo.key.ServerIP = util.AddressFromNetIP(p.ipv4Payload.SrcIP)
-				pktInfo.key.ClientIP = util.AddressFromNetIP(p.ipv4Payload.DstIP)
+				pktInfo.key.ServerIP, _ = netaddr.FromStdIP(p.ipv4Payload.SrcIP)
+				pktInfo.key.ClientIP, _ = netaddr.FromStdIP(p.ipv4Payload.DstIP)
 			}
 		case layers.LayerTypeIPv6:
 			if pktInfo.pktType == query {
-				pktInfo.key.ClientIP = util.AddressFromNetIP(p.ipv6Payload.SrcIP)
-				pktInfo.key.ServerIP = util.AddressFromNetIP(p.ipv6Payload.DstIP)
+				pktInfo.key.ClientIP, _ = netaddr.FromStdIP(p.ipv6Payload.SrcIP)
+				pktInfo.key.ServerIP, _ = netaddr.FromStdIP(p.ipv6Payload.DstIP)
 			} else {
-				pktInfo.key.ServerIP = util.AddressFromNetIP(p.ipv6Payload.SrcIP)
-				pktInfo.key.ClientIP = util.AddressFromNetIP(p.ipv6Payload.DstIP)
+				pktInfo.key.ServerIP, _ = netaddr.FromStdIP(p.ipv6Payload.SrcIP)
+				pktInfo.key.ClientIP, _ = netaddr.FromStdIP(p.ipv6Payload.DstIP)
 
 			}
 		case layers.LayerTypeUDP:
@@ -211,7 +211,7 @@ func (p *dnsParser) parseAnswerInto(
 	pktInfo.queryType = QueryType(question.Type)
 	alias := p.extractCNAME(question.Name, dns.Answers)
 	p.extractIPsInto(alias, dns.Answers, t)
-	t.dns = string(bytes.ToLower(question.Name))
+	t.dns = intern.GetByString(string(bytes.ToLower(question.Name)))
 
 	pktInfo.pktType = successfulResponse
 	return nil
@@ -239,7 +239,8 @@ func (*dnsParser) extractIPsInto(alias []byte, records []layers.DNSResourceRecor
 			continue
 		}
 		if bytes.Equal(alias, record.Name) {
-			t.add(util.AddressFromNetIP(record.IP), time.Duration(record.TTL)*time.Second)
+			ip, _ := netaddr.FromStdIP(record.IP)
+			t.add(ip, time.Duration(record.TTL)*time.Second)
 		}
 	}
 }

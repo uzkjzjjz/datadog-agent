@@ -9,19 +9,21 @@
 package dns
 
 import (
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"inet.af/netaddr"
+
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"go4.org/intern"
 )
 
 type reverseDNSCache struct {
 	// Telemetry
 	// Note: these variables are manipulated with sync/atomic. To ensure
-	// that this file can run on a 32 bit system, they must 64-bit aligned.
+	// that this file can run on a 32-bit system, they must 64-bit aligned.
 	// Go will ensure that each struct is 64-bit aligned, so these fields
 	// must always be at the beginning of the struct.
 	length    int64
@@ -32,7 +34,7 @@ type reverseDNSCache struct {
 	oversized int64
 
 	mux  sync.Mutex
-	data map[util.Address]*dnsCacheVal
+	data map[netaddr.IP]*dnsCacheVal
 	exit chan struct{}
 	size int
 
@@ -43,7 +45,7 @@ type reverseDNSCache struct {
 
 func newReverseDNSCache(size int, expirationPeriod time.Duration) *reverseDNSCache {
 	cache := &reverseDNSCache{
-		data:              make(map[util.Address]*dnsCacheVal),
+		data:              make(map[netaddr.IP]*dnsCacheVal),
 		exit:              make(chan struct{}),
 		size:              size,
 		oversizedLogLimit: util.NewLogLimit(10, time.Minute*10),
@@ -85,7 +87,7 @@ func (c *reverseDNSCache) Add(translation *translation) bool {
 		} else {
 			atomic.AddInt64(&c.added, 1)
 			// flag as in use, so mapping survives until next time connections are queried, in case TTL is shorter
-			c.data[addr] = &dnsCacheVal{names: map[string]time.Time{translation.dns: deadline}, inUse: true}
+			c.data[addr] = &dnsCacheVal{names: map[*intern.Value]time.Time{translation.dns: deadline}, inUse: true}
 		}
 	}
 
@@ -95,7 +97,7 @@ func (c *reverseDNSCache) Add(translation *translation) bool {
 	return true
 }
 
-func (c *reverseDNSCache) Get(ips []util.Address) map[util.Address][]string {
+func (c *reverseDNSCache) Get(ips []netaddr.IP) map[netaddr.IP][]*intern.Value {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -108,12 +110,12 @@ func (c *reverseDNSCache) Get(ips []util.Address) map[util.Address][]string {
 	}
 
 	var (
-		resolved   = make(map[util.Address][]string)
-		unresolved = make(map[util.Address]struct{})
-		oversized  = make(map[util.Address]struct{})
+		resolved   = make(map[netaddr.IP][]*intern.Value)
+		unresolved = make(map[netaddr.IP]struct{})
+		oversized  = make(map[netaddr.IP]struct{})
 	)
 
-	collectNamesForIP := func(addr util.Address) {
+	collectNamesForIP := func(addr netaddr.IP) {
 		if _, ok := resolved[addr]; ok {
 			return
 		}
@@ -207,7 +209,7 @@ func (c *reverseDNSCache) Expire(now time.Time) {
 	)
 }
 
-func (c *reverseDNSCache) getNamesForIP(ip util.Address) []string {
+func (c *reverseDNSCache) getNamesForIP(ip netaddr.IP) []*intern.Value {
 	val, ok := c.data[ip]
 	if !ok {
 		return nil
@@ -217,7 +219,7 @@ func (c *reverseDNSCache) getNamesForIP(ip util.Address) []string {
 }
 
 type dnsCacheVal struct {
-	names map[string]time.Time
+	names map[*intern.Value]time.Time
 	// inUse keeps track of whether this dns cache record is currently in use by a connection.
 	// This flag is reset to false every time reverseDnsCache.Get is called.
 	// This flag is only set to true if reverseDNSCache.getNamesForIP returns this struct.
@@ -225,7 +227,7 @@ type dnsCacheVal struct {
 	inUse bool
 }
 
-func (v *dnsCacheVal) merge(name string, deadline time.Time, maxSize int) (rejected bool) {
+func (v *dnsCacheVal) merge(name *intern.Value, deadline time.Time, maxSize int) (rejected bool) {
 	if exp, ok := v.names[name]; ok {
 		if deadline.After(exp) {
 			v.names[name] = deadline
@@ -242,21 +244,20 @@ func (v *dnsCacheVal) merge(name string, deadline time.Time, maxSize int) (rejec
 	return false
 }
 
-func (v *dnsCacheVal) copy() []string {
-	cpy := make([]string, 0, len(v.names))
+func (v *dnsCacheVal) copy() []*intern.Value {
+	cpy := make([]*intern.Value, 0, len(v.names))
 	for n := range v.names {
 		cpy = append(cpy, n)
 	}
-	sort.Strings(cpy)
 	return cpy
 }
 
 type translation struct {
-	dns string
-	ips map[util.Address]time.Time
+	dns *intern.Value
+	ips map[netaddr.IP]time.Time
 }
 
-func (t *translation) add(addr util.Address, ttl time.Duration) {
+func (t *translation) add(addr netaddr.IP, ttl time.Duration) {
 	if _, ok := t.ips[addr]; ok {
 		return
 	}

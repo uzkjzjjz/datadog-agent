@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 var originalConfig = config.Datadog
@@ -172,13 +173,13 @@ func TestSerialization(t *testing.T) {
 				},
 			},
 		},
-		DNS: map[util.Address][]string{
-			util.AddressFromString("172.217.12.145"): {"golang.org"},
+		DNS: map[netaddr.IP][]*intern.Value{
+			netaddr.MustParseIP("172.217.12.145"): {intern.GetByString("golang.org")},
 		},
 		DNSStats: dns.StatsByKeyByNameByType{
 			dns.Key{
-				ClientIP:   util.AddressFromString("10.1.1.1"),
-				ServerIP:   util.AddressFromString("8.8.8.8"),
+				ClientIP:   netaddr.MustParseIP("10.1.1.1"),
+				ServerIP:   netaddr.MustParseIP("8.8.8.8"),
 				ClientPort: uint16(1000),
 				Protocol:   syscall.IPPROTO_UDP,
 			}: map[*intern.Value]map[dns.QueryType]dns.Stats{

@@ -6,9 +6,12 @@
 package debugging
 
 import (
+	"encoding/binary"
+
 	"github.com/DataDog/datadog-agent/pkg/network/http"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/sketches-go/ddsketch"
+	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 // RequestSummary represents a (debug-friendly) aggregated view of requests
@@ -36,7 +39,7 @@ type Stats struct {
 }
 
 // HTTP returns a debug-friendly representation of map[http.Key]http.RequestStats
-func HTTP(stats map[http.Key]http.RequestStats, dns map[util.Address][]string) []RequestSummary {
+func HTTP(stats map[http.Key]http.RequestStats, dns map[netaddr.IP][]*intern.Value) []RequestSummary {
 	all := make([]RequestSummary, 0, len(stats))
 	for k, v := range stats {
 		clientAddr := formatIP(k.SrcIPLow, k.SrcIPHigh)
@@ -76,20 +79,16 @@ func HTTP(stats map[http.Key]http.RequestStats, dns map[util.Address][]string) [
 	return all
 }
 
-func formatIP(low, high uint64) util.Address {
-	// TODO: this is  not correct, but we don't have socket family information
-	// for HTTP at the moment, so given this is purely debugging code I think it's fine
-	// to assume for now that it's only IPv6 if higher order bits are set.
-	if high > 0 || (low>>32) > 0 {
-		return util.V6Address(low, high)
-	}
-
-	return util.V4Address(uint32(low))
+func formatIP(low, high uint64) netaddr.IP {
+	a := [16]byte{}
+	binary.LittleEndian.PutUint64(a[:8], high)
+	binary.LittleEndian.PutUint64(a[8:], low)
+	return netaddr.IPFrom16(a)
 }
 
-func getDNS(dns map[util.Address][]string, addr util.Address) string {
+func getDNS(dns map[netaddr.IP][]*intern.Value, addr netaddr.IP) string {
 	if names := dns[addr]; len(names) > 0 {
-		return names[0]
+		return names[0].Get().(string)
 	}
 
 	return ""

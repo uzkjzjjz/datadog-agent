@@ -15,11 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	"inet.af/netaddr"
+
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/network/dns"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -128,9 +129,9 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 	t.activeBuffer.Reset()
 	t.closedBuffer.Reset()
 
-	ips := make([]util.Address, 0, len(delta.Conns)*2)
+	ips := make([]netaddr.IP, 0, len(delta.Conns)*2)
 	for _, conn := range delta.Conns {
-		ips = append(ips, conn.Source, conn.Dest)
+		ips = append(ips, conn.Source.NetaddrIP(), conn.Dest.NetaddrIP())
 	}
 	names := t.reverseDNS.Resolve(ips)
 	telemetryDelta := t.state.GetTelemetryDelta(clientID, t.getConnTelemetry())

@@ -1231,7 +1231,7 @@ func TestDNSStatsWithMultipleClients(t *testing.T) {
 		DPort:  53,
 	}
 
-	dKey := dns.Key{ClientIP: c.Source, ClientPort: c.SPort, ServerIP: c.Dest, Protocol: getIPProtocol(c.Type)}
+	dKey := dns.Key{ClientIP: c.Source.NetaddrIP(), ClientPort: c.SPort, ServerIP: c.Dest.NetaddrIP(), Protocol: getIPProtocol(c.Type)}
 
 	getStats := func() dns.StatsByKeyByNameByType {
 		var d = intern.GetByString("foo.com")

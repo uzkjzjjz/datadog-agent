@@ -20,8 +20,8 @@ func DNSKey(c *ConnectionStats) (dns.Key, bool) {
 	serverIP, _ := GetNATRemoteAddress(*c)
 	clientIP, clientPort := GetNATLocalAddress(*c)
 	key := dns.Key{
-		ServerIP:   serverIP,
-		ClientIP:   clientIP,
+		ServerIP:   serverIP.NetaddrIP(),
+		ClientIP:   clientIP.NetaddrIP(),
 		ClientPort: clientPort,
 	}
 	switch c.Type {

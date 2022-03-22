@@ -15,15 +15,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"inet.af/netaddr"
+
+	"go4.org/intern"
+
 	"github.com/stretchr/testify/assert"
 )
 
 var disableAutomaticExpiration = 1 * time.Hour
 
 func TestMultipleIPsForSameName(t *testing.T) {
-	datadog1 := util.AddressFromString("52.85.98.155")
-	datadog2 := util.AddressFromString("52.85.98.143")
+	datadog1 := netaddr.MustParseIP("52.85.98.155")
+	datadog2 := netaddr.MustParseIP("52.85.98.143")
 
 	datadogIPs := newTranslation("datadoghq.com")
 	datadogIPs.add(datadog1, 1*time.Minute)
@@ -32,12 +35,12 @@ func TestMultipleIPsForSameName(t *testing.T) {
 	cache := newReverseDNSCache(100, disableAutomaticExpiration)
 	cache.Add(datadogIPs)
 
-	localhost := util.AddressFromString("127.0.0.1")
-	connections := []util.Address{localhost, datadog1, datadog2}
+	localhost := netaddr.MustParseIP("127.0.0.1")
+	connections := []netaddr.IP{localhost, datadog1, datadog2}
 	actual := cache.Get(connections)
-	expected := map[util.Address][]string{
-		datadog1: {"datadoghq.com"},
-		datadog2: {"datadoghq.com"},
+	expected := map[netaddr.IP][]*intern.Value{
+		datadog1: {intern.GetByString("datadoghq.com")},
+		datadog2: {intern.GetByString("datadoghq.com")},
 	}
 	assert.Equal(t, expected, actual)
 }
@@ -45,7 +48,7 @@ func TestMultipleIPsForSameName(t *testing.T) {
 func TestMultipleNamesForSameIP(t *testing.T) {
 	cache := newReverseDNSCache(100, disableAutomaticExpiration)
 
-	raddr := util.AddressFromString("172.022.116.123")
+	raddr := netaddr.MustParseIP("172.022.116.123")
 	tr1 := newTranslation("i-03e46c9ff42db4abc")
 	tr1.add(raddr, 1*time.Minute)
 	tr2 := newTranslation("ip-172-22-116-123.ec2.internal")
@@ -54,12 +57,12 @@ func TestMultipleNamesForSameIP(t *testing.T) {
 	cache.Add(tr1)
 	cache.Add(tr2)
 
-	localhost := util.AddressFromString("127.0.0.1")
-	connections := []util.Address{localhost, raddr}
+	localhost := netaddr.MustParseIP("127.0.0.1")
+	connections := []netaddr.IP{localhost, raddr}
 
 	names := cache.Get(connections)
 	expected := []string{"i-03e46c9ff42db4abc", "ip-172-22-116-123.ec2.internal"}
-	assert.ElementsMatch(t, expected, names[raddr])
+	assert.ElementsMatch(t, expected, internStrings(names[raddr]))
 }
 
 func TestDNSCacheExpiration(t *testing.T) {
@@ -67,18 +70,18 @@ func TestDNSCacheExpiration(t *testing.T) {
 	cache := newReverseDNSCache(1000, disableAutomaticExpiration)
 	t1 := time.Now()
 
-	laddr1 := util.AddressFromString("127.0.0.1")
-	raddr1 := util.AddressFromString("192.168.0.1") // host-a
+	laddr1 := netaddr.MustParseIP("127.0.0.1")
+	raddr1 := netaddr.MustParseIP("192.168.0.1") // host-a
 	hostA := newTranslation("host-a")
 	hostA.add(raddr1, ttl+20*time.Millisecond)
 
-	laddr2 := util.AddressFromString("127.0.0.1")
-	raddr2 := util.AddressFromString("192.168.0.2") // host-b
+	laddr2 := netaddr.MustParseIP("127.0.0.1")
+	raddr2 := netaddr.MustParseIP("192.168.0.2") // host-b
 	hostB := newTranslation("host-b")
 	hostB.add(raddr2, ttl+20*time.Millisecond)
 
-	laddr3 := util.AddressFromString("127.0.0.1")
-	raddr3 := util.AddressFromString("192.168.0.3") // host-c
+	laddr3 := netaddr.MustParseIP("127.0.0.1")
+	raddr3 := netaddr.MustParseIP("192.168.0.3") // host-c
 	hostC := newTranslation("host-c")
 	hostC.add(raddr3, ttl)
 
@@ -93,7 +96,7 @@ func TestDNSCacheExpiration(t *testing.T) {
 	assert.Equal(t, 3, cache.Len())
 
 	// Bump host-a and host-b in-use flag
-	stats := []util.Address{
+	stats := []netaddr.IP{
 		laddr1, raddr1,
 		laddr2, raddr2,
 	}
@@ -104,14 +107,14 @@ func TestDNSCacheExpiration(t *testing.T) {
 	cache.Expire(t3)
 	assert.Equal(t, 2, cache.Len())
 
-	stats = []util.Address{
+	stats = []netaddr.IP{
 		laddr1, raddr1,
 		laddr2, raddr2,
 		laddr3, raddr3,
 	}
 	names := cache.Get(stats)
-	assert.Contains(t, names[raddr1], "host-a")
-	assert.Contains(t, names[raddr2], "host-b")
+	assert.Contains(t, internStrings(names[raddr1]), "host-a")
+	assert.Contains(t, internStrings(names[raddr2]), "host-b")
 	assert.Nil(t, names[raddr3])
 
 	// entries should still be around after expiration that are referenced
@@ -120,7 +123,7 @@ func TestDNSCacheExpiration(t *testing.T) {
 	assert.Equal(t, 2, cache.Len())
 
 	// All entries should be allowed to expire now
-	cache.Get([]util.Address{})
+	cache.Get([]netaddr.IP{})
 	cache.Expire(t4)
 	assert.Equal(t, 0, cache.Len())
 }
@@ -131,7 +134,7 @@ func TestDNSCacheTelemetry(t *testing.T) {
 	t1 := time.Now()
 
 	translation := newTranslation("host-a")
-	translation.add(util.AddressFromString("192.168.0.1"), ttl)
+	translation.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(translation)
 
 	expected := map[string]int64{
@@ -144,11 +147,11 @@ func TestDNSCacheTelemetry(t *testing.T) {
 	}
 	assert.Equal(t, expected, cache.Stats())
 
-	conns := []util.Address{
-		util.AddressFromString("127.0.0.1"),
-		util.AddressFromString("192.168.0.1"),
-		util.AddressFromString("127.0.0.1"),
-		util.AddressFromString("192.168.0.2"),
+	conns := []netaddr.IP{
+		netaddr.MustParseIP("127.0.0.1"),
+		netaddr.MustParseIP("192.168.0.1"),
+		netaddr.MustParseIP("127.0.0.1"),
+		netaddr.MustParseIP("192.168.0.2"),
 	}
 
 	// Attempt to resolve IPs
@@ -165,7 +168,7 @@ func TestDNSCacheTelemetry(t *testing.T) {
 
 	// Expire IP
 	t2 := t1.Add(ttl + 1*time.Millisecond)
-	cache.Get([]util.Address{})
+	cache.Get([]netaddr.IP{})
 	cache.Expire(t2)
 	expected = map[string]int64{
 		"lookups":   3,
@@ -182,68 +185,68 @@ func TestDNSCacheMerge(t *testing.T) {
 	ttl := 100 * time.Millisecond
 	cache := newReverseDNSCache(1000, disableAutomaticExpiration)
 
-	conns := []util.Address{
-		util.AddressFromString("127.0.0.1"),
-		util.AddressFromString("192.168.0.1"),
+	conns := []netaddr.IP{
+		netaddr.MustParseIP("127.0.0.1"),
+		netaddr.MustParseIP("192.168.0.1"),
 	}
 
 	t1 := newTranslation("host-b")
-	t1.add(util.AddressFromString("192.168.0.1"), ttl)
+	t1.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(t1)
 	res := cache.Get(conns)
-	assert.Equal(t, []string{"host-b"}, res[util.AddressFromString("192.168.0.1")])
+	assert.Equal(t, []string{"host-b"}, internStrings(res[netaddr.MustParseIP("192.168.0.1")]))
 
 	t2 := newTranslation("host-a")
-	t2.add(util.AddressFromString("192.168.0.1"), ttl)
+	t2.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(t2)
 
 	t3 := newTranslation("host-b")
-	t3.add(util.AddressFromString("192.168.0.1"), ttl)
+	t3.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(t3)
 
 	res = cache.Get(conns)
 
-	assert.Equal(t, []string{"host-a", "host-b"}, res[util.AddressFromString("192.168.0.1")])
+	assert.ElementsMatch(t, []string{"host-a", "host-b"}, internStrings(res[netaddr.MustParseIP("192.168.0.1")]))
 }
 
 func TestDNSCacheMerge_MixedCaseNames(t *testing.T) {
 	ttl := 100 * time.Millisecond
 	cache := newReverseDNSCache(1000, disableAutomaticExpiration)
 
-	conns := []util.Address{
-		util.AddressFromString("192.168.0.1"),
+	conns := []netaddr.IP{
+		netaddr.MustParseIP("192.168.0.1"),
 	}
 
 	tr := newTranslation("host.name.com")
-	tr.add(util.AddressFromString("192.168.0.1"), ttl)
+	tr.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(tr)
 
 	tr = newTranslation("host.NaMe.com")
-	tr.add(util.AddressFromString("192.168.0.1"), ttl)
+	tr.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(tr)
 
 	tr = newTranslation("HOST.NAME.CoM")
-	tr.add(util.AddressFromString("192.168.0.1"), ttl)
+	tr.add(netaddr.MustParseIP("192.168.0.1"), ttl)
 	cache.Add(tr)
 
 	res := cache.Get(conns)
-	assert.Equal(t, []string{"host.name.com"}, res[util.AddressFromString("192.168.0.1")])
+	assert.Equal(t, []string{"host.name.com"}, internStrings(res[netaddr.MustParseIP("192.168.0.1")]))
 }
 
 func TestGetOversizedDNS(t *testing.T) {
 	cache := newReverseDNSCache(1000, time.Minute)
 	cache.maxDomainsPerIP = 10
-	addr := util.AddressFromString("192.168.0.1")
+	addr := netaddr.MustParseIP("192.168.0.1")
 	exp := time.Now().Add(1 * time.Hour)
 
 	for i := 0; i < 5; i++ {
 		cache.Add(&translation{
-			dns: fmt.Sprintf("%d.host.com", i),
-			ips: map[util.Address]time.Time{addr: exp},
+			dns: intern.GetByString(fmt.Sprintf("%d.host.com", i)),
+			ips: map[netaddr.IP]time.Time{addr: exp},
 		})
 	}
 
-	conns := []util.Address{addr}
+	conns := []netaddr.IP{addr}
 
 	result := cache.Get(conns)
 	assert.Len(t, result[addr], 5)
@@ -251,12 +254,12 @@ func TestGetOversizedDNS(t *testing.T) {
 
 	for i := 5; i < 100; i++ {
 		cache.Add(&translation{
-			dns: fmt.Sprintf("%d.host.com", i),
-			ips: map[util.Address]time.Time{addr: exp},
+			dns: intern.GetByString(fmt.Sprintf("%d.host.com", i)),
+			ips: map[netaddr.IP]time.Time{addr: exp},
 		})
 	}
 
-	conns = []util.Address{addr}
+	conns = []netaddr.IP{addr}
 	result = cache.Get(conns)
 	assert.Len(t, result[addr], 0)
 	assert.Len(t, cache.data[addr].names, 10)
@@ -268,7 +271,7 @@ func BenchmarkDNSCacheGet(b *testing.B) {
 	// Instantiate cache and add numIPs to it
 	var (
 		cache   = newReverseDNSCache(numIPs, disableAutomaticExpiration)
-		added   = make([]util.Address, 0, numIPs)
+		added   = make([]netaddr.IP, 0, numIPs)
 		addrGen = randomAddressGen()
 	)
 	for i := 0; i < numIPs; i++ {
@@ -292,23 +295,23 @@ func BenchmarkDNSCacheGet(b *testing.B) {
 	}
 }
 
-func randomAddressGen() func() util.Address {
-	b := make([]byte, 4)
-	return func() util.Address {
+func randomAddressGen() func() netaddr.IP {
+	b := [4]byte{}
+	return func() netaddr.IP {
 		for {
-			if _, err := rand.Read(b); err != nil {
+			if _, err := rand.Read(b[:]); err != nil {
 				continue
 			}
 
-			return util.V4AddressFromBytes(b)
+			return netaddr.IPFrom4(b)
 		}
 	}
 }
 
-func payloadGen(size int, resolveRatio float64, added []util.Address) []util.Address {
+func payloadGen(size int, resolveRatio float64, added []netaddr.IP) []netaddr.IP {
 	var (
 		addrGen = randomAddressGen()
-		stats   = make([]util.Address, size)
+		stats   = make([]netaddr.IP, size)
 	)
 
 	for i := 0; i < size; i++ {
@@ -325,7 +328,15 @@ func payloadGen(size int, resolveRatio float64, added []util.Address) []util.Add
 
 func newTranslation(domain string) *translation {
 	return &translation{
-		dns: strings.ToLower(domain),
-		ips: make(map[util.Address]time.Time),
+		dns: intern.GetByString(strings.ToLower(domain)),
+		ips: make(map[netaddr.IP]time.Time),
 	}
+}
+
+func internStrings(arr []*intern.Value) []string {
+	strs := make([]string, len(arr))
+	for i, a := range arr {
+		strs[i] = a.Get().(string)
+	}
+	return strs
 }

@@ -9,6 +9,8 @@ import (
 	"encoding/binary"
 	"net"
 	"sync"
+
+	"inet.af/netaddr"
 )
 
 // Address is an IP abstraction that is family (v4/v6) agnostic
@@ -18,6 +20,7 @@ type Address interface {
 	String() string
 	IsLoopback() bool
 	Len() int
+	NetaddrIP() netaddr.IP
 }
 
 // AddressFromNetIP returns an Address from a provided net.IP
@@ -108,7 +111,11 @@ func (a v4Address) IsLoopback() bool {
 
 // Len returns the number of bytes required to represent this IP
 func (a v4Address) Len() int {
-	return 4
+	return net.IPv4len
+}
+
+func (a v4Address) NetaddrIP() netaddr.IP {
+	return netaddr.IPFrom4(a)
 }
 
 type v6Address [16]byte
@@ -150,7 +157,11 @@ func (a v6Address) IsLoopback() bool {
 
 // Len returns the number of bytes required to represent this IP
 func (a v6Address) Len() int {
-	return 16
+	return net.IPv6len
+}
+
+func (a v6Address) NetaddrIP() netaddr.IP {
+	return netaddr.IPFrom16(a)
 }
 
 // IPBufferPool is meant to be used in conjunction with `NetIPFromAddress`

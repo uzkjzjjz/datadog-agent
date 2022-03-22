@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"inet.af/netaddr"
+
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
@@ -32,7 +34,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	manager "github.com/DataDog/ebpf-manager"
@@ -336,9 +337,9 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 
 	t.retryConntrack(delta.Conns)
 
-	ips := make([]util.Address, 0, len(delta.Conns)*2)
+	ips := make([]netaddr.IP, 0, len(delta.Conns)*2)
 	for _, conn := range delta.Conns {
-		ips = append(ips, conn.Source, conn.Dest)
+		ips = append(ips, conn.Source.NetaddrIP(), conn.Dest.NetaddrIP())
 	}
 	names := t.reverseDNS.Resolve(ips)
 	ctm := t.state.GetTelemetryDelta(clientID, t.getConnTelemetry(len(active)))

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/config"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/google/gopacket/layers"
 	"github.com/miekg/dns"
@@ -25,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 func skipIfDNSNotSupported(t *testing.T) {
@@ -36,19 +36,19 @@ func skipIfDNSNotSupported(t *testing.T) {
 }
 
 func checkSnooping(t *testing.T, destIP string, destName string, reverseDNS *dnsMonitor) {
-	destAddr := util.AddressFromString(destIP)
+	destAddr := netaddr.MustParseIP(destIP)
 	srcIP := "127.0.0.1"
-	srcAddr := util.AddressFromString(srcIP)
+	srcAddr := netaddr.MustParseIP(srcIP)
 
 	require.Eventually(t, func() bool {
 		return reverseDNS.cache.Len() >= 1
 	}, 1*time.Second, 10*time.Millisecond)
 
 	// Verify that the IP from the connections above maps to the right name
-	payload := []util.Address{srcAddr, destAddr}
+	payload := []netaddr.IP{srcAddr, destAddr}
 	names := reverseDNS.Resolve(payload)
 	require.Len(t, names, 1)
-	assert.Contains(t, names[destAddr], destName)
+	assert.Contains(t, internStrings(names[destAddr]), destName)
 
 	// Verify telemetry
 	stats := reverseDNS.GetStats()
@@ -190,9 +190,9 @@ func getKey(
 	protocol uint8,
 ) Key {
 	return Key{
-		ClientIP:   util.AddressFromString(qIP),
+		ClientIP:   netaddr.MustParseIP(qIP),
 		ClientPort: uint16(qPort),
-		ServerIP:   util.AddressFromString(sIP),
+		ServerIP:   netaddr.MustParseIP(sIP),
 		Protocol:   protocol,
 	}
 }

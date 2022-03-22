@@ -17,6 +17,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/stretchr/testify/assert"
 	"go4.org/intern"
+	"inet.af/netaddr"
 )
 
 func TestFormatConnectionDNS(t *testing.T) {
@@ -36,8 +37,8 @@ func TestFormatConnectionDNS(t *testing.T) {
 		},
 		DNSStats: dns.StatsByKeyByNameByType{
 			dns.Key{
-				ClientIP:   util.AddressFromString("10.1.1.1"),
-				ServerIP:   util.AddressFromString("8.8.8.8"),
+				ClientIP:   netaddr.MustParseIP("10.1.1.1"),
+				ServerIP:   netaddr.MustParseIP("8.8.8.8"),
 				ClientPort: uint16(1000),
 				Protocol:   syscall.IPPROTO_UDP,
 			}: map[*intern.Value]map[dns.QueryType]dns.Stats{
@@ -140,8 +141,8 @@ func TestDNSPIDCollision(t *testing.T) {
 		},
 		DNSStats: dns.StatsByKeyByNameByType{
 			dns.Key{
-				ClientIP:   util.AddressFromString("10.1.1.1"),
-				ServerIP:   util.AddressFromString("8.8.8.8"),
+				ClientIP:   netaddr.MustParseIP("10.1.1.1"),
+				ServerIP:   netaddr.MustParseIP("8.8.8.8"),
 				ClientPort: uint16(1000),
 				Protocol:   syscall.IPPROTO_UDP,
 			}: map[*intern.Value]map[dns.QueryType]dns.Stats{
