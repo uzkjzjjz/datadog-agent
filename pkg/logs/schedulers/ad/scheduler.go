@@ -59,6 +59,7 @@ func (s *Scheduler) Stop() {
 // An entity represents a unique identifier for a process that be reused to query logs.
 func (s *Scheduler) Schedule(configs []integration.Config) {
 	for _, config := range configs {
+		log.Warnf("Got %#v", config)
 		if !config.IsLogConfig() {
 			continue
 		}
@@ -75,6 +76,7 @@ func (s *Scheduler) Schedule(configs []integration.Config) {
 				continue
 			}
 			for _, source := range sources {
+				log.Warnf("Creating Source %#v with Config %#v", source, source.Config)
 				s.mgr.AddSource(source)
 				s.sourcesByServiceID[source.Config.Identifier] = source
 			}
@@ -94,6 +96,7 @@ func (s *Scheduler) Schedule(configs []integration.Config) {
 				log.Warnf("Invalid service: %v", err)
 				continue
 			}
+			log.Warnf("Creating Service %#v", service)
 			s.mgr.AddService(service)
 		default:
 			// invalid integration config
