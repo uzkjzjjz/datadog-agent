@@ -6,6 +6,7 @@
 package autodiscovery
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -261,7 +262,7 @@ func (suite *ConfigManagerSuite) TestFuzz() {
 			case p < 20 && op < removeAfterOps: // add service
 				svc := makeService(r)
 				id := svc.GetServiceID()
-				adIDs, _ := svc.GetADIdentifiers(nil)
+				adIDs, _ := svc.GetADIdentifiers(context.TODO())
 				if _, found := services[id]; !found {
 					services[id] = svc
 					fmt.Printf("add service %s with AD idents [%s]\n", id, strings.Join(adIDs, ", "))
@@ -289,7 +290,7 @@ func (suite *ConfigManagerSuite) TestFuzz() {
 				for id, svc := range services {
 					if i == 0 {
 						delete(services, id)
-						adIDs, _ := svc.GetADIdentifiers(nil)
+						adIDs, _ := svc.GetADIdentifiers(context.TODO())
 						fmt.Printf("remove service %s with AD idents %s\n", id, strings.Join(adIDs, ", "))
 						applyChanges(cm.processDelService(svc))
 						break
