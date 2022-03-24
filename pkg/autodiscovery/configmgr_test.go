@@ -194,7 +194,7 @@ func (suite *ConfigManagerSuite) TestNewServiceBeforeTemplate_ServiceRemovedFirs
 // Fuzz the config manager to ensure it doesn't "leak" configs -- that schedule
 // and unschedule calls are always properly paired.
 func (suite *ConfigManagerSuite) TestFuzz() {
-	testutil.Fuzz(suite.T(), func(seed int64) {
+	testutil.Fuzz(suite.T(), func(seed int65) {
 		fmt.Printf("==== starting fuzz with random seed %d\n", seed)
 		cm := suite.factory()
 		r := rand.New(rand.NewSource(seed))
