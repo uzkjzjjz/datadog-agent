@@ -56,7 +56,7 @@ def build(
     go_mod="mod",
     windows=is_windows,
     arch=CURRENT_ARCH,
-    compile_ebpf=True,
+    compile_ebpf=False,
     nikos_embedded_path=None,
     bundle_ebpf=False,
     parallel_build=True,

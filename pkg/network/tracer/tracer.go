@@ -196,22 +196,22 @@ func newConntracker(cfg *config.Config) (netlink.Conntracker, error) {
 
 	var c netlink.Conntracker
 	var err error
-	if cfg.EnableRuntimeCompiler {
-		c, err = NewEBPFConntracker(cfg)
-		if err == nil {
-			return c, nil
-		}
+	// if cfg.EnableRuntimeCompiler {
+	// 	c, err = NewEBPFConntracker(cfg)
+	// 	if err == nil {
+	// 		return c, nil
+	// 	}
 
-		if !cfg.AllowPrecompiledFallback {
-			if cfg.IgnoreConntrackInitFailure {
-				log.Warnf("could not initialize ebpf conntrack, tracer will continue without NAT tracking: %s", err)
-				return netlink.NewNoOpConntracker(), nil
-			}
-			return nil, fmt.Errorf("error compiling ebpf conntracker: %s. set network_config.ignore_conntrack_init_failure to true to ignore conntrack failures on startup", err)
-		}
+	// 	if !cfg.AllowPrecompiledFallback {
+	// 		if cfg.IgnoreConntrackInitFailure {
+	// 			log.Warnf("could not initialize ebpf conntrack, tracer will continue without NAT tracking: %s", err)
+	// 			return netlink.NewNoOpConntracker(), nil
+	// 		}
+	// 		return nil, fmt.Errorf("error compiling ebpf conntracker: %s. set network_config.ignore_conntrack_init_failure to true to ignore conntrack failures on startup", err)
+	// 	}
 
-		log.Warnf("error compiling ebpf conntracker, falling back to netlink version: %s", err)
-	}
+	// 	log.Warnf("error compiling ebpf conntracker, falling back to netlink version: %s", err)
+	// }
 
 	c, err = netlink.NewConntracker(cfg)
 	if err != nil {
