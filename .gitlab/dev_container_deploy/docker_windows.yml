@@ -33,6 +33,7 @@ dev_branch-a7-windows:
     - docker_build_agent7_windows2022_core_jmx
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-7"
@@ -61,6 +62,7 @@ dev_branch-a6-windows:
     - docker_build_agent6_windows2022_core
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-6"
@@ -95,6 +97,7 @@ dev_master-a7-windows:
     - docker_build_agent7_windows2022_core_jmx
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-7"
@@ -123,6 +126,7 @@ dev_master-a6-windows:
     - docker_build_agent6_windows2022_core
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-6"
@@ -157,6 +161,7 @@ dev_nightly-a7-windows:
     - docker_build_agent7_windows2022_core_jmx
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-7"
@@ -185,6 +190,7 @@ dev_nightly-a6-windows:
     - docker_build_agent6_windows2022_core
   variables:
     IMG_REGISTRIES: dev
+    IMG_SIGNING: "false"
   parallel:
     matrix:
       - IMG_VARIABLES: "BASE=${SRC_AGENT}:v${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}-6"
