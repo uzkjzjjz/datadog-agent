@@ -354,7 +354,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.21.12 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/smira/go-ftp-protocol v0.0.0-20140829150050-066b75c2b70d // indirect
-	github.com/smira/go-xz v0.0.0-20150414201226-0c531f070014
+	github.com/smira/go-xz v0.0.0-20150414201226-0c531f070014 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
