@@ -1,8 +1,10 @@
 ---
 .rtloader_tests:
   stage: source_test
+  variables:
+    GIMME_GO_VERSION: 1.17.6
   before_script:
-    - bash /entrypoint.sh
+    - source /entrypoint.sh
     - !reference [.retrieve_linux_go_deps]
     - source /root/.bashrc && conda activate $CONDA_ENV
     - python3 -m pip install wheel
@@ -19,6 +21,7 @@
   variables:
     FLAVORS: '--flavors base'
   script:
+    - source /entrypoint.sh
     - !reference [.retrieve_linux_go_tools_deps]
     - inv -e install-tools
     - inv -e test $FLAVORS --race --profile --rerun-fails=2 --python-runtimes "$PYTHON_RUNTIMES" --cpus 4 $EXTRA_OPTS --save-result-json test_output.json --junit-tar "junit-${CI_JOB_NAME}.tgz"
@@ -41,6 +44,7 @@ tests_deb-x64-py2:
   variables:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
+    DD_TARGET_ARCH: amd64
 
 tests_deb-x64-py3:
   extends:
@@ -52,6 +56,7 @@ tests_deb-x64-py3:
   variables:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
+    DD_TARGET_ARCH: amd64
 
 tests_flavor_iot_deb-x64:
   extends:
@@ -64,6 +69,7 @@ tests_flavor_iot_deb-x64:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
     FLAVORS: '--flavors iot'
+    DD_TARGET_ARCH: amd64
 
 tests_flavor_dogstatsd_deb-x64:
   extends:
@@ -76,6 +82,7 @@ tests_flavor_dogstatsd_deb-x64:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
     FLAVORS: '--flavors dogstatsd'
+    DD_TARGET_ARCH: amd64
 
 # Exclude systemd because it cannot succeed on Centos 6: the image doesn't have the shared object required by
 # https://github.com/coreos/go-systemd/blob/c8cc474ba8655dfbdb0ac7fcc09b7faf5b643caf/sdjournal/functions.go#L46
@@ -91,6 +98,7 @@ tests_rpm-x64-py2:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
     EXTRA_OPTS: '--build-exclude=systemd'
+    DD_TARGET_ARCH: amd64
 
 tests_rpm-x64-py3:
   extends:
@@ -103,6 +111,7 @@ tests_rpm-x64-py3:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
     EXTRA_OPTS: '--build-exclude=systemd'
+    DD_TARGET_ARCH: amd64
 
 tests_deb-arm64-py2:
   extends: .rtloader_tests
@@ -114,6 +123,7 @@ tests_deb-arm64-py2:
   variables:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
+    DD_TARGET_ARCH: aarch64
 
 tests_deb-arm64-py3:
   extends:
@@ -125,6 +135,7 @@ tests_deb-arm64-py3:
   variables:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
+    DD_TARGET_ARCH: aarch64
 
 tests_rpm-arm64-py2:
   extends: .rtloader_tests
@@ -136,6 +147,7 @@ tests_rpm-arm64-py2:
   variables:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
+    DD_TARGET_ARCH: aarch64
 
 tests_rpm-arm64-py3:
   extends:
@@ -147,6 +159,7 @@ tests_rpm-arm64-py3:
   variables:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
+    DD_TARGET_ARCH: aarch64
 
 # Check consistency of go.mod file with project imports
 go_mod_tidy_check:
@@ -154,8 +167,11 @@ go_mod_tidy_check:
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/deb_x64:$DATADOG_AGENT_BUILDIMAGES
   tags: ["arch:amd64"]
   needs: ["go_deps"]
+  variables:
+    GIMME_GO_VERSION: 1.17.6
+    DD_TARGET_ARCH: amd64
   before_script:
-    - bash /entrypoint.sh
+    - source /entrypoint.sh
     - !reference [.retrieve_linux_go_deps]
     - python3 -m pip install -r requirements.txt
   script:
