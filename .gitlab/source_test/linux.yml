@@ -2,6 +2,7 @@
 .rtloader_tests:
   stage: source_test
   before_script:
+    - bash /entrypoint.sh
     - !reference [.retrieve_linux_go_deps]
     - source /root/.bashrc && conda activate $CONDA_ENV
     - python3 -m pip install wheel
@@ -154,6 +155,7 @@ go_mod_tidy_check:
   tags: ["arch:amd64"]
   needs: ["go_deps"]
   before_script:
+    - bash /entrypoint.sh
     - !reference [.retrieve_linux_go_deps]
     - python3 -m pip install -r requirements.txt
   script:
