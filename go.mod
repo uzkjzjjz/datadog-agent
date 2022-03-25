@@ -67,7 +67,7 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.1.0
 	github.com/DataDog/datadog-operator v0.5.0-rc.2.0.20210402083916-25ba9a22e67a
 	github.com/DataDog/ebpf v0.0.0-20220301203322-3fc9ab3b8daf
-	github.com/DataDog/ebpf-manager v0.0.0-20220223090948-29871766cdd0
+	github.com/DataDog/ebpf-manager v0.0.0-20220324104039-19ad7d79646d
 	github.com/DataDog/gohai v0.0.0-20220121142033-4006c7a9c63d
 	github.com/DataDog/gopsutil v0.0.0-20220308095538-d086941833e3
 	github.com/DataDog/nikos v1.7.5
@@ -113,7 +113,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/florianl/go-conntrack v0.2.0
 	github.com/freddierice/go-losetup v0.0.0-20170407175016-fc9adea44124
-	github.com/go-ini/ini v1.66.3
+	github.com/go-ini/ini v1.66.4
 	github.com/go-ole/go-ole v1.2.6
 	github.com/go-openapi/spec v0.20.4
 	github.com/gobwas/glob v0.2.3
@@ -153,7 +153,7 @@ require (
 	github.com/moby/sys/mountinfo v0.5.0
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/open-policy-agent/opa v0.37.2
+	github.com/open-policy-agent/opa v0.38.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.47.0
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/openshift/api v0.0.0-20190924102528-32369d4db2ad
@@ -175,7 +175,7 @@ require (
 	github.com/tinylib/msgp v1.1.6
 	github.com/twmb/murmur3 v1.1.6
 	github.com/urfave/negroni v1.0.0
-	github.com/vishvananda/netlink v1.1.1-0.20210508154835-66ddd91f7ddd
+	github.com/vishvananda/netlink v1.1.1-0.20220316193741-b112db377d18
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74
 	github.com/vmihailenco/msgpack/v4 v4.3.12
 	github.com/xeipuuv/gojsonschema v1.2.0
