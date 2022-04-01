@@ -341,10 +341,16 @@ func fmtProcesses(
 			ioStat = formatIO(fp.Stats, lastProcs[fp.Pid].Stats.IOStat, lastRun)
 		}
 
+		command := formatCommand(fp)
+		tags, err := getProcessTags(fp.Pid, command)
+		if err != nil {
+			log.Errorf("failed to collect process %d tags: %s", fp.Pid, err)
+		}
+
 		proc := &model.Process{
 			Pid:                    fp.Pid,
 			NsPid:                  fp.NsPid,
-			Command:                formatCommand(fp),
+			Command:                command,
 			User:                   formatUser(fp),
 			Memory:                 formatMemory(fp.Stats),
 			Cpu:                    formatCPU(fp.Stats, lastProcs[fp.Pid].Stats, syst2, syst1),
@@ -356,6 +362,7 @@ func fmtProcesses(
 			InvoluntaryCtxSwitches: uint64(fp.Stats.CtxSwitches.Involuntary),
 			ContainerId:            ctrByProc[int(fp.Pid)],
 			Networks:               formatNetworks(connsByPID[fp.Pid], connCheckIntervalS),
+			Tags:                   tags,
 		}
 		_, ok := procsByCtr[proc.ContainerId]
 		if !ok {

@@ -54,7 +54,7 @@ require (
 	code.cloudfoundry.org/bbs v0.0.0-20200403215808-d7bc971db0db
 	code.cloudfoundry.org/garden v0.0.0-20210208153517-580cadd489d2
 	code.cloudfoundry.org/lager v2.0.0+incompatible
-	github.com/DataDog/agent-payload/v5 v5.0.19
+	github.com/DataDog/agent-payload/v5 v5.0.20-0.20220331183924-800109358c40
 	github.com/DataDog/btf-internals v0.0.0-20220317155923-e1a7b770b6a1
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.35.0-rc.4
 	github.com/DataDog/datadog-agent/pkg/otlp/model v0.35.0-rc.4
@@ -252,7 +252,7 @@ require (
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/awalterschulze/gographviz v2.0.1+incompatible // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blang/semver v3.5.1+incompatible // indirect
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect

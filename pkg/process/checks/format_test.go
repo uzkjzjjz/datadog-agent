@@ -67,6 +67,7 @@ func TestHumanFormatProcess(t *testing.T) {
 						ReadBytesRate:  100.0,
 						WriteBytesRate: 200.0,
 					},
+					Tags: []string{"service:foo"},
 				},
 			},
 			Containers: []*model.Container{
@@ -141,6 +142,7 @@ Processes
   IO:
     Read:  100 B/s 10 Ops/s
     Write: 200 B/s 30 Ops/s
+  Tags: service:foo
 
 Containers
 ==========

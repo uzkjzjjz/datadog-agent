@@ -34,4 +34,5 @@ Processes
     Read:  {{ io .ReadBytesRate }} B/s {{ io .ReadRate }} Ops/s
     Write: {{ io .WriteBytesRate }} B/s {{ io .WriteRate }} Ops/s
 {{- end }}
+  Tags: {{range $idx, $tag := .Tags}}{{if $idx}},{{end}}{{$tag}}{{end}}
 {{- end }}
