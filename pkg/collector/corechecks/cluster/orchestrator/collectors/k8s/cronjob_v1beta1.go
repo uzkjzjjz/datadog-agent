@@ -17,62 +17,51 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 
 	"k8s.io/apimachinery/pkg/labels"
-	rbacv1Informers "k8s.io/client-go/informers/rbac/v1"
-	rbacv1Listers "k8s.io/client-go/listers/rbac/v1"
+	batchv1Informers "k8s.io/client-go/informers/batch/v1beta1"
+	batchv1Listers "k8s.io/client-go/listers/batch/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
-// ClusterRoleBindingCollector is a collector for Kubernetes ClusterRoleBindings.
-type ClusterRoleBindingCollector struct {
-	informer  rbacv1Informers.ClusterRoleBindingInformer
-	lister    rbacv1Listers.ClusterRoleBindingLister
+// CronJobV1Beta1Collector is a collector for Kubernetes CronJobs.
+type CronJobV1Beta1Collector struct {
+	informer  batchv1Informers.CronJobInformer
+	lister    batchv1Listers.CronJobLister
 	metadata  *collectors.CollectorMetadata
 	processor *processors.Processor
 }
 
-// NewClusterRoleBindingCollectorVersions builds the group of collector versions.
-func NewClusterRoleBindingCollectorVersions() collectors.CollectorVersions {
-	return collectors.NewCollectorVersions(
-		NewClusterRoleBindingCollector(),
-	)
-}
-
-// NewClusterRoleBindingCollector creates a new collector for the Kubernetes
-// ClusterRoleBinding resource.
-func NewClusterRoleBindingCollector() *ClusterRoleBindingCollector {
-	return &ClusterRoleBindingCollector{
+// NewCronJobV1Beta1Collector creates a new collector for the Kubernetes Job resource.
+func NewCronJobV1Beta1Collector() *CronJobV1Beta1Collector {
+	return &CronJobV1Beta1Collector{
 		metadata: &collectors.CollectorMetadata{
 			IsDefaultVersion: true,
 			IsStable:         true,
-			Name:             "clusterrolebindings",
-			NodeType:         orchestrator.K8sClusterRoleBinding,
-			Version:          "rbac.authorization.k8s.io/v1",
+			Name:             "cronjobs",
+			NodeType:         orchestrator.K8sCronJob,
+			Version:          "batch/v1beta1",
 		},
-		processor: processors.NewProcessor(new(k8sProcessors.ClusterRoleBindingHandlers)),
+		processor: processors.NewProcessor(new(k8sProcessors.CronJobV1Beta1Handlers)),
 	}
 }
 
 // Informer returns the shared informer.
-func (c *ClusterRoleBindingCollector) Informer() cache.SharedInformer {
+func (c *CronJobV1Beta1Collector) Informer() cache.SharedInformer {
 	return c.informer.Informer()
 }
 
 // Init is used to initialize the collector.
-func (c *ClusterRoleBindingCollector) Init(rcfg *collectors.CollectorRunConfig) {
-	c.informer = rcfg.APIClient.InformerFactory.Rbac().V1().ClusterRoleBindings()
+func (c *CronJobV1Beta1Collector) Init(rcfg *collectors.CollectorRunConfig) {
+	c.informer = rcfg.APIClient.InformerFactory.Batch().V1beta1().CronJobs()
 	c.lister = c.informer.Lister()
 }
 
-// IsAvailable returns whether the collector is available.
-func (c *ClusterRoleBindingCollector) IsAvailable() bool { return true }
-
 // Metadata is used to access information about the collector.
-func (c *ClusterRoleBindingCollector) Metadata() *collectors.CollectorMetadata {
+func (c *CronJobV1Beta1Collector) Metadata() *collectors.CollectorMetadata {
 	return c.metadata
 }
 
 // Run triggers the collection process.
-func (c *ClusterRoleBindingCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
+func (c *CronJobV1Beta1Collector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
 	list, err := c.lister.List(labels.Everything())
 	if err != nil {
 		return nil, collectors.NewListingError(err)

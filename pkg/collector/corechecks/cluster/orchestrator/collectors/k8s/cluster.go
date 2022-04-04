@@ -30,14 +30,23 @@ type ClusterCollector struct {
 	processor *k8sProcessors.ClusterProcessor
 }
 
+// NewClusterCollectorVersions builds the group of collector versions.
+func NewClusterCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewClusterCollector(),
+	)
+}
+
 // NewClusterCollector creates a new collector for the Kubernetes Cluster
 // resource.
 func NewClusterCollector() *ClusterCollector {
 	return &ClusterCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "clusters",
-			NodeType: orchestrator.K8sCluster,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "clusters",
+			NodeType:         orchestrator.K8sCluster,
+			Version:          "v1",
 		},
 		processor: k8sProcessors.NewClusterProcessor(),
 	}

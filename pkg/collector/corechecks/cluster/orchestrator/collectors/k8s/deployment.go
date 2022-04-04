@@ -30,14 +30,23 @@ type DeploymentCollector struct {
 	processor *processors.Processor
 }
 
+// NewDeploymentCollectorVersions builds the group of collector versions.
+func NewDeploymentCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewDeploymentCollector(),
+	)
+}
+
 // NewDeploymentCollector creates a new collector for the Kubernetes Deployment
 // resource.
 func NewDeploymentCollector() *DeploymentCollector {
 	return &DeploymentCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "deployments",
-			NodeType: orchestrator.K8sDeployment,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "deployments",
+			NodeType:         orchestrator.K8sDeployment,
+			Version:          "apps/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.DeploymentHandlers)),
 	}

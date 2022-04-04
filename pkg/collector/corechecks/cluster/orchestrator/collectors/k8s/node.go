@@ -30,13 +30,22 @@ type NodeCollector struct {
 	processor *processors.Processor
 }
 
+// NewNodesCollectorVersions builds the group of collector versions.
+func NewNodeCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewNodeCollector(),
+	)
+}
+
 // NewNodeCollector creates a new collector for the Kubernetes Node resource.
 func NewNodeCollector() *NodeCollector {
 	return &NodeCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "nodes",
-			NodeType: orchestrator.K8sNode,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "nodes",
+			NodeType:         orchestrator.K8sNode,
+			Version:          "v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.NodeHandlers)),
 	}

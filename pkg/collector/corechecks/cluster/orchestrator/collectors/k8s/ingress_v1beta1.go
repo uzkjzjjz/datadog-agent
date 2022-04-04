@@ -9,6 +9,7 @@
 package k8s
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/collectors"
@@ -16,63 +17,56 @@ import (
 	k8sProcessors "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors/k8s"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 
+	netv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	rbacv1Informers "k8s.io/client-go/informers/rbac/v1"
-	rbacv1Listers "k8s.io/client-go/listers/rbac/v1"
+	netv1Informers "k8s.io/client-go/informers/networking/v1beta1"
+	netv1Listers "k8s.io/client-go/listers/networking/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
-// ClusterRoleBindingCollector is a collector for Kubernetes ClusterRoleBindings.
-type ClusterRoleBindingCollector struct {
-	informer  rbacv1Informers.ClusterRoleBindingInformer
-	lister    rbacv1Listers.ClusterRoleBindingLister
-	metadata  *collectors.CollectorMetadata
-	processor *processors.Processor
+// IngressV1Beta1Collector is a collector for Kubernetes Ingresss.
+type IngressV1Beta1Collector struct {
+	informer    netv1Informers.IngressInformer
+	lister      netv1Listers.IngressLister
+	metadata    *collectors.CollectorMetadata
+	processor   *processors.Processor
+	retryLister func(ctx context.Context, opts metav1.ListOptions) (*netv1.IngressList, error)
 }
 
-// NewClusterRoleBindingCollectorVersions builds the group of collector versions.
-func NewClusterRoleBindingCollectorVersions() collectors.CollectorVersions {
-	return collectors.NewCollectorVersions(
-		NewClusterRoleBindingCollector(),
-	)
-}
-
-// NewClusterRoleBindingCollector creates a new collector for the Kubernetes
-// ClusterRoleBinding resource.
-func NewClusterRoleBindingCollector() *ClusterRoleBindingCollector {
-	return &ClusterRoleBindingCollector{
+// NewIngressV1Beta1Collector creates a new collector for the Kubernetes Ingress
+// resource.
+func NewIngressV1Beta1Collector() *IngressV1Beta1Collector {
+	return &IngressV1Beta1Collector{
 		metadata: &collectors.CollectorMetadata{
-			IsDefaultVersion: true,
-			IsStable:         true,
-			Name:             "clusterrolebindings",
-			NodeType:         orchestrator.K8sClusterRoleBinding,
-			Version:          "rbac.authorization.k8s.io/v1",
+			IsDefaultVersion: false,
+			IsStable:         false,
+			Name:             "ingresses",
+			NodeType:         orchestrator.K8sIngress,
+			Version:          "networking.k8s.io/v1beta1",
 		},
-		processor: processors.NewProcessor(new(k8sProcessors.ClusterRoleBindingHandlers)),
+		processor: processors.NewProcessor(new(k8sProcessors.IngressHandlers)),
 	}
 }
 
 // Informer returns the shared informer.
-func (c *ClusterRoleBindingCollector) Informer() cache.SharedInformer {
+func (c *IngressV1Beta1Collector) Informer() cache.SharedInformer {
 	return c.informer.Informer()
 }
 
 // Init is used to initialize the collector.
-func (c *ClusterRoleBindingCollector) Init(rcfg *collectors.CollectorRunConfig) {
-	c.informer = rcfg.APIClient.InformerFactory.Rbac().V1().ClusterRoleBindings()
+func (c *IngressV1Beta1Collector) Init(rcfg *collectors.CollectorRunConfig) {
+	c.informer = rcfg.APIClient.InformerFactory.Networking().V1beta1().Ingresses()
 	c.lister = c.informer.Lister()
 }
 
-// IsAvailable returns whether the collector is available.
-func (c *ClusterRoleBindingCollector) IsAvailable() bool { return true }
-
 // Metadata is used to access information about the collector.
-func (c *ClusterRoleBindingCollector) Metadata() *collectors.CollectorMetadata {
+func (c *IngressV1Beta1Collector) Metadata() *collectors.CollectorMetadata {
 	return c.metadata
 }
 
 // Run triggers the collection process.
-func (c *ClusterRoleBindingCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
+func (c *IngressV1Beta1Collector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
 	list, err := c.lister.List(labels.Everything())
 	if err != nil {
 		return nil, collectors.NewListingError(err)

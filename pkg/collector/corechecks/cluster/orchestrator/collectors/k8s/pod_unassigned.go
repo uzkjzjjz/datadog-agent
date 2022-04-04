@@ -31,14 +31,23 @@ type UnassignedPodCollector struct {
 	processor *processors.Processor
 }
 
+// NewUnassignedPodCollectorVersions builds the group of collector versions.
+func NewUnassignedPodCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewUnassignedPodCollector(),
+	)
+}
+
 // NewUnassignedPodCollector creates a new collector for the Kubernetes Pod
 // resource that is not assigned to any node.
 func NewUnassignedPodCollector() *UnassignedPodCollector {
 	return &UnassignedPodCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "pods",
-			NodeType: orchestrator.K8sPod,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "pods",
+			NodeType:         orchestrator.K8sPod,
+			Version:          "v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.PodHandlers)),
 	}

@@ -28,6 +28,7 @@ const (
 // CollectorBundle is a container for a group of collectors. It provides a way
 // to easily run them all.
 type CollectorBundle struct {
+	autodiscovery    bool
 	check            *OrchestratorCheck
 	collectors       []collectors.Collector
 	extraSyncTimeout time.Duration
@@ -64,6 +65,31 @@ func NewCollectorBundle(chk *OrchestratorCheck) *CollectorBundle {
 	return bundle
 }
 
+// NewCollectorBundleWithAutodiscovery is the same as NewCollectorBundle but
+// with autodiscovery enabled.
+//
+// Autodiscovery is the process of discovering what collectors should be enabled
+// based on the environment. If the process fails, we fall back to configuration
+// settings.
+func NewCollectorBundleWithAutodiscovery(chk *OrchestratorCheck) *CollectorBundle {
+	bundle := &CollectorBundle{
+		autodiscovery: true,
+		check:         chk,
+		inventory:     inventory.NewCollectorInventory(),
+		runCfg: &collectors.CollectorRunConfig{
+			APIClient:   chk.apiClient,
+			ClusterID:   chk.clusterID,
+			Config:      chk.orchestratorConfig,
+			MsgGroupRef: &chk.groupID,
+		},
+		stopCh: make(chan struct{}),
+	}
+
+	bundle.prepare()
+
+	return bundle
+}
+
 // prepare initializes the collector bundle internals before it can be used.
 func (cb *CollectorBundle) prepare() {
 	cb.prepareCollectors()
@@ -72,6 +98,23 @@ func (cb *CollectorBundle) prepare() {
 
 // prepareCollectors initializes the bundle collector list.
 func (cb *CollectorBundle) prepareCollectors() {
+	// Discover collectors automatically.
+	if cb.autodiscovery {
+		for _, provider := range discoveryProviders {
+			if collectors, err := provider.Discover(cb.inventory); err == nil {
+				cb.collectors = append(cb.collectors, collectors...)
+			} else {
+				_ = cb.check.Warnf("Could not automatically activate collectors for provider %s: %s", provider.Name(), err)
+			}
+		}
+		// Collector(s) discovered
+		if len(cb.collectors) > 0 {
+			return
+		}
+	}
+
+	log.Info("Autodiscovery did not return any collector, falling back to configuration settings")
+
 	// No collector configured in the check configuration.
 	// Use the list of stable collectors as the default.
 	if len(cb.check.instance.Collectors) == 0 {
@@ -82,7 +125,7 @@ func (cb *CollectorBundle) prepareCollectors() {
 	// Collectors configured in the check configuration.
 	// Build the custom list of collectors.
 	for _, name := range cb.check.instance.Collectors {
-		if collector, err := cb.inventory.CollectorByName(name); err == nil {
+		if collector, err := cb.inventory.CollectorForDefaultVersion(name); err == nil {
 			if !collector.Metadata().IsStable {
 				_ = cb.check.Warnf("Using unstable collector: %s", name)
 			}
@@ -111,16 +154,9 @@ func (cb *CollectorBundle) prepareExtraSyncTimeout() {
 // synced.
 func (cb *CollectorBundle) Initialize() error {
 	informersToSync := make(map[apiserver.InformerName]cache.SharedInformer)
-	availableCollectors := []collectors.Collector{}
 
 	for _, collector := range cb.collectors {
 		collector.Init(cb.runCfg)
-		if !collector.IsAvailable() {
-			_ = cb.check.Warnf("Collector %q is unavailable, skipping it", collector.Metadata().Name)
-			continue
-		}
-
-		availableCollectors = append(availableCollectors, collector)
 
 		informer := collector.Informer()
 		informersToSync[apiserver.InformerName(collector.Metadata().Name)] = informer
@@ -130,8 +166,6 @@ func (cb *CollectorBundle) Initialize() error {
 		// see https://github.com/kubernetes/client-go/blob/3511ef41b1fbe1152ef5cab2c0b950dfd607eea7/informers/factory.go#L64-L66
 		go informer.Run(cb.stopCh)
 	}
-
-	cb.collectors = availableCollectors
 
 	return apiserver.SyncInformers(informersToSync, cb.extraSyncTimeout)
 }

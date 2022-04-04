@@ -30,14 +30,23 @@ type PersistentVolumeCollector struct {
 	processor *processors.Processor
 }
 
+// NewPersistentVolumeCollectorVersions builds the group of collector versions.
+func NewPersistentVolumeCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewPersistentVolumeCollector(),
+	)
+}
+
 // NewPersistentVolumeCollector creates a new collector for the Kubernetes
 // PersistentVolume resource.
 func NewPersistentVolumeCollector() *PersistentVolumeCollector {
 	return &PersistentVolumeCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "persistentvolumes",
-			NodeType: orchestrator.K8sPersistentVolume,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "persistentvolumes",
+			NodeType:         orchestrator.K8sPersistentVolume,
+			Version:          "v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.PersistentVolumeHandlers)),
 	}

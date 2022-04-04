@@ -30,14 +30,23 @@ type ClusterRoleCollector struct {
 	processor *processors.Processor
 }
 
+// NewClusterRoleCollectorVersions builds the group of collector versions.
+func NewClusterRoleCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewClusterRoleCollector(),
+	)
+}
+
 // NewClusterRoleCollector creates a new collector for the Kubernetes
 // ClusterRole resource.
 func NewClusterRoleCollector() *ClusterRoleCollector {
 	return &ClusterRoleCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "clusterroles",
-			NodeType: orchestrator.K8sClusterRole,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "clusterroles",
+			NodeType:         orchestrator.K8sClusterRole,
+			Version:          "rbac.authorization.k8s.io/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.ClusterRoleHandlers)),
 	}

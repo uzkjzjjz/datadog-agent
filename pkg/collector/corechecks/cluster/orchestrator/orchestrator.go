@@ -136,7 +136,8 @@ func (o *OrchestratorCheck) Configure(config, initConfig integration.Data, sourc
 	}
 
 	// Create a new bundle for the check.
-	o.collectorBundle = NewCollectorBundle(o)
+	o.collectorBundle = NewCollectorBundleWithAutodiscovery(o)
+	//o.collectorBundle = NewCollectorBundle(o)
 
 	// Initialize collectors.
 	return o.collectorBundle.Initialize()

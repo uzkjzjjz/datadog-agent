@@ -30,14 +30,23 @@ type ServiceCollector struct {
 	processor *processors.Processor
 }
 
+// NewServiceCollectorVersions builds the group of collector versions.
+func NewServiceCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewServiceCollector(),
+	)
+}
+
 // NewServiceCollector creates a new collector for the Kubernetes Service
 // resource.
 func NewServiceCollector() *ServiceCollector {
 	return &ServiceCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "services",
-			NodeType: orchestrator.K8sService,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "services",
+			NodeType:         orchestrator.K8sService,
+			Version:          "v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.ServiceHandlers)),
 	}

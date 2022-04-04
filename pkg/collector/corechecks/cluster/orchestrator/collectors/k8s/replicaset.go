@@ -30,14 +30,23 @@ type ReplicaSetCollector struct {
 	processor *processors.Processor
 }
 
+// NewReplicasetCollectorVersions builds the group of collector versions.
+func NewReplicaSetCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewReplicaSetCollector(),
+	)
+}
+
 // NewReplicaSetCollector creates a new collector for the Kubernetes ReplicaSet
 // resource.
 func NewReplicaSetCollector() *ReplicaSetCollector {
 	return &ReplicaSetCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "replicasets",
-			NodeType: orchestrator.K8sReplicaSet,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "replicasets",
+			NodeType:         orchestrator.K8sReplicaSet,
+			Version:          "apps/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.ReplicaSetHandlers)),
 	}

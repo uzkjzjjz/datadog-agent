@@ -27,12 +27,6 @@ type Collector interface {
 	// informers and listers.
 	Init(*CollectorRunConfig)
 
-	// IsAvailable returns whether a collector is available.
-	// A typical use-case is checking whether the targeted apiGroup version
-	// used by the collector is available in the cluster.
-	// Should be called after Init.
-	IsAvailable() bool
-
 	// Metadata is used to access information describing the collector.
 	Metadata() *CollectorMetadata
 
@@ -41,11 +35,34 @@ type Collector interface {
 	Run(*CollectorRunConfig) (*CollectorRunResult, error)
 }
 
+type CollectorVersions struct {
+	Collectors []Collector
+}
+
+func NewCollectorVersions(versions ...Collector) CollectorVersions {
+	var collectorVersions CollectorVersions
+	for _, collector := range append(versions) {
+		collectorVersions.Collectors = append(collectorVersions.Collectors, collector)
+	}
+	return collectorVersions
+}
+
+func (cv *CollectorVersions) CollectorForVersion(version string) (Collector, bool) {
+	for _, collector := range cv.Collectors {
+		if collector.Metadata().Version == version {
+			return collector, true
+		}
+	}
+	return nil, false
+}
+
 // CollectorMetadata contains information about a collector.
 type CollectorMetadata struct {
-	IsStable bool
-	Name     string
-	NodeType orchestrator.NodeType
+	IsDefaultVersion bool
+	IsStable         bool
+	Name             string
+	NodeType         orchestrator.NodeType
+	Version          string
 }
 
 // CollectorRunConfig is the configuration used to initialize or run the

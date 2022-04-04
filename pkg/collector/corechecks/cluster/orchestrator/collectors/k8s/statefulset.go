@@ -30,14 +30,23 @@ type StatefulSetCollector struct {
 	processor *processors.Processor
 }
 
+// NewStatefulSetCollectorVersions builds the group of collector versions.
+func NewStatefulSetCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewStatefulSetCollector(),
+	)
+}
+
 // NewStatefulSetCollector creates a new collector for the Kubernetes
 // StatefulSet resource.
 func NewStatefulSetCollector() *StatefulSetCollector {
 	return &StatefulSetCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "statefulsets",
-			NodeType: orchestrator.K8sStatefulSet,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "statefulsets",
+			NodeType:         orchestrator.K8sStatefulSet,
+			Version:          "apps/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.StatefulSetHandlers)),
 	}

@@ -30,14 +30,23 @@ type RoleBindingCollector struct {
 	processor *processors.Processor
 }
 
+// NewRoleBindingCollectorVersions builds the group of collector versions.
+func NewRoleBindingCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewRoleBindingCollector(),
+	)
+}
+
 // NewRoleBindingCollector creates a new collector for the Kubernetes
 // RoleBinding resource.
 func NewRoleBindingCollector() *RoleBindingCollector {
 	return &RoleBindingCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "rolebindings",
-			NodeType: orchestrator.K8sRoleBinding,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "rolebindings",
+			NodeType:         orchestrator.K8sRoleBinding,
+			Version:          "rbac.authorization.k8s.io/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.RoleBindingHandlers)),
 	}

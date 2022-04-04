@@ -30,13 +30,22 @@ type JobCollector struct {
 	processor *processors.Processor
 }
 
+// NewJobCollectorVersions builds the group of collector versions.
+func NewJobCollectorVersions() collectors.CollectorVersions {
+	return collectors.NewCollectorVersions(
+		NewJobCollector(),
+	)
+}
+
 // NewJobCollector creates a new collector for the Kubernetes Job resource.
 func NewJobCollector() *JobCollector {
 	return &JobCollector{
 		metadata: &collectors.CollectorMetadata{
-			IsStable: true,
-			Name:     "jobs",
-			NodeType: orchestrator.K8sJob,
+			IsDefaultVersion: true,
+			IsStable:         true,
+			Name:             "jobs",
+			NodeType:         orchestrator.K8sJob,
+			Version:          "batch/v1",
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.JobHandlers)),
 	}
