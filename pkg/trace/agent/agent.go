@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+	"blah"
 
 	"github.com/DataDog/datadog-agent/pkg/obfuscate"
 	"github.com/DataDog/datadog-agent/pkg/trace/api"
