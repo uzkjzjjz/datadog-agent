@@ -84,6 +84,7 @@ func TestBuildTraceBlocklist(t *testing.T) {
 		"PATCH /tutu",
 		"GET /lambda/hello",
 		"POST /lambda/flush",
+		"GET 127.0.0.1:9001/?/runtime/invocation/next",
 	}
 	result := buildTraceBlocklist(userProvidedBlocklist)
 	assert.Equal(t, expected, result)

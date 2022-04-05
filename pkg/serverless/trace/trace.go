@@ -92,5 +92,6 @@ func (s *ServerlessTraceAgent) Stop() {
 func buildTraceBlocklist(userProvidedList []string) []string {
 	list := append(userProvidedList, "GET /lambda/hello")
 	list = append(list, "POST /lambda/flush")
+	list = append(list, "GET 127.0.0.1:9001/?/runtime/invocation/next")
 	return list
 }
