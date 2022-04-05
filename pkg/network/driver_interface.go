@@ -282,7 +282,7 @@ func (di *DriverInterface) createFlowHandleFilters() ([]driver.FilterDefinition,
 
 	var filters []driver.FilterDefinition
 	for _, iface := range ifaces {
-		log.Debugf("Creating filters for interface: %s [%+v]", iface.Name, iface)
+		log.Infof("Creating filters for interface: %s [%+v]", iface.Name, iface)
 		if di.cfg.CollectTCPConns {
 			filters = append(filters, driver.FilterDefinition{
 				FilterVersion:  driver.Signature,
@@ -361,6 +361,6 @@ func (di *DriverInterface) createFlowHandleFilters() ([]driver.FilterDefinition,
 			}
 		}
 	}
-
+	log.Infof("Created %v filters", len(filters))
 	return filters, nil
 }

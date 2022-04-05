@@ -99,7 +99,8 @@ func (dh *Handle) Close() error {
 // SetFlowFilters installs the provided filters for flows
 func (dh *Handle) SetFlowFilters(filters []FilterDefinition) error {
 	var id int64
-	for _, filter := range filters {
+	for idx, filter := range filters {
+		log.Infof("Calling ioctl() to set filter %v", idx)
 		err := windows.DeviceIoControl(dh.Handle,
 			SetFlowFilterIOCTL,
 			(*byte)(unsafe.Pointer(&filter)),
@@ -107,8 +108,10 @@ func (dh *Handle) SetFlowFilters(filters []FilterDefinition) error {
 			(*byte)(unsafe.Pointer(&id)),
 			uint32(unsafe.Sizeof(id)), nil, nil)
 		if err != nil {
+			log.Infof("Failed to set filter %v", idx)
 			return fmt.Errorf("failed to set filter: %v", err)
 		}
+		log.Infof("set filter %v", idx)
 	}
 	return nil
 }
