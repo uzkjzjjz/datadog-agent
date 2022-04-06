@@ -68,7 +68,7 @@ type DCAClient struct {
 
 	clusterAgentAPIEndpoint       string          // ${SCHEME}://${clusterAgentHost}:${PORT}
 	ClusterAgentVersion           version.Version // Version of the cluster-agent we're connected to
-	clusterAgentAPIClient         *http.Client
+	clusterAgentAPIClient         *loggingClient
 	clusterAgentAPIRequestHeaders http.Header
 	leaderClient                  *leaderClient
 }
@@ -117,8 +117,10 @@ func (c *DCAClient) init() error {
 	c.clusterAgentAPIRequestHeaders.Set(RealIPHeader, podIP)
 
 	// TODO remove insecure
-	c.clusterAgentAPIClient = util.GetClient(false)
-	c.clusterAgentAPIClient.Timeout = 2 * time.Second
+	bareClient := util.GetClient(false)
+	bareClient.Timeout = 2 * time.Second
+
+	c.clusterAgentAPIClient = newLoggingClient(bareClient)
 
 	// Validate the cluster-agent client by checking the version
 	c.ClusterAgentVersion, err = c.GetVersion()

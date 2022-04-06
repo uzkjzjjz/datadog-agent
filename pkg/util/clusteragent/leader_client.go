@@ -17,18 +17,18 @@ import (
 // to preferentially direct requests to it.
 // Test coverage is ensured by TestClusterChecksRedirect
 type leaderClient struct {
-	http.Client
+	loggingClient
 	m          sync.Mutex
 	serviceURL string // Common URL to fallback to
 	leaderURL  string // Current leader URL
 }
 
-func newLeaderClient(mainClient *http.Client, serviceURL string) *leaderClient {
+func newLeaderClient(mainClient *loggingClient, serviceURL string) *leaderClient {
 	l := &leaderClient{
-		Client:     *mainClient,
-		serviceURL: serviceURL,
+		loggingClient: *mainClient,
+		serviceURL:    serviceURL,
 	}
-	l.CheckRedirect = l.redirected
+	l.SetCheckRedirect(l.redirected)
 	return l
 }
 
