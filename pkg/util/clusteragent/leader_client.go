@@ -99,10 +99,6 @@ func (l *leaderClient) redirected(req *http.Request, via []*http.Request) error 
 }
 
 func (l *leaderClient) Do(req *http.Request) (*http.Response, error) {
-	log.Debugf("XXXXX Called clusteragent.(*leaderClient).Do(%#v)", req)
-	log.Debugf("XXXXX        context: %#v", req.Context())
-	log.Debugf("XXXXX        Stack:\n%s", debug.Stack())
-	resp, err := l.httpClient.Do(req)
-	log.Debugf("XXXXX        err: %#v", err)
-	return resp, err
+	log.Debugf("XXXXX Called clusteragent.(*leaderClient).Do(%#v)\n%s", req, debug.Stack())
+	return l.httpClient.Do(req)
 }
