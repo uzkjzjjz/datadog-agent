@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime/debug"
 
 	"strings"
 	"time"
@@ -222,7 +221,6 @@ func (c *DCAClient) GetVersion() (version.Version, error) {
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return version, err
@@ -259,7 +257,6 @@ func (c *DCAClient) getMapStringString(queryPath, objectName string) (map[string
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -308,7 +305,6 @@ func (c *DCAClient) GetCFAppsMetadataForNode(nodename string) (map[string][]stri
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -365,7 +361,6 @@ func (c *DCAClient) GetPodsMetadataForNode(nodeName string) (apiv1.NamespacesPod
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -412,7 +407,6 @@ func (c *DCAClient) GetKubernetesMetadataNames(nodeName, ns, podName string) ([]
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return metadataNames, err
@@ -454,7 +448,6 @@ func (c *DCAClient) GetKubernetesClusterID() (string, error) {
 	}
 	req.Header = c.clusterAgentAPIRequestHeaders
 
-	log.Debugf("XXXXX Called clusteragent.(*DCAClient).clusterAgentAPIClient.Do(%#v)\n%s", req, debug.Stack())
 	resp, err := c.clusterAgentAPIClient.Do(req)
 	if err != nil {
 		return "", err

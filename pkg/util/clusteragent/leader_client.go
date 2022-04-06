@@ -9,18 +9,15 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"runtime/debug"
 	"strings"
 	"sync"
-
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // leaderClient is used to keep track of the leading cluster-agent
 // to preferentially direct requests to it.
 // Test coverage is ensured by TestClusterChecksRedirect
 type leaderClient struct {
-	httpClient http.Client
+	http.Client
 	m          sync.Mutex
 	serviceURL string // Common URL to fallback to
 	leaderURL  string // Current leader URL
@@ -28,10 +25,10 @@ type leaderClient struct {
 
 func newLeaderClient(mainClient *http.Client, serviceURL string) *leaderClient {
 	l := &leaderClient{
-		httpClient: *mainClient,
+		Client:     *mainClient,
 		serviceURL: serviceURL,
 	}
-	l.httpClient.CheckRedirect = l.redirected
+	l.CheckRedirect = l.redirected
 	return l
 }
 
@@ -96,9 +93,4 @@ func (l *leaderClient) redirected(req *http.Request, via []*http.Request) error 
 	l.leaderURL = newURL.String()
 
 	return nil
-}
-
-func (l *leaderClient) Do(req *http.Request) (*http.Response, error) {
-	log.Debugf("XXXXX Called clusteragent.(*leaderClient).Do(%#v)\n%s", req, debug.Stack())
-	return l.httpClient.Do(req)
 }
