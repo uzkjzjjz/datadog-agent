@@ -30,7 +30,7 @@ type agentWindowsService struct{}
 func (m *agentWindowsService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPreShutdown
 	changes <- svc.Status{State: svc.StartPending}
-
+	time.Sleep(90 * time.Second)
 	if err := common.CheckAndUpgradeConfig(); err != nil {
 		elog.Warning(0x80000002, err.Error())
 		// continue running with what we have.
