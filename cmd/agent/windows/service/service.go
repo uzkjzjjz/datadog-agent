@@ -28,7 +28,6 @@ type agentWindowsService struct{}
 
 // Execute sets up the configuration and runs the Agent as a Windows service
 func (m *agentWindowsService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	panic("PANIC")
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPreShutdown
 	changes <- svc.Status{State: svc.StartPending}
 
