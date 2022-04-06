@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	panic("PANIC")
+	time.Sleep(90 * time.Second)
 	common.EnableLoggingToFile()
 	// if command line arguments are supplied, even in a non interactive session,
 	// then just execute that.  Used when the service is executing the executable,
