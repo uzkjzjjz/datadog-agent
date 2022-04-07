@@ -183,7 +183,7 @@ func (p *ProcessCheck) run(cfg *config.AgentConfig, groupID int32, collectRealTi
 	}
 
 	connsByPID := Connections.getLastConnectionsByPID()
-	procsByCtr := fmtProcesses(cfg, procs, p.lastProcs, pidToCid, cpuTimes[0], p.lastCPUTime, p.lastRun, connsByPID)
+	procsByCtr := fmtProcesses(cfg, procs, p.lastProcs, pidToCid, cpuTimes[0], p.lastCPUTime, p.lastRun, connsByPID, p.probe)
 	messages, totalProcs, totalContainers := createProcCtrMessages(procsByCtr, containers, cfg, p.maxBatchSize, p.maxBatchBytes, p.sysInfo, groupID, p.networkID)
 
 	// Store the last state for comparison on the next run.
@@ -317,6 +317,7 @@ func fmtProcesses(
 	syst2, syst1 cpu.TimesStat,
 	lastRun time.Time,
 	connsByPID map[int32][]*model.Connection,
+	probe procutil.Probe,
 ) map[string][]*model.Process {
 	procsByCtr := make(map[string][]*model.Process)
 	connCheckIntervalS := int(cfg.CheckIntervals[config.ConnectionsCheckName] / time.Second)
@@ -342,7 +343,7 @@ func fmtProcesses(
 		}
 
 		command := formatCommand(fp)
-		tags, err := getProcessTags(fp.Pid, command)
+		tags, err := getProcessTags(probe, fp.Pid, command)
 		if err != nil {
 			log.Errorf("failed to collect process %d tags: %s", fp.Pid, err)
 		}

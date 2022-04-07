@@ -105,6 +105,8 @@ type probe struct {
 	bootTimeRefreshInterval time.Duration
 }
 
+var _ Probe = (*probe)(nil)
+
 // NewProcessProbe initializes a new Probe object
 func NewProcessProbe(options ...Option) Probe {
 	hostProc := util.HostProc()
@@ -198,6 +200,40 @@ func (p *probe) StatsForPIDs(pids []int32, now time.Time) (map[int32]*Stats, err
 		statsByPID[pid] = stats
 	}
 	return statsByPID, nil
+}
+
+const (
+	equalByte = byte('=')
+	nullByte  = '\000'
+)
+
+func (p *probe) EnvironForPid(pid int32) (map[string]string, error) {
+	environFile := filepath.Join(p.procRootLoc, strconv.Itoa(int(pid)), "environ")
+	content, err := ioutil.ReadFile(environFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read environ file from %s: %s", environFile, err)
+	}
+
+	env := make(map[string]string)
+	var varStart int
+	var delim int
+	log.Info("Env vars:")
+	for i, r := range content {
+		if r == equalByte {
+			delim = i
+			continue
+		}
+
+		if r == nullByte {
+			k := string(content[varStart:delim])
+			v := string(content[delim+1 : i])
+			env[k] = v
+			varStart = i + 1
+			log.Infof("%s=%s\n", k, v)
+		}
+	}
+
+	return env, nil
 }
 
 // ProcessesByPID returns a map of process info indexed by PID

@@ -114,7 +114,7 @@ func TestBasicProcessMessages(t *testing.T) {
 			cfg.Blacklist = bl
 			networks := make(map[int32][]*model.Connection)
 
-			procs := fmtProcesses(cfg, tc.processes, tc.processes, tc.pidToCid, syst2, syst1, lastRun, networks)
+			procs := fmtProcesses(cfg, tc.processes, tc.processes, tc.pidToCid, syst2, syst1, lastRun, networks, nil)
 			messages, totalProcs, totalContainers := createProcCtrMessages(procs, tc.containers, cfg, tc.maxSize, maxBatchBytes, sysInfo, int32(i), "nid")
 
 			assert.Equal(t, tc.expectedChunks, len(messages))
@@ -226,7 +226,7 @@ func TestContainerProcessChunking(t *testing.T) {
 			cfg := config.NewDefaultAgentConfig()
 			sysInfo := &model.SystemInfo{}
 
-			processes := fmtProcesses(cfg, procsByPid, procsByPid, pidToCid, syst2, syst1, lastRun, networks)
+			processes := fmtProcesses(cfg, procsByPid, procsByPid, pidToCid, syst2, syst1, lastRun, networks, nil)
 			messages, totalProcs, totalContainers := createProcCtrMessages(processes, ctrs, cfg, tc.maxSize, maxBatchBytes, sysInfo, int32(i), "nid")
 
 			assert.Equal(t, tc.expectedProcCount, totalProcs)

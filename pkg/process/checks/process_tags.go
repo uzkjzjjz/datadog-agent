@@ -10,22 +10,31 @@ import (
 	"strings"
 
 	model "github.com/DataDog/agent-payload/v5/process"
+	"github.com/DataDog/datadog-agent/pkg/process/procutil"
 	"github.com/davecgh/go-spew/spew"
 )
 
-func getProcessTags(pid int32, cmd *model.Command) ([]string, error) {
-	if strings.HasSuffix(cmd.Exe, "/java") {
-		cmd := exec.Command(cmd.Exe, "-version")
-
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return nil, err
-		}
-
-		spew.Dump(out)
-
-		ver := strings.Split(string(out), "\n")[0]
-		return []string{"jvm_version:" + ver}, nil
+func getProcessTags(probe procutil.Probe, pid int32, cmd *model.Command) ([]string, error) {
+	if !strings.HasSuffix(cmd.Exe, "/java") {
+		return nil, nil
 	}
-	return nil, nil
+
+	env, err := probe.EnvironForPid(pid)
+	if err == nil {
+		if ver, ok := env["JAVA_VERSION"]; ok {
+			return []string{"jvm_version:" + ver}, nil
+		}
+	}
+
+	command := exec.Command(cmd.Exe, "-version")
+
+	out, err := command.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	spew.Dump(out)
+
+	ver := strings.Split(string(out), "\n")[0]
+	return []string{"jvm_version:" + ver}, nil
 }

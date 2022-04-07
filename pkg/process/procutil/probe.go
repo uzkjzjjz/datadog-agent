@@ -15,6 +15,7 @@ type Probe interface {
 	StatsForPIDs(pids []int32, now time.Time) (map[int32]*Stats, error)
 	ProcessesByPID(now time.Time, collectStats bool) (map[int32]*Process, error)
 	StatsWithPermByPID(pids []int32) (map[int32]*StatsWithPerm, error)
+	EnvironForPid(pid int32) (map[string]string, error)
 }
 
 // Option is config options callback for system-probe

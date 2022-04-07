@@ -49,3 +49,7 @@ func (p *probe) ProcessesByPID(now time.Time, collectStats bool) (map[int32]*Pro
 func (p *probe) StatsWithPermByPID(pids []int32) (map[int32]*StatsWithPerm, error) {
 	return nil, fmt.Errorf("StatsWithPermByPID is not implemented in this environment")
 }
+
+func (p *probe) EnvironForPid(pid int32) (map[string]string, error) {
+	return nil, fmt.Errorf("EnvironForPid is not implemented in this environment")
+}
