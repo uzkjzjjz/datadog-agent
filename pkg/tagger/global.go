@@ -143,13 +143,6 @@ func TagWithHash(entity string, cardinality collectors.TagCardinality) ([]string
 	return tags, utils.ComputeTagsHash(tags), nil
 }
 
-// GetEntityHash returns the hash for the tags associated with the given entity
-// Returns an empty string if the tags lookup fails
-func GetEntityHash(entity string, cardinality collectors.TagCardinality) string {
-	_, hash, _ := TagWithHash(entity, cardinality)
-	return hash
-}
-
 // StandardTags queries the defaultTagger to get entity
 // standard tags (env, version, service) from cache or sources.
 func StandardTags(entity string) ([]string, error) {

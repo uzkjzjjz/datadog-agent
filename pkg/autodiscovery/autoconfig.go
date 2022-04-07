@@ -22,7 +22,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/secrets"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
-	"github.com/DataDog/datadog-agent/pkg/tagger"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
@@ -126,7 +125,11 @@ func (ac *AutoConfig) checkTagFreshness(ctx context.Context) {
 	var servicesToRefresh []listeners.Service
 	for _, service := range ac.store.getServices() {
 		previousHash := ac.store.getTagsHashForService(service.GetTaggerEntity())
-		currentHash := tagger.GetEntityHash(service.GetTaggerEntity(), tagger.ChecksCardinality)
+		_, currentHash, err := service.GetTags()
+		if err != nil {
+			log.Debugf("cannot get entity hash for service %q: %s", service.GetServiceID(), err)
+		}
+
 		// Since an empty hash is a valid value, and we are not able to differentiate
 		// an empty tagger or store with an empty value.
 		// So we only look at the difference between current and previous
@@ -613,11 +616,13 @@ func GetResolveWarnings() map[string][]string {
 // triggers scheduling events if it finds a valid config for it.
 func (ac *AutoConfig) processNewService(ctx context.Context, svc listeners.Service) {
 	// in any case, register the service and store its tag hash
+	_, hash, err := svc.GetTags()
+	if err != nil {
+		log.Debugf("cannot get entity hash for service %q: %s", svc.GetServiceID(), err)
+	}
+
 	ac.store.setServiceForEntity(svc, svc.GetServiceID())
-	ac.store.setTagsHashForService(
-		svc.GetTaggerEntity(),
-		tagger.GetEntityHash(svc.GetTaggerEntity(), tagger.ChecksCardinality),
-	)
+	ac.store.setTagsHashForService(svc.GetTaggerEntity(), hash)
 
 	// get all the templates matching service identifiers
 	var templates []integration.Config
