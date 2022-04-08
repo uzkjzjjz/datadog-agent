@@ -118,7 +118,7 @@ func (c *DCAClient) init() error {
 
 	// TODO remove insecure
 	bareClient := util.GetClient(false)
-	bareClient.Timeout = 2 * time.Second
+	bareClient.Timeout = 10 * time.Second
 
 	c.clusterAgentAPIClient = newLoggingClient(bareClient)
 
