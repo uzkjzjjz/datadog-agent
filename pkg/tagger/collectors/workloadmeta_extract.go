@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/tagger/tagstore"
 	"github.com/DataDog/datadog-agent/pkg/tagger/utils"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes"
@@ -105,6 +106,7 @@ var (
 )
 
 func (c *WorkloadMetaCollector) processEvents(evBundle workloadmeta.EventBundle) {
+	var sourceTags []tagstore.SourceTags
 	var tagInfos []*TagInfo
 
 	for _, ev := range evBundle.Events {

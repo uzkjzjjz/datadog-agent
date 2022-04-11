@@ -256,7 +256,7 @@ func TestGetEntityTags(t *testing.T) {
 	assert.True(t, etags.cacheValid)
 
 	// Add tags but don't invalidate the cache, we should return empty arrays
-	etags.sourceTags["source"] = sourceTags{
+	etags.sourceTags["source"] = SourceTags{
 		lowCardTags:  []string{"low1", "low2"},
 		highCardTags: []string{"high1", "high2"},
 	}
@@ -316,17 +316,17 @@ func TestDuplicateSourceTags(t *testing.T) {
 	}
 
 	// Add tags but don't invalidate the cache, we should return empty arrays
-	etags.sourceTags["sourceNodeOrchestrator"] = sourceTags{
+	etags.sourceTags["sourceNodeOrchestrator"] = SourceTags{
 		lowCardTags:  []string{"bar", "tag1:sourceHigh", "tag2:sourceHigh"},
 		highCardTags: []string{"tag3:sourceHigh", "tag4:sourceHigh"},
 	}
 
-	etags.sourceTags["sourceNodeRuntime"] = sourceTags{
+	etags.sourceTags["sourceNodeRuntime"] = SourceTags{
 		lowCardTags:  []string{"foo", "tag1:sourceLow", "tag2:sourceLow"},
 		highCardTags: []string{"tag3:sourceLow", "tag5:sourceLow"},
 	}
 
-	etags.sourceTags["sourceClusterOrchestrator"] = sourceTags{
+	etags.sourceTags["sourceClusterOrchestrator"] = SourceTags{
 		lowCardTags:  []string{"tag3:sourceClusterHigh", "tag1:sourceClusterLow"},
 		highCardTags: []string{"tag4:sourceClusterLow"},
 	}

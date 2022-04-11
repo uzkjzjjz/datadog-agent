@@ -19,7 +19,7 @@ import (
 // store is safe since it relies on a global lock.
 type EntityTags struct {
 	entityID           string
-	sourceTags         map[string]sourceTags
+	sourceTags         map[string]SourceTags
 	cacheValid         bool
 	cachedAll          tagset.HashedTags // Low + orchestrator + high
 	cachedOrchestrator tagset.HashedTags // Low + orchestrator (subslice of cachedAll)
@@ -29,7 +29,7 @@ type EntityTags struct {
 func newEntityTags(entityID string) *EntityTags {
 	return &EntityTags{
 		entityID:   entityID,
-		sourceTags: make(map[string]sourceTags),
+		sourceTags: make(map[string]SourceTags),
 		cacheValid: true,
 	}
 }

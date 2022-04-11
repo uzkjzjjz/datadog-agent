@@ -143,7 +143,7 @@ func (s *TagStore) ProcessTagInfo(tagInfos []*collectors.TagInfo) {
 
 func updateStoredTags(storedTags *EntityTags, info *collectors.TagInfo) {
 	storedTags.cacheValid = false
-	storedTags.sourceTags[info.Source] = sourceTags{
+	storedTags.sourceTags[info.Source] = SourceTags{
 		lowCardTags:          info.LowCardTags,
 		orchestratorCardTags: info.OrchestratorCardTags,
 		highCardTags:         info.HighCardTags,

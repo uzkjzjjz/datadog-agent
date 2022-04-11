@@ -7,9 +7,9 @@ package tagstore
 
 import "time"
 
-// sourceTags holds the tags for a given entity collected from a single source,
+// SourceTags holds the tags for a given entity collected from a single source,
 // grouped by their cardinality.
-type sourceTags struct {
+type SourceTags struct {
 	lowCardTags          []string
 	orchestratorCardTags []string
 	highCardTags         []string
@@ -17,11 +17,11 @@ type sourceTags struct {
 	expiryDate           time.Time
 }
 
-func (st *sourceTags) isEmpty() bool {
+func (st *SourceTags) isEmpty() bool {
 	return len(st.lowCardTags) == 0 && len(st.orchestratorCardTags) == 0 && len(st.highCardTags) == 0 && len(st.standardTags) == 0
 }
 
-func (st *sourceTags) isExpired(t time.Time) bool {
+func (st *SourceTags) isExpired(t time.Time) bool {
 	if st.expiryDate.IsZero() {
 		return false
 	}
