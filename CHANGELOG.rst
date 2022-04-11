@@ -6996,400 +6996,63 @@ Bug Fixes
 =====
 2018-05-11
 
-Prelude
--------
-
-- Please refer to the `6.2.0 tag on integrations-core <https://github.com/DataDog/integrations-core/releases/tag/6.2.0>`_
-  for the list of changes on the Core Checks.
-
-- Please refer to the `6.2.0 tag on trace-agent <https://github.com/DataDog/datadog-trace-agent/releases/tag/6.2.0>`_
-  for the list of changes on the Trace Agent.
-
-- Please refer to the `6.2.0 tag on process-agent <https://github.com/DataDog/datadog-process-agent/releases/tag/6.2.0>`_
-  for the list of changes on the Process Agent.
-
-Enhancements
-------------
-
-- Introduce new docker cpu shares gauge.
-
-- Add ability to configure the namespace in which the resources related to the kubernetes check are created.
-
-- The kubelet check now honors container filtering options
-
-- Adding Datadog Cluster Agent client in Node Agent.
-  Adding support for TLS in the Datadog Cluster Agent API.
-
-- Docker: set a default 5 seconds timeout on all docker requests to mitigate
-  possible docker daemon freezes
-
-- Connection to the ECS agent should be more resilient
-
-- Add agent5-like JMXFetch helper commands to help with JMXFetch troubleshooting.
-
-- The agent has been tested on Kubernetes 1.4 & OpenShift 3.4. Refer to
-  https://github.com/DataDog/datadog-agent/blob/main/Dockerfiles/agent/README.md
-  for installation instructions
-
-- Extract creator tags from kubernetes legacy `created-by` annotation if
-  the new `ownerReferences` field is not found
-
-- The `agent import` command now handles converting options from the legacy
-  `kubernetes.yaml` file, for agents running on the host
-
-- The memory corecheck sends 2 new metrics on Linux: ``system.mem.commit_limit``
-  and ``system.mem.committed_as``
-
-- Added the possibility to filter docker containers by name for log collection.
-
-- Added a support for docker labels to enrich logs metadata.
-
-- Logs Agent: add a `filename` tag to messages with the name of the file being tailed.
-
-- Shipping protobuf C++ implementation for the protobuf package, this should
-  help us be more performant when parsing larger/binary protobuf messages in
-  relevant integrations.
-
-- Enable to set collect_ec2_tags from environment variable DD_COLLECT_EC2_TAGS
-
-- The configcheck command now display checks in alphabetical orders and are
-  no longer grouped by configuration provider
-
-- Add average check run time to ``datadog-agent status`` and to the GUI.
-
-- Consider every configuration having autodiscovery identifier a template
-
-- Implement a circuit breaker and use jittered, truncated exponential backoff for network error retries.
-
-- Change logs agent configuration to use protocol buffers encoding and
-  endpoint by default.
-
-Known Issues
-------------
-
-- Kubernetes 1.3 & OpenShift 3.3 are currently not fully supported: docker and kubelet
-  integrations work OK, but apiserver communication (event collection, `kube_service`
-  tagging) is not implemented
-
-Deprecation Notes
------------------
-
-- Removing python PDH code bundled with the agent in favor of code already included
-  in the integrations-core` repository and bundled with datadog_checks_base wheel.
-  This provides a single source of truth for the python PDH logic.
-
-Bug Fixes
----------
-
-- Fix a possible race condition in AutoDiscovery where configuration is
-  identical on container churn and considered as duplicate before being
-  de-scheduled.
-
-- It is now possible to save logs only configuration in the GUI without getting an error message.
-
-- Docker network metrics are now tagged by interface name as a fallback if a
-  docker network name cannot be determined (affects some Swarm stack deployments)
-
-- Dogstatsd now support listening on an IPv6 address when using ``bind_host``
-  config option.
-
-- The agent now fetches a hostname alias from kubernetes when possible. It fixes some duplicated
-  host issues that could happen when metrics were using kubernetes host names, as the
-  kubernetes_state integration
-
-- Fix case issues in tag extraction for docker/kubernetes container tags and kubernetes host tags
-
-- Fixes initialization of performance counter (Windows) to be able to better cope with missing
-  counter strings, and non-english locales
-
-- Bind the kubelet_tls_verify as an environment variable.
-
-- Docker image: fix entrypoint bug causing the kubernetes_apiserver check
-  to not be enabled
-
-- Fixed an issue with collecting logs bigger than 4096 chars on windows.
-
-- Fixes a misleading log line on windows for logs file tailing
-
-- Fixed a concurrent issue in the logs auditor causing the agent to crash.
-
-- Fix an issue for docker image name filtering when images contain a tag.
-
-- On Windows, changes the configuration for Process Agent and Trace
-  Agent services to be manual-start.  There is no impact if the
-  services are configured to be active; however, if they're disabled,
-  will stop the behavior where they're briefly started then stopped,
-  which creates excessive Windows service alert.
-
-- API key validation logic was ignoring proxy settings, leading to situations
-  where the agent reported that it was "Unable to validate API key" in the GUI.
-
-- Fix EC2 tags collection when multiple marketplaces are set.
-
-- Fixes collection of host tags from GCE metadata
-
-- Fix Go checks errors not being displayed in the status page.
-
-- Sanitize logged Datadog URLs when proxies are configured.
-
-- Fix a race condition in the kubernetes service tagging logic
-
-- Fix a possible panic when docker cannot inspect a container
-
-Other Notes
------------
-
-- In the metrics aggregator, log readable context information (metric name,
-  host, tags) instead of the raw context key to help troubleshooting
-
-- Remove executable permission bits from systemd/upstart/launchd service definition
-  files.
-
-- Improved the flare credential removing logic to work in a few edge cases
-  that where not accounted for previously.
-
-- Make file tailing a little less verbose. We avoid logging at every iteration
-  the different issues we encountered, instead we log them at first run only.
-  The status command shows the up-to-date information, and can
-  be used at anytime to troubleshoot such issues
-
-- Adds collection of PDH counter information to the flare; saves the
-  step of always asking the customer for this information.
-
-- Improve logging for the metamap, avoid spammy error when no cluster level metadata is found.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.2.0
 
 
 6.1.4
 =====
 2018-04-19
 
-Prelude
--------
-
-Our development staff observed that a local, unprivileged user had the ability to make an HTTP request to the `/agent/check-config` endpoint on the agent process that listens on localhost. This request would result in the local-users' ability to read Agent integration configurations. This issue was patched by enforcing authentication via a session token. Please upgrade your agent accordingly.
-
-Security Issues
----------------
-
-- The ``/agent/check-config`` endpoint has been patched to enforce authentication
-  of the caller via a bearer session token.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.1.4
 
 
 6.1.3
 =====
 2018-04-16
 
-Prelude
--------
-
-- This release also includes changes to the trace agent. See
-  `6.1.3 tag on trace-agent <https://github.com/DataDog/datadog-trace-agent/releases/tag/6.1.3>`_
-
-Bug Fixes
----------
-
-- Fix a bug where the `docker_network` tag incorrectly appeared on
-  non-network docker metrics and autodiscovery tags
-
-- Fix the use of "docker restart" with the agent image
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.1.3
 
 
 6.1.2
 ==========
 2018-04-05
 
-Bug Fixes
----------
-
-- Fix some edge cases where flare could contain secrets if the secrets where encapsulated in quotes.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.1.2
 
 
 6.1.1
 ==========
 2018-03-29
 
-Bug Fixes
----------
-
-- Fix a crash in the docker check when collecting sizes on an image with no repository tags.
-
-- Fixes bug on Windows where, if configuration options are specified on the
-  installation command line, invalid proxy options are set.
-
-- Removed the read timeout for UDP connections causing the agent to stop forwarding logs after one minute of nonactivity.
-
-- Updating the data type of the CPU of the task and the metadata name for Version to Revision.
-
-
-Other Notes
------------
-
-- Add environment variable DD_ENABLE_GOHAI for setting option enable_gohai when running in a container.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.1.1
 
 
 6.1.0
 =====
 2018-03-23
 
-New Features
-------------
-
-- Add Agent Version to flare form
-
-- Add the DD_CHECK_RUNNERS environment variable binding
-
-- Add the status command to the DCA.
-
-- Docker check: ignore the new exec_die event type by default
-
-- Extract the swarm_namespace tag for docker swarm containers, in addition
-  to the already present swarm_service tag.
-
-- Allow configuration of the enabled-state of process, logs, and apm to be
-  specified on the installation command line for Windows.
-
-- Add a jmx_use_cgroup_memory_limit option to set jmxfetch to use cgroup
-  memory limits when calculating its heap size. It is enabled by default
-  in the docker image.
-
-- Add option to extract kubernetes pod annotations as tags, similar to labels
-
-- Added an environment variable `DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL` to enable logs tailing on all containers.
-
-- Adding the 'bind_host' option to configure the interface to bind by dogstatsd and JMX.
-
-- Support setting tags as a YAML array in the logs agent integration configuration
-
-
-Bug Fixes
----------
-
-- Fix docker memory metrics parsing from cgroup files
-
-- Fix docker.mem.in_use metric computation
-
-- When using the import script, change the group owner of configuration files to the dd-agent user.
-
-- Fix a false positive in the collector-queue healthcheck
-
-- The old docker_daemon check is now properly converted in the "import" command by default
-
-- Docker check: fix event filtering for exec events
-
-- Improve docker monitoring when the system is under a very high load. The agent
-  might still temporarily miss a healthcheck, but will be able to run already
-  scheduled checks, and recover once the spike ends
-
-- Fixes the container startup on Fargate, where we tried and remove the same
-  file twice, failing hard (stopping) on the second attempt.
-
-- Fix flare failing on zipping individual components
-
-- Fixed an issue where the import script would put an empty histogram aggregates and percentiles in datadog.yaml if they didn't exist in datadog.conf.
-
-- Fix the build for platforms not supporting Gohai.
-
-- Fixes flaw where Windows Performance counters were not properly initialized
-  on non EN-US versions of windows
-
-- Menu in system tray reports wrong version (6.0.0) for all versions of Agent.  This fixes the system tray menu to report the correct version.
-
-- Fixing clear passwords in "config-check.log" when sending a flare.
-
-- Allow network proxy settings set on the Windows installation command
-  line to be set in the registry, where they'll be translated to the
-  configuration
-
-- Accept now short names for docker image in logs configuration file and added to the possibility to filter containers by image name with Kubernetes.
-
-- Fixes an issue that would prevent the agent from stopping when it was tailing logs
-  of a container that had no logs.
-
-- fixes an issue with wildcard tailing of logs files on windows
-
-- Allow Linux package uninstallation to proceed without errors even on platforms
-  that aren't supported by the Agent
-
-- Fixes agent to run on Server "Core" versions
-
-- Changes default precision of pdh-based counters from int to float. Fixes bug where fidelity of some counters is quite low, especially counters with values between 0 and 1.
-
-- Adds back the removed system.mem.usable metric for Agents running on Windows.
-
-- Avoid multiple initializations of the tagger subsystem
-
-
-Other Notes
------------
-
-- Normalize support of nested config options defined with env vars.
-
-- Make the check-rate command more visible when running "check` to get a list of metrics.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.1.0
 
 
 6.0.3
 =====
 2018-03-12
 
-Prelude
--------
-
-- This release also includes bugfixes to the process agent. See diff_.
-
-  .. _diff: https://github.com/DataDog/datadog-process-agent/compare/5.23.1...6.0.3
-
-Bug Fixes
----------
-
-- Fixed the issue preventing from having docker tags when collecting logs from containers.
-- Fix docker metrics collection on Moby Linux hosts (default Swarm AMI)
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.0.3
 
 
 6.0.2
 =====
 2018-03-07
 
-Critical Issues
----------------
-
-- Packaging issue in 6.0.1 resulted in the release of nightly builds for trace-agent and process-agent. 6.0.2 ships the stable intended versions.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.0.2
 
 
 6.0.1
 =====
 2018-03-07
 
-Enhancements
-------------
-
-- Add information about Log Agent checks to the GUI General Status page.
-
-
-Bug Fixes
----------
-
-- Run the service mapper on all the agents running the apiserver check. Exit before running the rest of the check if the agent is not the leader.
-
-- Fixing docker network metrics collection for the docker check and the process agent on some network configurations.
-
-- Replaces the system.mem.free metric with gopsutil's 'available' and splits the windows and linux memory checks. Previously this reported with a value of 0 and `system.mem.used` was reporting the same as `system.mem.total`
-
-- ".pdh" suffix was added to `system.io` metrics on windows for side-by-side
-  testing when changed the collection mechanism, and inadvertently left.
-
-- Fix bug where global tags for PDH based python checks are not read
-  correctly from the configuration yaml.
-
-- IE does not support String.prototype.endsWith, add implementation to the
-  string prototype to enable the functionality.
-
-- remove `.pdh` suffix from system.io.wkb_s, system.io_w_s, system.io.rkb_s,
-  system.io.r_s, system.io.avg_q_sz
-
-- Fix GUI for JMX checks, they are now manageable from the web UI.
-
-- Fix the launch of JMXFetch on windows and make multiplatform treatment of
-  the launch more robust.
+Release notes - https://github.com/DataDog/datadog-agent/releases/tag/6.0.1
 
 
 6.0.0
