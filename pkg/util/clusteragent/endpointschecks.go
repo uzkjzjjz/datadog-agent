@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
+	"sync/atomic"
 
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/clusterchecks/types"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -41,7 +43,7 @@ func (c *DCAClient) doGetEndpointsCheckConfigs(ctx context.Context, nodeName str
 
 	// https://host:port/api/v1/endpointschecks/configs/{nodeName}
 	rawURL := c.leaderClient.buildURL(dcaEndpointsChecksConfigsPath, nodeName)
-	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return configs, err
 	}

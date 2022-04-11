@@ -6,24 +6,29 @@
 package clusteragent
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
-
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/util/log"
-
 	"github.com/DataDog/datadog-agent/pkg/api/security"
-	"github.com/DataDog/datadog-agent/pkg/api/util"
 	apiv1 "github.com/DataDog/datadog-agent/pkg/clusteragent/api/v1"
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/clusterchecks/types"
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
 	"github.com/DataDog/datadog-agent/pkg/version"
 )
@@ -98,6 +103,139 @@ func GetClusterAgentClient() (DCAClientInterface, error) {
 	return globalClusterAgentClient, nil
 }
 
+var goroutineSpace = []byte("goroutine ")
+
+var littleBuf = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 64)
+		return &buf
+	},
+}
+
+func curGoroutineID() uint64 {
+	bp := littleBuf.Get().(*[]byte)
+	defer littleBuf.Put(bp)
+	b := *bp
+	b = b[:runtime.Stack(b, false)]
+	// Parse the 4707 out of "goroutine 4707 ["
+	b = bytes.TrimPrefix(b, goroutineSpace)
+	i := bytes.IndexByte(b, ' ')
+	if i < 0 {
+		panic(fmt.Sprintf("No space found in %q", b))
+	}
+	b = b[:i]
+	n, err := strconv.ParseUint(string(b), 10, 64)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse goroutine ID out of %q: %v", b, err))
+	}
+	return n
+}
+
+var eventSeq, requestSeq uint64 = 0, 0
+
+func getCustomClientTracer(requestNumber uint64) *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		GetConn: func(hostPort string) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | GetConn | %d | %d | %s", eventNum, requestNumber, hostPort)
+		},
+		GotConn: func(gci httptrace.GotConnInfo) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | GotConn | %d | %d | %+v", eventNum, requestNumber, gci)
+		},
+		PutIdleConn: func(err error) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | PutIdleConn | %d | %d | err: %v", eventNum, requestNumber, err)
+		},
+		DNSStart: func(di httptrace.DNSStartInfo) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | DNSStart | %d | %d | host: %s", eventNum, requestNumber, di.Host)
+		},
+		DNSDone: func(di httptrace.DNSDoneInfo) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | DNSDone | %d | %d | %+v", eventNum, requestNumber, di)
+		},
+		ConnectStart: func(network, addr string) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | ConnectStart | %d | %d | %s/%s", eventNum, requestNumber, network, addr)
+		},
+		ConnectDone: func(network, addr string, err error) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | ConnectDone | %d | %d | %s/%s, err: %v", eventNum, requestNumber, network, addr, err)
+		},
+		TLSHandshakeStart: func() {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | TLSHandshakeStart | %d", eventNum)
+		},
+		TLSHandshakeDone: func(cs tls.ConnectionState, err error) {
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | TLSHandshakeDone | %d | server: %s, resume: %t, complete: %t", eventNum, requestNumber, cs.ServerName, cs.DidResume, cs.HandshakeComplete)
+		},
+	}
+}
+
+type LoggingRoundTriper struct {
+	tr *http.Transport
+}
+
+func (lt *LoggingRoundTriper) RoundTrip(req *http.Request) (*http.Response, error) {
+	eventNum := atomic.AddUint64(&eventSeq, 1)
+	goRoutineID := curGoroutineID()
+	log.Infof("VBDEBUG | TRANS | %d | %d | RoundTrip Query: %s, %s", eventNum, goRoutineID, req.Method, req.URL.String())
+	resp, err := lt.tr.RoundTrip(req)
+	var statusCode int
+	if resp != nil {
+		statusCode = resp.StatusCode
+	}
+
+	eventNum = atomic.AddUint64(&eventSeq, 1)
+	log.Infof("VBDEBUG | TRANS | %d | %d | RoundTrip Response: %s, %s, rc: %d, err: %v", eventNum, goRoutineID, req.Method, req.URL.String(), statusCode, err)
+	return resp, err
+}
+
+func buildDCAHttpClient() *http.Client {
+	// Using default Dialer (same as default Transport code)
+	dialer := net.Dialer{
+		Timeout:   2 * time.Second,
+		KeepAlive: 10 * time.Second,
+	}
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			goRoutineID := curGoroutineID()
+			eventNum := atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | DIAL | %d | %d | Dialing to: %s/%s", eventNum, goRoutineID, network, addr)
+			conn, err := dialer.DialContext(ctx, network, addr)
+
+			var conStr string
+			var connAddr net.Addr
+			if conn != nil {
+				connAddr = conn.LocalAddr()
+				if connAddr != nil {
+					conStr += "local: '" + connAddr.String() + "'"
+				}
+
+				connAddr = conn.RemoteAddr()
+				if connAddr != nil {
+					conStr += " remote: '" + connAddr.String() + "'"
+				}
+			}
+
+			eventNum = atomic.AddUint64(&eventSeq, 1)
+			log.Infof("VBDEBUG | DIAL | %d | %d | Dialing to: %s/%s FINISHED!, conn: %v, connStr: %s, err: %v", eventNum, goRoutineID, network, addr, conn, conStr, err)
+			return conn, err
+		},
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+		TLSHandshakeTimeout: 1 * time.Second,
+		MaxConnsPerHost:     1,
+		IdleConnTimeout:     5 * time.Minute,
+	}
+
+	return &http.Client{
+		Transport: &LoggingRoundTriper{tr: tr},
+		Timeout:   3 * time.Second,
+	}
+}
+
 func (c *DCAClient) init() error {
 	var err error
 
@@ -117,8 +255,7 @@ func (c *DCAClient) init() error {
 	c.clusterAgentAPIRequestHeaders.Set(RealIPHeader, podIP)
 
 	// TODO remove insecure
-	c.clusterAgentAPIClient = util.GetClient(false)
-	c.clusterAgentAPIClient.Timeout = 2 * time.Second
+	c.clusterAgentAPIClient = buildDCAHttpClient()
 
 	// Validate the cluster-agent client by checking the version
 	c.ClusterAgentVersion, err = c.GetVersion()
@@ -215,7 +352,7 @@ func (c *DCAClient) GetVersion() (version.Version, error) {
 	// https://host:port/version
 	rawURL := fmt.Sprintf("%s/%s", c.clusterAgentAPIEndpoint, dcaVersionPath)
 
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return version, err
 	}
@@ -251,7 +388,7 @@ func (c *DCAClient) getMapStringString(queryPath, objectName string) (map[string
 	// https://host:port/api/v1/annotations/node/{nodeName}
 	rawURL := fmt.Sprintf("%s/%s/%s", c.clusterAgentAPIEndpoint, queryPath, objectName)
 
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +436,7 @@ func (c *DCAClient) GetCFAppsMetadataForNode(nodename string) (map[string][]stri
 	// https://host:port/api/v1/tags/cf/apps/{nodename}
 	rawURL := fmt.Sprintf("%s/%s/%s", c.clusterAgentAPIEndpoint, dcaCFAppsMeta, nodename)
 
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +492,7 @@ func (c *DCAClient) GetPodsMetadataForNode(nodeName string) (apiv1.NamespacesPod
 	}
 	*/
 	rawURL := fmt.Sprintf("%s/%s/%s", c.clusterAgentAPIEndpoint, dcaMetadataPath, nodeName)
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +538,7 @@ func (c *DCAClient) GetKubernetesMetadataNames(nodeName, ns, podName string) ([]
 
 	// https://host:port/api/v1/metadata/{nodeName}/{ns}/{pod-[0-9a-z]+}
 	rawURL := fmt.Sprintf("%s/%s/%s/%s/%s", c.clusterAgentAPIEndpoint, dcaMetadataPath, nodeName, ns, podName)
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return metadataNames, err
 	}
@@ -442,7 +579,7 @@ func (c *DCAClient) GetKubernetesClusterID() (string, error) {
 
 	// https://host:port/api/v1/cluster/id
 	rawURL := fmt.Sprintf("%s/%s", c.clusterAgentAPIEndpoint, dcaClusterIDPath)
-	req, err := http.NewRequest("GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return "", err
 	}

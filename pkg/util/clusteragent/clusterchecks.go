@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
+	"sync/atomic"
 
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/clusterchecks/types"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -47,7 +49,7 @@ func (c *DCAClient) doPostClusterCheckStatus(ctx context.Context, identifier str
 
 	// https://host:port/api/v1/clusterchecks/status/{identifier}
 	rawURL := c.leaderClient.buildURL(dcaClusterChecksStatusPath, identifier)
-	req, err := http.NewRequestWithContext(ctx, "POST", rawURL, bytes.NewBuffer(queryBody))
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "POST", rawURL, bytes.NewBuffer(queryBody))
 	if err != nil {
 		return response, err
 	}
@@ -91,7 +93,7 @@ func (c *DCAClient) doGetClusterCheckConfigs(ctx context.Context, identifier str
 
 	// https://host:port/api/v1/clusterchecks/configs/{identifier}
 	rawURL := c.leaderClient.buildURL(dcaClusterChecksConfigsPath, identifier)
-	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, getCustomClientTracer(atomic.AddUint64(&requestSeq, 1))), "GET", rawURL, nil)
 	if err != nil {
 		return configs, err
 	}
