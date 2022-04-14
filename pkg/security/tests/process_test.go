@@ -1008,6 +1008,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETUID, 1001, 0, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 
 			wg.Wait()
@@ -1038,6 +1039,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETREUID, 1002, 1003, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1068,6 +1070,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETRESUID, 1002, 1003, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 
 			wg.Wait()
@@ -1099,6 +1102,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETFSUID, 1004, 0, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1128,6 +1132,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETGID, 1005, 0, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1157,6 +1162,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETREGID, 1006, 1007, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1187,6 +1193,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETRESGID, 1006, 1007, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1217,6 +1224,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if _, _, errno := syscall.Syscall(syscall.SYS_SETFSGID, 1008, 0, 0); errno != 0 {
 					errChan <- error(errno)
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
@@ -1263,6 +1271,7 @@ func TestProcessCredentialsUpdate(t *testing.T) {
 				if err := threadCapabilities.Apply(capability.CAPS); err != nil {
 					errChan <- err
 				}
+				runtime.Goexit()
 			}()
 			wg.Wait()
 
