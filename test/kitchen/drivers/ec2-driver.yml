@@ -21,8 +21,10 @@ driver:
   associate_public_ip: false
   subnet_id: <%= ENV['KITCHEN_EC2_SUBNET'] ||= 'subnet-b89e00e2' %>
   iam_profile_name: <%= ENV['KITCHEN_EC2_IAM_PROFILE_NAME'] ||= '' %>
+  <% if ENV['KITCHEN_EC2_SPOT_PRICE'] != nil %>
   spot_price: <%= ENV['KITCHEN_EC2_SPOT_PRICE'] %>
   block_duration_minutes: <%= ENV['KITCHEN_EC2_SPOT_DURATION'] ||= '60' %>
+  <% end %>
   tags:
     Name: ci-datadog-agent-kitchen
     team: agent-platform

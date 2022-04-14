@@ -55,7 +55,7 @@
   variables:
     KITCHEN_ARCH: x86_64
     KITCHEN_EC2_INSTANCE_TYPE: "t3.xlarge"
-  extends: .kitchen_ec2_spot_instances
+  extends: .kitchen_ec2_demand_instances
 
 # Kitchen: agents
 # ---------------
