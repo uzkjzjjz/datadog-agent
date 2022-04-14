@@ -138,6 +138,7 @@ func TestMkdirError(t *testing.T) {
 					errChan <- error(errno)
 					return
 				}
+				runtime.Goexit()
 			}()
 
 			wg.Wait()
