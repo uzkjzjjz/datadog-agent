@@ -353,3 +353,7 @@ func (suite *ConfigManagerSuite) TestFuzz() {
 func TestSimpleConfigManagement(t *testing.T) {
 	suite.Run(t, &ConfigManagerSuite{factory: newSimpleConfigManager})
 }
+
+func TestPriorityConfigManagement(t *testing.T) {
+	suite.Run(t, &ConfigManagerSuite{factory: newPriorityConfigManager})
+}
