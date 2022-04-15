@@ -19,6 +19,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
 	"github.com/DataDog/datadog-agent/pkg/tagger"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
@@ -58,6 +59,12 @@ func (l *listenerCandidate) try() (listeners.ServiceListener, error) {
 
 // NewAutoConfig creates an AutoConfig instance.
 func NewAutoConfig(scheduler *scheduler.MetaScheduler) *AutoConfig {
+	var cfgMgr configManager
+	if util.CcaUseBareConfigs() {
+		cfgMgr = newReconcilingConfigManager()
+	} else {
+		cfgMgr = newSimpleConfigManager()
+	}
 	ac := &AutoConfig{
 		providers:          make([]*configPoller, 0, 9),
 		listenerCandidates: make(map[string]*listenerCandidate),
@@ -67,7 +74,7 @@ func NewAutoConfig(scheduler *scheduler.MetaScheduler) *AutoConfig {
 		newService:         make(chan listeners.Service),
 		delService:         make(chan listeners.Service),
 		store:              newStore(),
-		cfgMgr:             newSimpleConfigManager(),
+		cfgMgr:             cfgMgr,
 		scheduler:          scheduler,
 	}
 	// We need to listen to the service channels before anything is sent to them
