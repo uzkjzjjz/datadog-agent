@@ -55,7 +55,6 @@
   extends: .kitchen_ec2_spot_instances
   variables:
     KITCHEN_ARCH: x86_64
-    KITCHEN_EC2_INSTANCE_TYPE: "t2.medium"
 
 # Kitchen: agents
 # ---------------

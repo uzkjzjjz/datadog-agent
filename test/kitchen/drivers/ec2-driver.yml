@@ -89,6 +89,14 @@ platforms:
     <% if windows %>
     name: winrm
     elevated: true
+    port: 5986
+    winrm_transport: ssl
+    ssl: true
+    self_signed: true
+    username: Administrator
+    connection_retries: 10
+    connection_retry_sleep: 5
+    max_wait_until_ready: 1000
     <% else %>
     connection_retries: 30
     connection_retry_sleep: 2
@@ -96,6 +104,8 @@ platforms:
     <% if sles15 %>
     username: ec2-user
     <% end %>
+    <% if ENV['KITCHEN_EC2_SSH_KEY'] != nil %>
     ssh_key: <%= ENV['KITCHEN_EC2_SSH_KEY'] %>
+    <% end %>
 
 <% end %>
