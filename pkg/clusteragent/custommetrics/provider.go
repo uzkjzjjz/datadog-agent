@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes-sigs/custom-metrics-apiserver/pkg/provider"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,13 +23,16 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/metrics/pkg/apis/custom_metrics"
 	"k8s.io/metrics/pkg/apis/external_metrics"
+	"sigs.k8s.io/custom-metrics-apiserver/pkg/provider"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
-const externalMetricsMaxBackoff = 32 * time.Second
-const externalMetricsBaseBackoff = 1 * time.Second
+const (
+	externalMetricsMaxBackoff  = 32 * time.Second
+	externalMetricsBaseBackoff = 1 * time.Second
+)
 
 type externalMetric struct {
 	info  provider.ExternalMetricInfo
@@ -156,7 +158,6 @@ func (p *datadogProvider) ListAllExternalMetrics() []provider.ExternalMetricInfo
 
 // GetExternalMetric is called by the Autoscaler Controller to get the value of the external metric it is currently evaluating.
 func (p *datadogProvider) GetExternalMetric(namespace string, metricSelector labels.Selector, info provider.ExternalMetricInfo) (*external_metrics.ExternalMetricValueList, error) {
-
 	if !p.isServing || time.Now().Unix()-p.timestamp > 2*p.maxAge {
 		return nil, fmt.Errorf("external metrics invalid")
 	}

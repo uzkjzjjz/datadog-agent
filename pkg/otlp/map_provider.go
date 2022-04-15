@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"strings"
 
+	"/collector/service"
 	"go.opentelemetry.io/collector/config"
-	"go.opentelemetry.io/collector/service"
 	"go.uber.org/multierr"
 
 	"github.com/DataDog/datadog-agent/pkg/otlp/internal/configutils"
