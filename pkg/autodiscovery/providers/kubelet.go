@@ -165,6 +165,8 @@ func (k *KubeletConfigProvider) generateConfigs() ([]integration.Config, error) 
 				continue
 			}
 
+			c := utils.AddContainerCollectAllConfigs(c)
+
 			containerIdentifiers[adIdentifier] = struct{}{}
 			containerNames[podContainer.Name] = struct{}{}
 
