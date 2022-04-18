@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -105,6 +106,7 @@ func ExtractTemplatesFromAnnotations(entityName string, annotations map[string]s
 		if err != nil {
 			errors = append(errors, err)
 		} else {
+			c = addEmptyOverrideCheck(entityName, c)
 			configs = append(configs, c...)
 		}
 	} else {
@@ -116,6 +118,7 @@ func ExtractTemplatesFromAnnotations(entityName string, annotations map[string]s
 			if err != nil {
 				errors = append(errors, fmt.Errorf("could not extract checks config: %v", err))
 			} else {
+				c = addEmptyOverrideCheck(entityName, c)
 				configs = append(configs, c...)
 			}
 		}
@@ -139,6 +142,24 @@ func ExtractTemplatesFromAnnotations(entityName string, annotations map[string]s
 	}
 
 	return configs, errors
+}
+
+// Empty check names on k8s annotations or container labels override the check
+// config from file Used to deactivate unneeded OOTB autodiscovery checks
+// defined in files The checkNames slice is considered empty also if it
+// contains one single empty string.
+func addEmptyOverrideCheck(adIdentifier string, configs []integration.Config) []integration.Config {
+	// This only occurs when temporary config `logs_config.cca_use_bare_configs` is set; otherwise
+	// this functionality is handled in the listener.
+	if util.CcaUseBareConfigs() {
+		if len(configs) == 0 || (len(configs) == 1 && configs[0].Name == "") {
+			configs = []integration.Config{{
+				ADIdentifiers:    []string{adIdentifier},
+				TemplatePriority: integration.OverrideFileTemplatePriority,
+			}}
+		}
+	}
+	return configs
 }
 
 // parseChecksJSON parses an AD annotation v2

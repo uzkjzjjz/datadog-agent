@@ -102,7 +102,11 @@ type Config struct {
 	// band are actually scheduled.  This value is used to implement features such
 	// as container_collect_all and is not externally configurable.
 	//
-	// Most templates have priority 0, the default.
+	// This value has no effect unless temporary config flag
+	// `logs_config.cca_use_bare_configs` is set.
+	//
+	// Most templates have priority 0, the default.  Other values are given by
+	// the *TemplatePriority constants in this package.
 	TemplatePriority int // (include in digest: false)
 }
 
@@ -133,6 +137,16 @@ type KubeNamespacedName struct {
 	Name      string `yaml:"name"`
 	Namespace string `yaml:"namespace"`
 }
+
+// Constants for Config.TemplatePriority.
+const (
+	// DefaultTemplatePriority is the default priority, applied to templates
+	// not explicitly setting the priority.
+	DefaultTemplatePriority int = 0
+
+	// OverrideFileTemplatePriority is used to override the priority of file-based configs.
+	OverrideFileTemplatePriority = 1
+)
 
 // IsEmpty returns true if the KubeNamespacedName is empty
 func (k KubeNamespacedName) IsEmpty() bool {

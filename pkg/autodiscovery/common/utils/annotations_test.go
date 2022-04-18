@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,11 +83,12 @@ func TestExtractTemplatesFromAnnotations(t *testing.T) {
 	const adID = "docker://foobar"
 
 	tests := []struct {
-		name         string
-		annotations  map[string]string
-		adIdentifier string
-		output       []integration.Config
-		errs         []error
+		name              string
+		annotations       map[string]string
+		adIdentifier      string
+		ccaUseBareConfigs bool
+		output            []integration.Config
+		errs              []error
 	}{
 		{
 			name: "Nominal case with two templates",
@@ -305,6 +307,30 @@ func TestExtractTemplatesFromAnnotations(t *testing.T) {
 			},
 		},
 		{
+			name: "empty check_names -> higher priority when cca_use_bare_configs",
+			annotations: map[string]string{
+				"ad.datadoghq.com/foobar.checks": `{}`,
+			},
+			adIdentifier:      "foobar",
+			ccaUseBareConfigs: true,
+			output: []integration.Config{
+				{
+					Name:             "", // empty config to override file-based configs
+					ADIdentifiers:    []string{adID},
+					TemplatePriority: integration.OverrideFileTemplatePriority,
+				},
+			},
+		},
+		{
+			name: "empty check_names -> nothing without cca_use_bare_configs",
+			annotations: map[string]string{
+				"ad.datadoghq.com/foobar.checks": `{}`,
+			},
+			adIdentifier:      "foobar",
+			ccaUseBareConfigs: false,
+			output:            []integration.Config{},
+		},
+		{
 			name: "v2 annotations + logs",
 			annotations: map[string]string{
 				"ad.datadoghq.com/foobar.checks": `{
@@ -334,6 +360,7 @@ func TestExtractTemplatesFromAnnotations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			util.ForceCcaUseBareConfigs(tt.ccaUseBareConfigs)
 			configs, errs := ExtractTemplatesFromAnnotations(adID, tt.annotations, tt.adIdentifier)
 			assert.ElementsMatch(t, tt.output, configs)
 			assert.ElementsMatch(t, tt.errs, errs)
