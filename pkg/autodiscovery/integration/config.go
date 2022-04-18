@@ -140,9 +140,14 @@ type KubeNamespacedName struct {
 
 // Constants for Config.TemplatePriority.
 const (
+	// ContainerCollectAllTemplatePriority is a low priority for collecting
+	// configuration on containers when they have no other applicable
+	// (default-priority) configuration.
+	ContainerCollectAllTemplatePriority int = -1
+
 	// DefaultTemplatePriority is the default priority, applied to templates
 	// not explicitly setting the priority.
-	DefaultTemplatePriority int = 0
+	DefaultTemplatePriority = 0
 
 	// OverrideFileTemplatePriority is used to override the priority of file-based configs.
 	OverrideFileTemplatePriority = 1

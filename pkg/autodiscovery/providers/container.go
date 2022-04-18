@@ -176,6 +176,8 @@ func (d *ContainerConfigProvider) generateConfigs() ([]integration.Config, error
 			log.Errorf("Can't parse template for container %s: %s", containerID, err)
 		}
 
+		c := utils.AddContainerCollectAllConfigs(c)
+
 		for idx := range c {
 			c[idx].Source = names.Container + ":" + containerEntityName
 		}
