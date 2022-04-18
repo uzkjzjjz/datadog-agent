@@ -96,6 +96,14 @@ type Config struct {
 	// LogsExcluded is whether logs collection is disabled (set by container
 	// listeners only)
 	LogsExcluded bool `json:"logs_excluded"` // (include in digest: false)
+
+	// TemplatePriority gives the priority of a configuration template.  When
+	// multiple templates match a service, only those in the highest priority
+	// band are actually scheduled.  This value is used to implement features such
+	// as container_collect_all and is not externally configurable.
+	//
+	// Most templates have priority 0, the default.
+	TemplatePriority int // (include in digest: false)
 }
 
 // CommonInstanceConfig holds the reserved fields for the yaml instance data

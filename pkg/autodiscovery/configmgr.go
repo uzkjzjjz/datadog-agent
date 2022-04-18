@@ -7,6 +7,7 @@ package autodiscovery
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/configresolver"
@@ -352,11 +353,21 @@ func (cm *priorityConfigManager) reconcileService(svcID string) configChanges {
 	}
 
 	// calculate the expected matching templates by template digest
+	resolutionPriority := math.MinInt
 	expectedResolutions := map[string]struct{}{}
 	for _, adID := range adIDs {
 		digests := cm.templatesByADID.get(adID)
 		for _, digest := range digests {
-			expectedResolutions[digest] = struct{}{}
+			config := cm.activeConfigs[digest]
+			if config.TemplatePriority > resolutionPriority {
+				// this config has higher priority than any seen so far, so
+				// drop all of the previous resolutions
+				resolutionPriority = config.TemplatePriority
+				expectedResolutions = map[string]struct{}{}
+			}
+			if config.TemplatePriority == resolutionPriority {
+				expectedResolutions[digest] = struct{}{}
+			}
 		}
 	}
 

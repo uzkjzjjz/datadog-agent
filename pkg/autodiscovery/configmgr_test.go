@@ -44,6 +44,19 @@ func assertConfigsMatch(t *testing.T, configs []integration.Config, matches ...f
 	}
 }
 
+// assertLoadedConfigsMatch asserts that the set of loaded configs on the given
+// configManager matches the given functions.
+func assertLoadedConfigsMatch(t *testing.T, cm configManager, matches ...func(integration.Config) bool) {
+	var configs []integration.Config
+	cm.mapOverLoadedConfigs(func(loaded map[string]integration.Config) {
+		for _, cfg := range loaded {
+			configs = append(configs, cfg)
+		}
+	})
+
+	assertConfigsMatch(t, configs, matches...)
+}
+
 // matchAll matches when all of the given functions match
 func matchAll(matches ...func(integration.Config) bool) func(integration.Config) bool {
 	return func(config integration.Config) bool {
@@ -67,6 +80,13 @@ func matchName(name string) func(integration.Config) bool {
 func matchLogsConfig(logsConfig string) func(integration.Config) bool {
 	return func(config integration.Config) bool {
 		return string(config.LogsConfig) == logsConfig
+	}
+}
+
+// matchLogsConfig matches config.LogsConfig (for verifying templates are applied)
+func matchSvc(serviceID string) func(integration.Config) bool {
+	return func(config integration.Config) bool {
+		return config.ServiceID == serviceID
 	}
 }
 
@@ -354,6 +374,151 @@ func TestSimpleConfigManagement(t *testing.T) {
 	suite.Run(t, &ConfigManagerSuite{factory: newSimpleConfigManager})
 }
 
+type PriorityConfigManagerSuite struct {
+	ConfigManagerSuite // include all ConfigManager tests, and more..
+}
+
+// Adding and removing templates at various priorities schedules only the
+// appropriate resolved configs.
+func (suite *PriorityConfigManagerSuite) TestServiceWithMultipleTemplatePriorities() {
+	// adding a service with no templates has no effect
+	changes := suite.cm.processNewService(myService.ADIdentifiers, myService)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm)
+
+	// adding a template at priority 0: resolve and schedule it
+	p0 := integration.Config{Name: "p0", ADIdentifiers: []string{"my-service"}, TemplatePriority: 0}
+	changes = suite.cm.processNewConfig(p0)
+	assertConfigsMatch(suite.T(), changes.schedule, matchName("p0"))
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p0"))
+
+	// adding a template at priority 1: override p0 with this new template
+	p1 := integration.Config{Name: "p1", ADIdentifiers: []string{"my-service"}, TemplatePriority: 1}
+	changes = suite.cm.processNewConfig(p1)
+	assertConfigsMatch(suite.T(), changes.schedule, matchName("p1"))
+	assertConfigsMatch(suite.T(), changes.unschedule, matchName("p0"))
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p1"))
+
+	// adding another template at priority 1: resolve and schedule it
+	p1b := integration.Config{Name: "p1b", ADIdentifiers: []string{"my-service"}, TemplatePriority: 1}
+	changes = suite.cm.processNewConfig(p1b)
+	assertConfigsMatch(suite.T(), changes.schedule, matchName("p1b"))
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p1"), matchName("p1b"))
+
+	// adding a template at priority 2: override both p1s with new template
+	p2 := integration.Config{Name: "p2", ADIdentifiers: []string{"my-service"}, TemplatePriority: 2}
+	changes = suite.cm.processNewConfig(p2)
+	assertConfigsMatch(suite.T(), changes.schedule, matchName("p2"))
+	assertConfigsMatch(suite.T(), changes.unschedule, matchName("p1"), matchName("p1b"))
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p2"))
+
+	// remove the template at priority 0: no change
+	changes = suite.cm.processDelConfigs([]integration.Config{p0})
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p2"))
+
+	// remove the template at priority 2: re-schedule both p1 templates
+	changes = suite.cm.processDelConfigs([]integration.Config{p2})
+	assertConfigsMatch(suite.T(), changes.schedule, matchName("p1"), matchName("p1b"))
+	assertConfigsMatch(suite.T(), changes.unschedule, matchName("p2"))
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p1"), matchName("p1b"))
+
+	// re-add the template at priority 0: no change
+	changes = suite.cm.processNewConfig(p0)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchName("p1"), matchName("p1b"))
+
+	// remove the service: unschedule the p1 templates
+	changes = suite.cm.processDelService(myService)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule, matchName("p1"), matchName("p1b"))
+	assertLoadedConfigsMatch(suite.T(), suite.cm)
+}
+
+// Multiple services matching subsets of configs obey template priorities
+// appropriate resolved configs.
+func (suite *PriorityConfigManagerSuite) TestMultipleServicesWithTemplatePriorities() {
+	var changes configChanges
+
+	svcAB := &dummyService{ID: "AB", ADIdentifiers: []string{"argbot", "bloopr"}}
+	//svcB := &dummyService{ID: "B", ADIdentifiers: []string{"bloopr"}}
+	svcC := &dummyService{ID: "C", ADIdentifiers: []string{"clestyl"}}
+
+	a0 := integration.Config{Name: "a0", ADIdentifiers: []string{"argbot"}, TemplatePriority: 0}
+	b1 := integration.Config{Name: "b1", ADIdentifiers: []string{"bloopr"}, TemplatePriority: 1}
+	c0 := integration.Config{Name: "c0", ADIdentifiers: []string{"clestyl"}, TemplatePriority: 0}
+	abc5 := integration.Config{Name: "abc5", ADIdentifiers: []string{"argbot", "bloopr", "clestyl"}, TemplatePriority: 5}
+
+	// adding a templates has no effect with no services defined
+	changes = suite.cm.processNewConfig(a0)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	changes = suite.cm.processNewConfig(b1)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	changes = suite.cm.processNewConfig(c0)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm)
+
+	// svcAB matches templates at different priorities and uses the highest priority
+	changes = suite.cm.processNewService(svcAB.ADIdentifiers, svcAB)
+	assertConfigsMatch(suite.T(), changes.schedule, matchAll(matchName("b1"), matchSvc("AB")))
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchAll(matchName("b1"), matchSvc("AB")))
+
+	// svcC matches templates at lower priority than svcAB
+	changes = suite.cm.processNewService(svcC.ADIdentifiers, svcC)
+	assertConfigsMatch(suite.T(), changes.schedule, matchAll(matchName("c0"), matchSvc("C")))
+	assertConfigsMatch(suite.T(), changes.unschedule)
+	assertLoadedConfigsMatch(suite.T(), suite.cm,
+		matchAll(matchName("b1"), matchSvc("AB")),
+		matchAll(matchName("c0"), matchSvc("C")),
+	)
+
+	// dropping a higher-priority template reverts svcAB back to a template with a different ADID
+	changes = suite.cm.processDelConfigs([]integration.Config{b1})
+	assertConfigsMatch(suite.T(), changes.schedule, matchAll(matchName("a0"), matchSvc("AB")))
+	assertConfigsMatch(suite.T(), changes.unschedule, matchAll(matchName("b1"), matchSvc("AB")))
+	assertLoadedConfigsMatch(suite.T(), suite.cm,
+		matchAll(matchName("a0"), matchSvc("AB")),
+		matchAll(matchName("c0"), matchSvc("C")),
+	)
+
+	// adding a higher-priority template updates both active services
+	changes = suite.cm.processNewConfig(abc5)
+	assertConfigsMatch(suite.T(), changes.schedule,
+		matchAll(matchName("abc5"), matchSvc("AB")),
+		matchAll(matchName("abc5"), matchSvc("C")),
+	)
+	assertConfigsMatch(suite.T(), changes.unschedule,
+		matchAll(matchName("a0"), matchSvc("AB")),
+		matchAll(matchName("c0"), matchSvc("C")),
+	)
+	assertLoadedConfigsMatch(suite.T(), suite.cm,
+		matchAll(matchName("abc5"), matchSvc("AB")),
+		matchAll(matchName("abc5"), matchSvc("C")),
+	)
+
+	// dropping the services one-by-one unschedules them
+	changes = suite.cm.processDelService(svcC)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule, matchAll(matchName("abc5"), matchSvc("C")))
+	assertLoadedConfigsMatch(suite.T(), suite.cm, matchAll(matchName("abc5"), matchSvc("AB")))
+
+	changes = suite.cm.processDelService(svcAB)
+	assertConfigsMatch(suite.T(), changes.schedule)
+	assertConfigsMatch(suite.T(), changes.unschedule, matchAll(matchName("abc5"), matchSvc("AB")))
+	assertLoadedConfigsMatch(suite.T(), suite.cm)
+}
+
 func TestPriorityConfigManagement(t *testing.T) {
-	suite.Run(t, &ConfigManagerSuite{factory: newPriorityConfigManager})
+	suite.Run(t, &PriorityConfigManagerSuite{
+		ConfigManagerSuite{factory: newPriorityConfigManager},
+	})
 }
