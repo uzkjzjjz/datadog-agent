@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -47,12 +46,11 @@ type KubeUtil struct {
 	// used to setup the KubeUtil
 	initRetry retry.Retrier
 
-	kubeletClient          *kubeletClient
-	rawConnectionInfo      map[string]string // kept to pass to the python kubelet check
-	podListCacheDuration   time.Duration
-	filter                 *containers.Filter
-	waitOnMissingContainer time.Duration
-	podUnmarshaller        *podUnmarshaller
+	kubeletClient        *kubeletClient
+	rawConnectionInfo    map[string]string // kept to pass to the python kubelet check
+	podListCacheDuration time.Duration
+	filter               *containers.Filter
+	podUnmarshaller      *podUnmarshaller
 }
 
 func (ku *KubeUtil) init() error {
@@ -90,11 +88,6 @@ func NewKubeUtil() *KubeUtil {
 		rawConnectionInfo:    make(map[string]string),
 		podListCacheDuration: config.Datadog.GetDuration("kubelet_cache_pods_duration") * time.Second,
 		podUnmarshaller:      newPodUnmarshaller(),
-	}
-
-	waitOnMissingContainer := config.Datadog.GetDuration("kubelet_wait_on_missing_container")
-	if waitOnMissingContainer > 0 {
-		ku.waitOnMissingContainer = waitOnMissingContainer * time.Second
 	}
 
 	return ku
@@ -232,63 +225,6 @@ func (ku *KubeUtil) ForceGetLocalPodList(ctx context.Context) ([]*Pod, error) {
 	return ku.GetLocalPodList(ctx)
 }
 
-// GetPodForContainerID fetches the podList and returns the pod running
-// a given container on the node. Reset the cache if needed.
-// Returns a nil pointer if not found.
-func (ku *KubeUtil) GetPodForContainerID(ctx context.Context, containerID string) (*Pod, error) {
-	// Best case scenario
-	pods, err := ku.GetLocalPodList(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pod, err := ku.searchPodForContainerID(pods, containerID)
-	if err == nil {
-		return pod, nil
-	}
-
-	// Retry with cache invalidation
-	if err != nil && errors.IsNotFound(err) {
-		log.Debugf("Cannot get container %q: %s, retrying without cache...", containerID, err)
-		pods, err = ku.ForceGetLocalPodList(ctx)
-		if err != nil {
-			return nil, err
-		}
-		pod, err = ku.searchPodForContainerID(pods, containerID)
-		if err == nil {
-			return pod, nil
-		}
-	}
-
-	// On some kubelet versions, containers can take up to a second to
-	// register in the podlist, retry a few times before failing
-	if ku.waitOnMissingContainer == 0 {
-		log.Tracef("Still cannot get container %q, wait disabled", containerID)
-		return pod, err
-	}
-	timeout := time.NewTimer(ku.waitOnMissingContainer)
-	defer timeout.Stop()
-	retryTicker := time.NewTicker(250 * time.Millisecond)
-	defer retryTicker.Stop()
-	for {
-		log.Tracef("Still cannot get container %q: %s, retrying in 250ms", containerID, err)
-		select {
-		case <-retryTicker.C:
-			pods, err = ku.ForceGetLocalPodList(ctx)
-			if err != nil {
-				continue
-			}
-			pod, err = ku.searchPodForContainerID(pods, containerID)
-			if err != nil {
-				continue
-			}
-			return pod, nil
-		case <-timeout.C:
-			// Return the latest error on timeout
-			return nil, err
-		}
-	}
-}
-
 func (ku *KubeUtil) searchPodForContainerID(podList []*Pod, containerID string) (*Pod, error) {
 	if containerID == "" {
 		return nil, fmt.Errorf("containerID is empty")
@@ -356,16 +292,6 @@ func (ku *KubeUtil) GetPodFromUID(ctx context.Context, podUID string) (*Pod, err
 		}
 	}
 	return nil, errors.NewNotFound(fmt.Sprintf("pod %s in podlist", podUID))
-}
-
-// GetPodForEntityID returns a pointer to the pod that corresponds to an entity ID.
-// If the pod is not found it returns nil and an error.
-func (ku *KubeUtil) GetPodForEntityID(ctx context.Context, entityID string) (*Pod, error) {
-	if strings.HasPrefix(entityID, KubePodPrefix) {
-		uid := strings.TrimPrefix(entityID, KubePodPrefix)
-		return ku.GetPodFromUID(ctx, uid)
-	}
-	return ku.GetPodForContainerID(ctx, entityID)
 }
 
 func (ku *KubeUtil) GetLocalStatsSummary(ctx context.Context) (*kubeletv1alpha1.Summary, error) {

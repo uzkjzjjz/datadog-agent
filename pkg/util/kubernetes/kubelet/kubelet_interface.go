@@ -23,7 +23,6 @@ type KubeUtilInterface interface {
 	GetNodename(ctx context.Context) (string, error)
 	GetLocalPodList(ctx context.Context) ([]*Pod, error)
 	ForceGetLocalPodList(ctx context.Context) ([]*Pod, error)
-	GetPodForContainerID(ctx context.Context, containerID string) (*Pod, error)
 	GetStatusForContainerID(pod *Pod, containerID string) (ContainerStatus, error)
 	GetSpecForContainerName(pod *Pod, containerName string) (ContainerSpec, error)
 	GetPodFromUID(ctx context.Context, podUID string) (*Pod, error)
