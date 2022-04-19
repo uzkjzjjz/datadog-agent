@@ -137,23 +137,6 @@ func GetKubeUtil() (KubeUtilInterface, error) {
 	return util, nil
 }
 
-// GetNodeInfo returns the IP address and the hostname of the first valid pod in the PodList
-func (ku *KubeUtil) GetNodeInfo(ctx context.Context) (string, string, error) {
-	pods, err := ku.GetLocalPodList(ctx)
-	if err != nil {
-		return "", "", fmt.Errorf("error getting pod list from kubelet: %s", err)
-	}
-
-	for _, pod := range pods {
-		if pod.Status.HostIP == "" || pod.Spec.NodeName == "" {
-			continue
-		}
-		return pod.Status.HostIP, pod.Spec.NodeName, nil
-	}
-
-	return "", "", fmt.Errorf("failed to get node info, pod list length: %d", len(pods))
-}
-
 // GetNodename returns the nodename of the first pod.spec.nodeName in the PodList
 func (ku *KubeUtil) GetNodename(ctx context.Context) (string, error) {
 	pods, err := ku.GetLocalPodList(ctx)
@@ -219,12 +202,6 @@ func (ku *KubeUtil) GetLocalPodList(ctx context.Context) ([]*Pod, error) {
 	return pods.Items, nil
 }
 
-// ForceGetLocalPodList reset podList cache and call GetLocalPodList
-func (ku *KubeUtil) ForceGetLocalPodList(ctx context.Context) ([]*Pod, error) {
-	ResetCache()
-	return ku.GetLocalPodList(ctx)
-}
-
 func (ku *KubeUtil) searchPodForContainerID(podList []*Pod, containerID string) (*Pod, error) {
 	if containerID == "" {
 		return nil, fmt.Errorf("containerID is empty")
@@ -265,33 +242,6 @@ func (ku *KubeUtil) GetSpecForContainerName(pod *Pod, containerName string) (Con
 		}
 	}
 	return ContainerSpec{}, errors.NewNotFound(fmt.Sprintf("container %s in pod", containerName))
-}
-
-func (ku *KubeUtil) GetPodFromUID(ctx context.Context, podUID string) (*Pod, error) {
-	if podUID == "" {
-		return nil, fmt.Errorf("pod UID is empty")
-	}
-	pods, err := ku.GetLocalPodList(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods {
-		if pod.Metadata.UID == podUID {
-			return pod, nil
-		}
-	}
-	log.Debugf("cannot get the pod uid %q: %s, retrying without cache...", podUID, err)
-
-	pods, err = ku.ForceGetLocalPodList(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods {
-		if pod.Metadata.UID == podUID {
-			return pod, nil
-		}
-	}
-	return nil, errors.NewNotFound(fmt.Sprintf("pod %s in podlist", podUID))
 }
 
 func (ku *KubeUtil) GetLocalStatsSummary(ctx context.Context) (*kubeletv1alpha1.Summary, error) {

@@ -383,42 +383,6 @@ func (suite *KubeletTestSuite) TestPodlistCache() {
 	require.Equal(suite.T(), "/pods", r.URL.Path)
 }
 
-func (suite *KubeletTestSuite) TestGetPodFromUID() {
-	ctx := context.Background()
-	mockConfig := config.Mock()
-
-	kubelet, err := newDummyKubelet("./testdata/podlist_1.8-2.json")
-	require.Nil(suite.T(), err)
-	ts, kubeletPort, err := kubelet.Start()
-	defer ts.Close()
-	require.Nil(suite.T(), err)
-
-	mockConfig.Set("kubernetes_kubelet_host", "localhost")
-	mockConfig.Set("kubernetes_http_kubelet_port", kubeletPort)
-	mockConfig.Set("kubernetes_https_kubelet_port", -1)
-
-	kubeutil := suite.getCustomKubeUtil()
-	kubelet.dropRequests() // Throwing away first GETs
-
-	// Empty Pod UID
-	pod, err := kubeutil.GetPodFromUID(ctx, "")
-	require.Nil(suite.T(), pod)
-	require.NotNil(suite.T(), err)
-	require.Contains(suite.T(), err.Error(), "pod UID is empty")
-
-	// Not found Pod UID
-	pod, err = kubeutil.GetPodFromUID(ctx, "invalid")
-	require.Nil(suite.T(), pod)
-	require.NotNil(suite.T(), err)
-	require.True(suite.T(), errors.IsNotFound(err))
-
-	// Valid Pod UID
-	pod, err = kubeutil.GetPodFromUID(ctx, "e42b42ec-0749-11e8-a2b8-000c29dea4f6")
-	require.Nil(suite.T(), err)
-	require.NotNil(suite.T(), pod)
-	require.Equal(suite.T(), "kube-proxy-rnd5q", pod.Metadata.Name)
-}
-
 func (suite *KubeletTestSuite) TestKubeletInitFailOnToken() {
 	mockConfig := config.Mock()
 
@@ -678,7 +642,8 @@ func (suite *KubeletTestSuite) TestPodListNoExpire() {
 	require.NotNil(suite.T(), kubeutil)
 	kubelet.dropRequests() // Throwing away first GETs
 
-	pods, err := kubeutil.ForceGetLocalPodList(ctx)
+	ResetCache()
+	pods, err := kubeutil.GetLocalPodList(ctx)
 	require.Nil(suite.T(), err)
 	require.NotNil(suite.T(), pods)
 	require.Len(suite.T(), pods, 4)
@@ -716,7 +681,8 @@ func (suite *KubeletTestSuite) TestPodListExpire() {
 		return t
 	}
 
-	pods, err := kubeutil.ForceGetLocalPodList(ctx)
+	ResetCache()
+	pods, err := kubeutil.GetLocalPodList(ctx)
 	require.Nil(suite.T(), err)
 	require.NotNil(suite.T(), pods)
 	require.Len(suite.T(), pods, 3)
@@ -854,7 +820,8 @@ func (suite *KubeletTestSuite) TestPodListWithNullPod() {
 	kubeutil := suite.getCustomKubeUtil()
 	kubelet.dropRequests() // Throwing away first GETs
 
-	pods, err := kubeutil.ForceGetLocalPodList(ctx)
+	ResetCache()
+	pods, err := kubeutil.GetLocalPodList(ctx)
 	require.Nil(suite.T(), err)
 	require.NotNil(suite.T(), pods)
 	require.Len(suite.T(), pods, 1)
@@ -883,7 +850,8 @@ func (suite *KubeletTestSuite) TestPodListOnKubeletInit() {
 	kubeutil := suite.getCustomKubeUtil()
 	kubelet.dropRequests() // Throwing away first GETs
 
-	pods, err := kubeutil.ForceGetLocalPodList(ctx)
+	ResetCache()
+	pods, err := kubeutil.GetLocalPodList(ctx)
 	require.NotNil(suite.T(), err)
 	require.Nil(suite.T(), pods)
 }
@@ -907,7 +875,8 @@ func (suite *KubeletTestSuite) TestPodListWithPersistentVolumeClaim() {
 	kubeutil := suite.getCustomKubeUtil()
 	kubelet.dropRequests() // Throwing away first GETs
 
-	pods, err := kubeutil.ForceGetLocalPodList(ctx)
+	ResetCache()
+	pods, err := kubeutil.GetLocalPodList(ctx)
 	require.Nil(suite.T(), err)
 	require.NotNil(suite.T(), pods)
 	require.Len(suite.T(), pods, 9)
