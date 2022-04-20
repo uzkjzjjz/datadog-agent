@@ -261,7 +261,7 @@ func (l *Launcher) getSource(svc *service.Service) (*config.LogSource, error) {
 		logsSource := ""
 		shortImageName := container.Image.ShortName
 		if shortImageName == "" {
-			log.Debugf("Couldn't get short image for container '%s': empty ShortName", container.Name, err)
+			log.Debugf("Couldn't get short image for container %q: empty ShortName", container.Name)
 			// Fallback and use `kubernetes` as source name
 			logsSource = kubernetesIntegration
 		} else {
