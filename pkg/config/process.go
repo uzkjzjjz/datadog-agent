@@ -151,6 +151,9 @@ func setupProcesses(config Config) {
 	)
 	procBindEnvAndSetDefault(config, "process_config.process_discovery.interval", 4*time.Hour)
 
+	// Process Lifecycle Events
+	procBindEnvAndSetDefault(config, "process_config.process_lifecycle_events.enabled", false)
+
 	processesAddOverrideOnce.Do(func() {
 		AddOverrideFunc(loadProcessTransforms)
 	})

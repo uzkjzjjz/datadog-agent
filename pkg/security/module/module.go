@@ -373,10 +373,24 @@ func (m *Module) EventDiscarderFound(rs *rules.RuleSet, event eval.Event, field 
 	}
 }
 
+// IsProcessLifecycleEvent returns if a probe event is a process lifecycle event
+func (*Module) IsProcessLifecycleEvent(event *sprobe.Event) bool {
+	if event.GetEventType() == model.ExecEventType ||
+		event.GetEventType() == model.ExitEventType {
+		return true
+	}
+
+	return false
+}
+
 // HandleEvent is called by the probe when an event arrives from the kernel
 func (m *Module) HandleEvent(event *sprobe.Event) {
 	if ruleSet := m.GetRuleSet(); ruleSet != nil {
 		ruleSet.Evaluate(event)
+	}
+
+	if m.config.ProcessLifecycleEvents && m.IsProcessLifecycleEvent(event) {
+		m.apiServer.SendProcessEvent(event)
 	}
 }
 

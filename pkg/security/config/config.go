@@ -130,6 +130,8 @@ type Config struct {
 	RuntimeCompiledConstantsEnabled bool
 	// RuntimeCompiledConstantsIsSet is set if the runtime compiled constants option is user-set
 	RuntimeCompiledConstantsIsSet bool
+	// ProcessLifecycleEvents defines if the process lifecycle events feature should be enabled
+	ProcessLifecycleEvents bool
 }
 
 // IsEnabled returns true if any feature is enabled. Has to be applied in config package too
@@ -196,6 +198,7 @@ func NewConfig(cfg *config.Config) (*Config, error) {
 		RuntimeCompilationEnabled:       aconfig.Datadog.GetBool("runtime_security_config.runtime_compilation.enabled"),
 		RuntimeCompiledConstantsEnabled: aconfig.Datadog.GetBool("runtime_security_config.runtime_compilation.compiled_constants_enabled"),
 		RuntimeCompiledConstantsIsSet:   aconfig.Datadog.IsSet("runtime_security_config.runtime_compilation.compiled_constants_enabled"),
+		ProcessLifecycleEvents:          aconfig.Datadog.GetBool("process_config.process_lifecycle_events.enabled"),
 	}
 
 	// if runtime is enabled then we force fim
