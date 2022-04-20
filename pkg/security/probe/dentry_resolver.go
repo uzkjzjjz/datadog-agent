@@ -375,8 +375,12 @@ func (dr *DentryResolver) ResolveFromCache(mountID uint32, inode uint64) (string
 	var path *PathEntry
 	var filename string
 	var err error
-	depth := int64(0)
+	var depth int64
+
 	key := PathKey{MountID: mountID, Inode: inode}
+	if key.IsNull() {
+		return filename, &ErrInvalidKeyPath{Inode: inode, MountID: mountID}
+	}
 
 	// Fetch path recursively
 	for i := 0; i <= model.MaxPathDepth; i++ {
@@ -418,7 +422,11 @@ func (dr *DentryResolver) ResolveFromMap(mountID uint32, inode uint64, pathID ui
 	var filename string
 	var name string
 	var path PathLeaf
+
 	key := PathKey{MountID: mountID, Inode: inode, PathID: pathID}
+	if key.IsNull() {
+		return filename, &ErrInvalidKeyPath{Inode: inode, MountID: mountID}
+	}
 
 	keyBuffer, err := key.MarshalBinary()
 	if err != nil {

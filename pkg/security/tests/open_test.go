@@ -253,6 +253,8 @@ func TestOpen(t *testing.T) {
 
 			return unix.Close(fd)
 		}, func(event *sprobe.Event, r *rules.Rule) {
+			fmt.Printf(">>>>>>>>>>>>>>: %+v\n", event)
+
 			assert.Equal(t, "open", event.GetType(), "wrong event type")
 			// O_LARGEFILE is added by io_uring during __io_openat_prep
 			assert.Equal(t, syscall.O_CREAT, int(event.Open.Flags&0xfff), "wrong flags")

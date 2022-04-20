@@ -103,7 +103,7 @@ static void *thread_open(void *data) {
 
     register_span(opts->tls, trace_id, span_id);
 
-    int fd = open(opts->argv[3], O_CREAT);
+    int fd = open(opts->argv[3], O_CREAT|O_RDWR|O_TRUNC);
     if (fd < 0) {
         fprintf(stderr, "Unable to create file `%s`\n", opts->argv[3]);
         return NULL;
