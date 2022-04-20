@@ -202,27 +202,6 @@ func (ku *KubeUtil) GetLocalPodList(ctx context.Context) ([]*Pod, error) {
 	return pods.Items, nil
 }
 
-func (ku *KubeUtil) searchPodForContainerID(podList []*Pod, containerID string) (*Pod, error) {
-	if containerID == "" {
-		return nil, fmt.Errorf("containerID is empty")
-	}
-
-	// We will match only on the id itself, without runtime identifier, it should be quite unlikely on a Kube node
-	// to have a container in the runtime used by Kube to match a container in another runtime...
-	if containers.IsEntityName(containerID) {
-		containerID = containers.ContainerIDForEntity(containerID)
-	}
-
-	for _, pod := range podList {
-		for _, container := range pod.Status.GetAllContainers() {
-			if container.ID != "" && containers.ContainerIDForEntity(container.ID) == containerID {
-				return pod, nil
-			}
-		}
-	}
-	return nil, errors.NewNotFound(fmt.Sprintf("container %s in PodList", containerID))
-}
-
 // GetStatusForContainerID returns the container status from the pod given an ID
 func (ku *KubeUtil) GetStatusForContainerID(pod *Pod, containerID string) (ContainerStatus, error) {
 	for _, container := range pod.Status.GetAllContainers() {
@@ -296,20 +275,6 @@ func (ku *KubeUtil) GetRawMetrics(ctx context.Context) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-// IsAgentHostNetwork returns whether the agent is running inside a container with `hostNetwork` or not
-func (ku *KubeUtil) IsAgentHostNetwork(ctx context.Context, agentContainerID string) (bool, error) {
-	if agentContainerID == "" {
-		return false, fmt.Errorf("unable to determine self container id")
-	}
-
-	pod, err := ku.GetPodForContainerID(ctx, agentContainerID)
-	if err != nil {
-		return false, err
-	}
-
-	return pod.Spec.HostNetwork, nil
 }
 
 // IsPodReady return a bool if the Pod is ready

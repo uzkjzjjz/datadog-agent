@@ -27,7 +27,6 @@ type KubeUtilInterface interface {
 	GetKubeletAPIEndpoint() string
 	GetRawConnectionInfo() map[string]string
 	GetRawMetrics(ctx context.Context) ([]byte, error)
-	IsAgentHostNetwork(ctx context.Context, agentContainerID string) (bool, error)
 	ListContainers(ctx context.Context) ([]*containers.Container, error)
 	UpdateContainerMetrics(ctrList []*containers.Container) error
 	GetLocalStatsSummary(ctx context.Context) (*kubeletv1alpha1.Summary, error)
