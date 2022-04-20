@@ -456,6 +456,7 @@ type KubernetesPod struct {
 	QOSClass                   string
 	KubeServices               []string
 	NamespaceLabels            map[string]string
+	HostNetwork                bool
 }
 
 // GetID implements Entity#GetID.

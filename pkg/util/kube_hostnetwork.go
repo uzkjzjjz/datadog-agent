@@ -3,28 +3,23 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-//go:build kubelet
-// +build kubelet
-
 package util
 
 import (
-	"context"
-
 	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics"
-	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
+	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 )
 
 func isAgentKubeHostNetwork() (bool, error) {
-	ku, err := kubelet.GetKubeUtil()
-	if err != nil {
-		return true, err
-	}
-
 	cid, err := metrics.GetProvider().GetMetaCollector().GetSelfContainerID()
 	if err != nil {
 		return false, err
 	}
 
-	return ku.IsAgentHostNetwork(context.TODO(), cid)
+	pod, err := workloadmeta.GetGlobalStore().GetKubernetesPod(cid)
+	if err != nil {
+		return false, err
+	}
+
+	return pod.HostNetwork, nil
 }
