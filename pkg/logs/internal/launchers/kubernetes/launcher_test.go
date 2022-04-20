@@ -259,18 +259,18 @@ func TestGetPath(t *testing.T) {
 }
 
 // contains returns true if the list contains all the items.
-func contains(list []string, items ...string) bool {
-	m := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		m[item] = struct{}{}
-	}
-	for _, elt := range list {
-		if _, exists := m[elt]; !exists {
-			return false
-		}
-	}
-	return true
-}
+// func contains(list []string, items ...string) bool {
+// 	m := make(map[string]struct{}, len(items))
+// 	for _, item := range items {
+// 		m[item] = struct{}{}
+// 	}
+// 	for _, elt := range list {
+// 		if _, exists := m[elt]; !exists {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
 /*
 func TestGetSourceServiceNameOrder(t *testing.T) {

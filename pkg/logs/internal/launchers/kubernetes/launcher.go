@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/logs/auditor"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
@@ -25,7 +24,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
-	"github.com/cenkalti/backoff"
 )
 
 const (
@@ -38,7 +36,6 @@ var errCollectAllDisabled = fmt.Errorf("%s disabled", config.ContainerCollectAll
 
 type retryOps struct {
 	service          *service.Service
-	backoff          backoff.BackOff
 	removalScheduled bool
 }
 
@@ -122,42 +119,6 @@ func (l *Launcher) run(sourceProvider launchers.SourceProvider, pipelineProvider
 			return
 		}
 	}
-}
-
-func (l *Launcher) scheduleServiceForRetry(svc *service.Service) {
-	containerID := svc.GetEntityID()
-	ops, exists := l.pendingRetries[containerID]
-	if !exists {
-		b := &backoff.ExponentialBackOff{
-			InitialInterval:     500 * time.Millisecond,
-			RandomizationFactor: 0,
-			Multiplier:          2,
-			MaxInterval:         5 * time.Second,
-			MaxElapsedTime:      30 * time.Second,
-			Clock:               backoff.SystemClock,
-		}
-		b.Reset()
-		ops = &retryOps{
-			service:          svc,
-			backoff:          b,
-			removalScheduled: false,
-		}
-		l.pendingRetries[containerID] = ops
-	}
-	l.delayRetry(ops)
-}
-
-func (l *Launcher) delayRetry(ops *retryOps) {
-	delay := ops.backoff.NextBackOff()
-	if delay == backoff.Stop {
-		log.Warnf("Unable to add source for container %v", ops.service.GetEntityID())
-		delete(l.pendingRetries, ops.service.GetEntityID())
-		return
-	}
-	go func() {
-		<-time.After(delay)
-		l.retryOperations <- ops
-	}()
 }
 
 // addSource creates a new log-source from a service by resolving the
