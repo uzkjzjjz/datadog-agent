@@ -10,10 +10,12 @@ package tests
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"testing"
 
+	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/stretchr/testify/assert"
@@ -45,6 +47,9 @@ func TestSpan(t *testing.T) {
 	}
 
 	test.Run(t, "open", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		patterns := seclog.AddPatterns("probe.*", "module.*")
+		defer seclog.SetPatterns(patterns...)
+
 		testFile, _, err := test.Path("test-span")
 		if err != nil {
 			t.Fatal(err)
@@ -56,10 +61,18 @@ func TestSpan(t *testing.T) {
 
 		test.WaitSignal(t, func() error {
 			cmd := cmdFunc(syscallTester, args, envs)
-			out, err := cmd.CombinedOutput()
-
+			stderr, err := cmd.StderrPipe()
 			if err != nil {
-				return fmt.Errorf("%s: %w", out, err)
+				return err
+			}
+
+			if err := cmd.Start(); err != nil {
+				return err
+			}
+
+			stderrOuput, _ := io.ReadAll(stderr)
+			if len(stderrOuput) != 0 {
+				t.Log(stderrOuput)
 			}
 
 			return nil
