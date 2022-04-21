@@ -503,6 +503,7 @@ func (a *APIServer) Apply(ruleIDs []rules.RuleID) {
 
 func (a *APIServer) SendProcessEvent(event *sprobe.Event) {
 	eventJSON, err := json.Marshal(event)
+	fmt.Println("received a process event: ", string(eventJSON))
 	if err != nil {
 		seclog.Errorf("failed to marshal process lifecycle event: %v", err)
 		return

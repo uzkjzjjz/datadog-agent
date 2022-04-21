@@ -389,7 +389,7 @@ func (m *Module) HandleEvent(event *sprobe.Event) {
 		ruleSet.Evaluate(event)
 	}
 
-	if m.config.ProcessLifecycleEvents && m.IsProcessLifecycleEvent(event) {
+	if m.config.ProcessEventsEnabled && m.IsProcessLifecycleEvent(event) {
 		m.apiServer.SendProcessEvent(event)
 	}
 }
