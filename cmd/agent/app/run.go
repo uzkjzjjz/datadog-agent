@@ -464,11 +464,6 @@ func StopAgent() {
 		log.Warnf("Some components were unhealthy: %v", health.Unhealthy)
 	}
 
-	if common.ExpvarServer != nil {
-		if err := common.ExpvarServer.Shutdown(context.Background()); err != nil {
-			log.Errorf("Error shutting down expvar server: %v", err)
-		}
-	}
 	if common.DSD != nil {
 		common.DSD.Stop()
 	}

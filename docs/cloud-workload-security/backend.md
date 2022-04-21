@@ -47,12 +47,6 @@ CWS logs have the following JSON schema:
         "splice": {
             "$ref": "#/definitions/SpliceEvent"
         },
-        "dns": {
-            "$ref": "#/definitions/DNSEvent"
-        },
-        "network": {
-            "$ref": "#/definitions/NetworkContext"
-        },
         "usr": {
             "$ref": "#/definitions/UserContext"
         },
@@ -88,8 +82,6 @@ CWS logs have the following JSON schema:
 | `module` | $ref | Please see [ModuleEvent](#moduleevent) |
 | `signal` | $ref | Please see [SignalEvent](#signalevent) |
 | `splice` | $ref | Please see [SpliceEvent](#spliceevent) |
-| `dns` | $ref | Please see [DNSEvent](#dnsevent) |
-| `network` | $ref | Please see [NetworkContext](#networkcontext) |
 | `usr` | $ref | Please see [UserContext](#usercontext) |
 | `process` | $ref | Please see [ProcessContext](#processcontext) |
 | `dd` | $ref | Please see [DDContext](#ddcontext) |
@@ -1477,11 +1469,11 @@ CWS logs have the following JSON schema:
     "properties": {
         "pipe_entry_flag": {
             "type": "string",
-            "description": "Entry flag of the fd_out pipe passed to the splice syscall"
+            "description": "entry flag of the fd_out pipe passed to the splice syscall"
         },
         "pipe_exit_flag": {
             "type": "string",
-            "description": "Exit flag of the fd_out pipe passed to the splice syscall"
+            "description": "exit flag of the fd_out pipe passed to the splice syscall"
         }
     },
     "additionalProperties": false,
@@ -1492,8 +1484,8 @@ CWS logs have the following JSON schema:
 
 | Field | Description |
 | ----- | ----------- |
-| `pipe_entry_flag` | Entry flag of the fd_out pipe passed to the splice syscall |
-| `pipe_exit_flag` | Exit flag of the fd_out pipe passed to the splice syscall |
+| `pipe_entry_flag` | entry flag of the fd_out pipe passed to the splice syscall |
+| `pipe_exit_flag` | exit flag of the fd_out pipe passed to the splice syscall |
 
 
 ## `UserContext`

@@ -86,18 +86,6 @@ func (e *ecsFargateCollector) GetContainerStats(containerNS, containerID string,
 	return containerStats, nil
 }
 
-// GetContainerPIDStats returns pid stats by container ID.
-func (e *ecsFargateCollector) GetContainerPIDStats(containerNS, containerID string, cacheValidity time.Duration) (*provider.ContainerPIDStats, error) {
-	// Not available
-	return nil, nil
-}
-
-// GetContainerOpenFilesCount returns open files count by container ID.
-func (e *ecsFargateCollector) GetContainerOpenFilesCount(containerNS, containerID string, cacheValidity time.Duration) (*uint64, error) {
-	// Not available
-	return nil, nil
-}
-
 // GetContainerNetworkStats returns network stats by container ID.
 func (e *ecsFargateCollector) GetContainerNetworkStats(containerNS, containerID string, cacheValidity time.Duration) (*provider.ContainerNetworkStats, error) {
 	stats, err := e.stats(containerID)

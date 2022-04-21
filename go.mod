@@ -55,18 +55,15 @@ require (
 	code.cloudfoundry.org/bbs v0.0.0-20200403215808-d7bc971db0db
 	code.cloudfoundry.org/garden v0.0.0-20210208153517-580cadd489d2
 	code.cloudfoundry.org/lager v2.0.0+incompatible
-	github.com/DataDog/agent-payload/v5 v5.0.19
-	github.com/DataDog/btf-internals v0.0.0-20220401093927-f65bd0b466d5
-	github.com/DataDog/datadog-agent/pkg/obfuscate v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/otlp/model v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/quantile v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/remoteconfig/client v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/security/secl v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/trace v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/util/log v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/util/scrubber v0.36.0-rc.2
-	github.com/DataDog/datadog-agent/pkg/util/winutil v0.36.0-rc.2
-	github.com/DataDog/datadog-go/v5 v5.1.0
+	github.com/DataDog/agent-payload/v5 v5.0.16
+	github.com/DataDog/datadog-agent/pkg/obfuscate v0.35.1
+	github.com/DataDog/datadog-agent/pkg/otlp/model v0.35.1
+	github.com/DataDog/datadog-agent/pkg/quantile v0.35.1
+	github.com/DataDog/datadog-agent/pkg/security/secl v0.35.1
+	github.com/DataDog/datadog-agent/pkg/util/log v0.35.1
+	github.com/DataDog/datadog-agent/pkg/util/scrubber v0.35.1
+	github.com/DataDog/datadog-agent/pkg/util/winutil v0.35.1
+	github.com/DataDog/datadog-go v4.8.3+incompatible
 	github.com/DataDog/datadog-operator v0.5.0-rc.2.0.20210402083916-25ba9a22e67a
 	github.com/DataDog/ebpf v0.0.0-20220301203322-3fc9ab3b8daf
 	github.com/DataDog/ebpf-manager v0.0.0-20220325092125-b2221d88caf3

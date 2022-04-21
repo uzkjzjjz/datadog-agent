@@ -41,14 +41,6 @@
       "$schema": "http://json-schema.org/draft-04/schema#",
       "$ref": "#/definitions/SpliceEvent"
     },
-    "dns": {
-      "$schema": "http://json-schema.org/draft-04/schema#",
-      "$ref": "#/definitions/DNSEvent"
-    },
-    "network": {
-      "$schema": "http://json-schema.org/draft-04/schema#",
-      "$ref": "#/definitions/NetworkContext"
-    },
     "usr": {
       "$schema": "http://json-schema.org/draft-04/schema#",
       "$ref": "#/definitions/UserContext"
@@ -993,11 +985,11 @@
       "properties": {
         "pipe_entry_flag": {
           "type": "string",
-          "description": "Entry flag of the fd_out pipe passed to the splice syscall"
+          "description": "entry flag of the fd_out pipe passed to the splice syscall"
         },
         "pipe_exit_flag": {
           "type": "string",
-          "description": "Exit flag of the fd_out pipe passed to the splice syscall"
+          "description": "exit flag of the fd_out pipe passed to the splice syscall"
         }
       },
       "additionalProperties": false,

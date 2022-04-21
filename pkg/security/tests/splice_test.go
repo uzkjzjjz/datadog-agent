@@ -20,7 +20,7 @@ import (
 func TestSpliceEvent(t *testing.T) {
 	ruleDefs := []*rules.RuleDefinition{
 		{
-			ID:         "test_splice",
+			ID:         "test_ptrace",
 			Expression: `splice.file.name == "splice_test" && process.file.name == "syscall_tester"`,
 		},
 	}

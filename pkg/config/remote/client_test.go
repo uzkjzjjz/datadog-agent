@@ -152,10 +152,17 @@ func TestClientValidResponse(t *testing.T) {
 	apmUpdates := c.APMSamplingUpdates()
 	require.Len(t, apmUpdates, 1)
 	apmUpdate := <-apmUpdates
-	assert.Len(t, apmUpdate, 1)
-	assert.Equal(t, "config-id-1", apmUpdate[0].ID)
-	assert.Equal(t, uint64(5), apmUpdate[0].Version)
-	assert.Equal(t, apmConfig, apmUpdate[0].Config)
+	assert.Equal(t, APMSamplingUpdate{
+		Config: &APMSamplingConfig{
+			Configs: map[string]Config{
+				"id": {
+					ID:      "id",
+					Version: 5,
+				},
+			},
+			Rates: []pb.APMSampling{apmConfig},
+		},
+	}, apmUpdate)
 }
 
 func generateKey() keys.Signer {

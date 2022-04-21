@@ -313,30 +313,28 @@ type ModuleEventSerializer struct {
 // SpliceEventSerializer serializes a splice event to JSON
 // easyjson:json
 type SpliceEventSerializer struct {
-	PipeEntryFlag string `json:"pipe_entry_flag" jsonschema_description:"Entry flag of the fd_out pipe passed to the splice syscall"`
-	PipeExitFlag  string `json:"pipe_exit_flag" jsonschema_description:"Exit flag of the fd_out pipe passed to the splice syscall"`
+	PipeEntryFlag string `json:"pipe_entry_flag" jsonschema_description:"entry flag of the fd_out pipe passed to the splice syscall"`
+	PipeExitFlag  string `json:"pipe_exit_flag" jsonschema_description:"exit flag of the fd_out pipe passed to the splice syscall"`
 }
 
 // EventSerializer serializes an event to JSON
 // easyjson:json
 type EventSerializer struct {
-	EventContextSerializer      `json:"evt,omitempty"`
-	*FileEventSerializer        `json:"file,omitempty"`
-	*SELinuxEventSerializer     `json:"selinux,omitempty"`
-	*BPFEventSerializer         `json:"bpf,omitempty"`
-	*MMapEventSerializer        `json:"mmap,omitempty"`
-	*MProtectEventSerializer    `json:"mprotect,omitempty"`
-	*PTraceEventSerializer      `json:"ptrace,omitempty"`
-	*ModuleEventSerializer      `json:"module,omitempty"`
-	*SignalEventSerializer      `json:"signal,omitempty"`
-	*SpliceEventSerializer      `json:"splice,omitempty"`
-	*DNSEventSerializer         `json:"dns,omitempty"`
-	*NetworkContextSerializer   `json:"network,omitempty"`
-	*UserContextSerializer      `json:"usr,omitempty"`
-	*ProcessContextSerializer   `json:"process,omitempty"`
-	*DDContextSerializer        `json:"dd,omitempty"`
-	*ContainerContextSerializer `json:"container,omitempty"`
-	Date                        time.Time `json:"date,omitempty"`
+	EventContextSerializer     `json:"evt,omitempty"`
+	*FileEventSerializer       `json:"file,omitempty"`
+	*SELinuxEventSerializer    `json:"selinux,omitempty"`
+	*BPFEventSerializer        `json:"bpf,omitempty"`
+	*MMapEventSerializer       `json:"mmap,omitempty"`
+	*MProtectEventSerializer   `json:"mprotect,omitempty"`
+	*PTraceEventSerializer     `json:"ptrace,omitempty"`
+	*ModuleEventSerializer     `json:"module,omitempty"`
+	*SignalEventSerializer     `json:"signal,omitempty"`
+	*SpliceEventSerializer     `json:"splice,omitempty"`
+	UserContextSerializer      UserContextSerializer       `json:"usr,omitempty"`
+	ProcessContextSerializer   ProcessContextSerializer    `json:"process,omitempty"`
+	DDContextSerializer        DDContextSerializer         `json:"dd,omitempty"`
+	ContainerContextSerializer *ContainerContextSerializer `json:"container,omitempty"`
+	Date                       time.Time                   `json:"date,omitempty"`
 }
 
 func getInUpperLayer(r *Resolvers, f *model.FileFields) *bool {
@@ -527,10 +525,14 @@ func newProcessContextSerializer(pc *model.ProcessContext, e *Event, r *Resolver
 		first = false
 
 		// dedup args/envs
-		if ancestor != nil && ancestor.ArgsEntry == pce.ArgsEntry {
-			prev.Args, prev.ArgsTruncated = prev.Args[0:0], false
-			prev.Envs, prev.EnvsTruncated = prev.Envs[0:0], false
-			prev.Argv0 = ""
+		if prev != nil {
+			// parent/child with the same comm then a fork thus we
+			// can remove the child args/envs
+			if prev.PPid == s.Pid && prev.Comm == s.Comm {
+				prev.Args, prev.ArgsTruncated = prev.Args[0:0], false
+				prev.Envs, prev.EnvsTruncated = prev.Envs[0:0], false
+				prev.Argv0 = ""
+			}
 		}
 		ancestor = pce
 		prev = s
@@ -652,49 +654,6 @@ func newSpliceEventSerializer(e *Event) *SpliceEventSerializer {
 	return &SpliceEventSerializer{
 		PipeEntryFlag: model.PipeBufFlag(e.Splice.PipeEntryFlag).String(),
 		PipeExitFlag:  model.PipeBufFlag(e.Splice.PipeExitFlag).String(),
-	}
-}
-
-func newDNSQuestionSerializer(d *model.DNSEvent) *DNSQuestionSerializer {
-	return &DNSQuestionSerializer{
-		Class: model.QClass(d.Class).String(),
-		Type:  model.QType(d.Type).String(),
-		Name:  d.Name,
-		Size:  d.Size,
-		Count: d.Count,
-	}
-}
-
-func newDNSEventSerializer(d *model.DNSEvent) *DNSEventSerializer {
-	return &DNSEventSerializer{
-		ID:       d.ID,
-		Question: newDNSQuestionSerializer(d),
-	}
-}
-
-func newIPPortSerializer(c *model.IPPortContext) *IPPortSerializer {
-	return &IPPortSerializer{
-		IP:   c.IP.String(),
-		Port: c.Port,
-	}
-}
-
-func newNetworkDeviceSerializer(e *Event) *NetworkDeviceSerializer {
-	return &NetworkDeviceSerializer{
-		NetNS:   e.NetworkContext.Device.NetNS,
-		IfIndex: e.NetworkContext.Device.IfIndex,
-		IfName:  e.ResolveNetworkDeviceIfName(&e.NetworkContext.Device),
-	}
-}
-
-func newNetworkContextSerializer(e *Event) *NetworkContextSerializer {
-	return &NetworkContextSerializer{
-		Device:      newNetworkDeviceSerializer(e),
-		L3Protocol:  model.L3Protocol(e.NetworkContext.L3Protocol).String(),
-		L4Protocol:  model.L4Protocol(e.NetworkContext.L4Protocol).String(),
-		Source:      newIPPortSerializer(&e.NetworkContext.Source),
-		Destination: newIPPortSerializer(&e.NetworkContext.Destination),
-		Size:        e.NetworkContext.Size,
 	}
 }
 
@@ -937,9 +896,6 @@ func NewEventSerializer(event *Event) *EventSerializer {
 				FileSerializer: *newFileSerializer(&event.Splice.File, event),
 			}
 		}
-	case model.DNSEventType:
-		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
-		s.DNSEventSerializer = newDNSEventSerializer(&event.DNS)
 	}
 
 	return s

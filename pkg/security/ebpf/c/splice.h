@@ -140,7 +140,6 @@ int __attribute__((always_inline)) sys_splice_ret(void *ctx, int retval) {
     }
 
     if (syscall->resolver.ret == DENTRY_DISCARDED) {
-        monitor_discarded(EVENT_SPLICE);
         return 0;
     }
 

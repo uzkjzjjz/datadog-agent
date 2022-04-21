@@ -74,28 +74,6 @@ func (f *FallbackConstantFetcher) appendRequest(id string) {
 		value = getDentrySuperBlockOffset(f.kernelVersion)
 	case "pipe_inode_info_bufs_offset":
 		value = getPipeInodeInfoBufsOffset(f.kernelVersion)
-	case "net_device_ifindex_offset":
-		value = getNetDeviceIfindexOffset(f.kernelVersion)
-	case "net_ns_offset":
-		value = getNetNSOffset(f.kernelVersion)
-	case "net_proc_inum_offset":
-		value = getNetProcINumOffset(f.kernelVersion)
-	case "sock_common_skc_net_offset":
-		value = getSockCommonSKCNetOffset(f.kernelVersion)
-	case "socket_sock_offset":
-		value = getSocketSockOffset(f.kernelVersion)
-	case "nf_conn_ct_net_offset":
-		value = getNFConnCTNetOffset(f.kernelVersion)
-	case "sock_common_skc_family_offset":
-		value = getSockCommonSKCFamilyOffset(f.kernelVersion)
-	case "flowi4_saddr_offset":
-		value = getFlowi4SAddrOffset(f.kernelVersion)
-	case "flowi6_saddr_offset":
-		value = getFlowi6SAddrOffset(f.kernelVersion)
-	case "flowi4_uli_offset":
-		value = getFlowi4ULIOffset(f.kernelVersion)
-	case "flowi6_uli_offset":
-		value = getFlowi6ULIOffset(f.kernelVersion)
 	}
 	f.res[id] = value
 }
@@ -520,160 +498,13 @@ func getPipeInodeInfoBufsOffset(kv *kernel.Version) uint64 {
 		offset = 128
 	case kv.IsRH8Kernel():
 		offset = 120
-	case kv.IsAmazonLinuxKernel() && kv.IsInRangeCloseOpen(kernel.Kernel5_10, kernel.Kernel5_11):
-		offset = 152
-	case kv.IsDebianKernel() && kv.IsInRangeCloseOpen(kernel.Kernel5_10, kernel.Kernel5_11):
-		offset = 152
 
 	case kv.IsInRangeCloseOpen(kernel.Kernel4_13, kernel.Kernel5_6):
 		offset = 120
-	case kv.IsInRangeCloseOpen(kernel.Kernel5_6, kernel.Kernel5_8) ||
-		kv.IsInRangeCloseOpen(kernel.Kernel5_10, kernel.Kernel5_11):
+	case kv.IsInRangeCloseOpen(kernel.Kernel5_6, kernel.Kernel5_8):
 		offset = 144
 	case kv.Code != 0 && kv.Code >= kernel.Kernel5_8:
 		offset = 152
 	}
-
 	return offset
-}
-
-func getNetDeviceIfindexOffset(kv *kernel.Version) uint64 {
-	offset := uint64(260)
-
-	switch {
-	case kv.IsRH7Kernel():
-		offset = 192
-	case kv.IsRH8Kernel():
-		offset = 264
-	case kv.IsSuse12Kernel():
-		offset = 264
-	case kv.IsSuse15Kernel():
-		offset = 256
-
-	case kv.Code >= kernel.Kernel4_14 && kv.Code < kernel.Kernel5_8:
-		offset = 264
-	case kv.Code >= kernel.Kernel5_8 && kv.Code < kernel.Kernel5_12:
-		offset = 256
-	case kv.Code >= kernel.Kernel5_12:
-		offset = 208
-	}
-
-	return offset
-}
-
-func getNetNSOffset(kv *kernel.Version) uint64 {
-	// see https://ubuntu.com/security/CVE-2019-10638
-	hashMixAbiMinVersion := map[string]int{
-		"generic":      60,
-		"generic-lpae": 60,
-		"lowlatency":   60,
-		"oracle":       1022,
-		"gke":          1041,
-		"gcp":          1042,
-		"aws":          1047,
-		"azure":        1018,
-	}
-
-	switch {
-	case kv.IsInRangeCloseOpen(kernel.Kernel4_15, kernel.Kernel4_16) && ubuntuAbiVersionCheck(kv, hashMixAbiMinVersion):
-		fallthrough
-	// Commit 355b98553789b646ed97ad801a619ff898471b92 introduces a hashmix field for security
-	// purposes. This commit was cherry-picked in stable releases 4.9.168, 4.14.111, 4.19.34 and 5.0.7
-	// and is part of master since 5.1
-	case kv.IsRH8Kernel():
-		fallthrough
-	case (kv.IsInRangeCloseOpen(kernel.Kernel4_9, kernel.Kernel4_10) && kv.Code.Patch() >= 168) ||
-		(kv.IsInRangeCloseOpen(kernel.Kernel4_14, kernel.Kernel4_15) && kv.Code.Patch() >= 111) ||
-		kv.Code >= kernel.Kernel5_1:
-		return 120
-	default:
-		return 112
-	}
-}
-
-func getNetProcINumOffset(kv *kernel.Version) uint64 {
-	return uint64(72)
-}
-
-func getSockCommonSKCNetOffset(kv *kernel.Version) uint64 {
-	return uint64(48)
-}
-
-func getSocketSockOffset(kv *kernel.Version) uint64 {
-	offset := uint64(32)
-
-	switch {
-	case kv.IsRH7Kernel():
-		offset = 32
-	case kv.IsRH8Kernel():
-		offset = 32
-	case kv.IsSuse12Kernel():
-		offset = 32
-	case kv.IsSuse15Kernel():
-		offset = 24
-
-	case kv.Code >= kernel.Kernel5_3:
-		offset = 24
-	}
-
-	return offset
-}
-
-func getNFConnCTNetOffset(kv *kernel.Version) uint64 {
-	offset := uint64(144)
-
-	switch {
-	case kv.IsRH7Kernel():
-		offset = 240
-	}
-
-	return offset
-}
-
-func getSockCommonSKCFamilyOffset(kv *kernel.Version) uint64 {
-	return 16
-}
-
-func getFlowi4SAddrOffset(kv *kernel.Version) uint64 {
-	offset := uint64(40)
-
-	switch {
-	case kv.IsRH7Kernel():
-		offset = 20
-	case kv.IsRH8Kernel():
-		offset = 56
-
-	case kv.IsInRangeCloseOpen(kernel.Kernel5_0, kernel.Kernel5_1):
-		offset = 32
-	case kv.Code >= kernel.Kernel5_1:
-		offset = 40
-	}
-
-	return offset
-}
-
-func getFlowi4ULIOffset(kv *kernel.Version) uint64 {
-	return getFlowi4SAddrOffset(kv) + 8
-}
-
-func getFlowi6SAddrOffset(kv *kernel.Version) uint64 {
-	return getFlowi4ULIOffset(kv) + 8
-}
-
-func getFlowi6ULIOffset(kv *kernel.Version) uint64 {
-	return getFlowi6SAddrOffset(kv) + 20
-}
-
-func ubuntuAbiVersionCheck(kv *kernel.Version, minAbiPerFlavor map[string]int) bool {
-	ukv := kv.UbuntuKernelVersion()
-	if ukv == nil {
-		return false
-	}
-
-	minAbi, present := minAbiPerFlavor[ukv.Flavor]
-	if !present {
-		return false
-	}
-
-	return ukv.Abi >= minAbi
 }

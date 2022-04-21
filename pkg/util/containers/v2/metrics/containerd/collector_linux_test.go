@@ -363,7 +363,7 @@ func TestGetContainerNetworkStats_Containerd(t *testing.T) {
 			}
 
 			// ID and cache TTL not relevant for these tests
-			result, err := collector.GetContainerNetworkStats("", containerID, 10*time.Second)
+			result, err := collector.GetContainerNetworkStats(containerID, 10*time.Second)
 			result.Timestamp = time.Time{} // We have no control over it, so set it to avoid checking it.
 
 			assert.NoError(t, err)

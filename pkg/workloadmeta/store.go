@@ -402,8 +402,9 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 		}
 	}
 
+	filteredEvents := make(map[subscriber][]Event)
+
 	s.subscribersMut.RLock()
-	filteredEvents := make(map[subscriber][]Event, len(s.subscribers))
 	for _, sub := range s.subscribers {
 		filter := sub.filter
 		filteredEvents[sub] = make([]Event, 0, len(evs))

@@ -686,25 +686,6 @@ func (p *Probe) handleEvent(CPU uint64, data []byte) {
 			log.Errorf("failed to decode splice event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-	case model.NetDeviceEventType:
-		if _, err = event.NetDevice.UnmarshalBinary(data[offset:]); err != nil {
-			log.Errorf("failed to decode net_device event: %s (offset %d, len %d)", err, offset, len(data))
-			return
-		}
-		_ = p.setupNewTCClassifier(event.NetDevice.Device)
-	case model.VethPairEventType:
-		if _, err = event.VethPair.UnmarshalBinary(data[offset:]); err != nil {
-			log.Errorf("failed to decode veth_pair event: %s (offset %d, len %d)", err, offset, len(data))
-			return
-		}
-		_ = p.setupNewTCClassifier(event.VethPair.PeerDevice)
-	case model.NamespaceSwitchEventType:
-		break
-	case model.DNSEventType:
-		if _, err = event.DNS.UnmarshalBinary(data[offset:]); err != nil {
-			log.Errorf("failed to decode DNS event: %s (offset %d, len %d)", err, offset, len(data))
-			return
-		}
 	default:
 		log.Errorf("unsupported event type %d", eventType)
 		return
@@ -1382,23 +1363,5 @@ func AppendProbeRequestsToFetcher(constantFetcher constantfetch.ConstantFetcher,
 	// splice event
 	constantFetcher.AppendOffsetofRequest("pipe_inode_info_bufs_offset", "struct pipe_inode_info", "bufs", "linux/pipe_fs_i.h")
 
-	// network related constants
-	constantFetcher.AppendOffsetofRequest("net_device_ifindex_offset", "struct net_device", "ifindex", "linux/netdevice.h")
-	constantFetcher.AppendOffsetofRequest("sock_common_skc_net_offset", "struct sock_common", "skc_net", "net/sock.h")
-	constantFetcher.AppendOffsetofRequest("sock_common_skc_family_offset", "struct sock_common", "skc_family", "net/sock.h")
-	constantFetcher.AppendOffsetofRequest("flowi4_saddr_offset", "struct flowi4", "saddr", "net/flow.h")
-	constantFetcher.AppendOffsetofRequest("flowi4_uli_offset", "struct flowi4", "uli", "net/flow.h")
-	constantFetcher.AppendOffsetofRequest("flowi6_saddr_offset", "struct flowi6", "saddr", "net/flow.h")
-	constantFetcher.AppendOffsetofRequest("flowi6_uli_offset", "struct flowi6", "uli", "net/flow.h")
-	constantFetcher.AppendOffsetofRequest("socket_sock_offset", "struct socket", "sk", "linux/net.h")
-
-	if !kv.IsRH7Kernel() {
-		constantFetcher.AppendOffsetofRequest("nf_conn_ct_net_offset", "struct nf_conn", "ct_net", "net/netfilter/nf_conntrack.h")
-	}
-
-	if getNetStructType(kv) == netStructHasProcINum {
-		constantFetcher.AppendOffsetofRequest("net_proc_inum_offset", "struct net", "proc_inum", "net/net_namespace.h")
-	} else {
-		constantFetcher.AppendOffsetofRequest("net_ns_offset", "struct net", "ns", "net/net_namespace.h")
-	}
+	return constantFetcher.FinishAndGetResults()
 }

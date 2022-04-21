@@ -116,20 +116,6 @@ func (c *systemCollector) GetContainerOpenFilesCount(containerNS, containerID st
 	return &ofCount, nil
 }
 
-func (c *systemCollector) GetContainerNetworkStats(containerNS, containerID string, cacheValidity time.Duration) (*provider.ContainerNetworkStats, error) {
-	cg, err := c.getCgroup(containerID, cacheValidity)
-	if err != nil {
-		return nil, err
-	}
-
-	pids, err := cg.GetPIDs(cacheValidity)
-	if err != nil {
-		return nil, err
-	}
-
-	return buildNetworkStats(c.procPath, pids)
-}
-
 func (c *systemCollector) GetContainerIDForPID(pid int, cacheValidity time.Duration) (string, error) {
 	containerID, err := cgroups.IdentiferFromCgroupReferences(c.procPath, strconv.Itoa(pid), c.baseController, cgroups.ContainerFilter)
 	return containerID, err

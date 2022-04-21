@@ -813,3 +813,12 @@ type VethPairEvent struct {
 	HostDevice NetDevice
 	PeerDevice NetDevice
 }
+
+// SpliceEvent represents a splice event
+type SpliceEvent struct {
+	SyscallEvent
+
+	File          FileEvent `field:"file"`            // File modified by the splice syscall
+	PipeEntryFlag uint32    `field:"pipe_entry_flag"` // Entry flag of the "fd_out" pipe passed to the splice syscall
+	PipeExitFlag  uint32    `field:"pipe_exit_flag"`  // Exit flag of the "fd_out" pipe passed to the splice syscall
+}

@@ -13,8 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func container1(testTime time.Time) Container {
-	return Container{
+func TestMerge(t *testing.T) {
+	testTime := time.Now()
+
+	fromSource1 := Container{
 		EntityID: EntityID{
 			Kind: KindContainer,
 			ID:   "foo1",
@@ -22,20 +24,6 @@ func container1(testTime time.Time) Container {
 		EntityMeta: EntityMeta{
 			Name:      "foo1-name",
 			Namespace: "",
-		},
-		Ports: []ContainerPort{
-			{
-				Name:     "port1",
-				Port:     42000,
-				Protocol: "tcp",
-			},
-			{
-				Port:     42001,
-				Protocol: "udp",
-			},
-			{
-				Port: 42002,
-			},
 		},
 		State: ContainerState{
 			Running:    true,
@@ -43,12 +31,9 @@ func container1(testTime time.Time) Container {
 			StartedAt:  testTime,
 			FinishedAt: time.Time{},
 		},
-		CollectorTags: []string{"tag1", "tag2"},
 	}
-}
 
-func container2(testTime time.Time) Container {
-	return Container{
+	fromSource2 := Container{
 		EntityID: EntityID{
 			Kind: KindContainer,
 			ID:   "foo1",
@@ -57,35 +42,13 @@ func container2(testTime time.Time) Container {
 			Name:      "foo1-name",
 			Namespace: "",
 		},
-		Ports: []ContainerPort{
-			{
-				Port:     42000,
-				Protocol: "tcp",
-			},
-			{
-				Port:     42001,
-				Protocol: "udp",
-			},
-			{
-				Port:     42002,
-				Protocol: "tcp",
-			},
-			{
-				Port: 42003,
-			},
-		},
 		State: ContainerState{
 			CreatedAt:  time.Time{},
 			StartedAt:  time.Time{},
 			FinishedAt: time.Time{},
 			ExitCode:   pointer.UInt32Ptr(100),
 		},
-		CollectorTags: []string{"tag3"},
 	}
-}
-
-func TestMerge(t *testing.T) {
-	testTime := time.Now()
 
 	expectedContainer := Container{
 		EntityID: EntityID{
@@ -105,63 +68,12 @@ func TestMerge(t *testing.T) {
 		},
 	}
 
-	expectedPorts := []ContainerPort{
-		{
-			Name:     "port1",
-			Port:     42000,
-			Protocol: "tcp",
-		},
-		{
-			Port:     42001,
-			Protocol: "udp",
-		},
-		{
-			Port: 42002,
-		},
-		{
-			Port:     42002,
-			Protocol: "tcp",
-		},
-		{
-			Port: 42003,
-		},
-	}
-
-	expectedTags := []string{"tag1", "tag2", "tag3"}
-
 	// Test merging both ways
-	fromSource1 := container1(testTime)
-	fromSource2 := container2(testTime)
 	err := merge(&fromSource1, &fromSource2)
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, expectedPorts, fromSource1.Ports)
-	assert.ElementsMatch(t, expectedTags, fromSource1.CollectorTags)
-	fromSource1.Ports = nil
-	fromSource1.CollectorTags = nil
 	assert.Equal(t, expectedContainer, fromSource1)
 
-	fromSource1 = container1(testTime)
-	fromSource2 = container2(testTime)
 	err = merge(&fromSource2, &fromSource1)
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, expectedPorts, fromSource2.Ports)
-	assert.ElementsMatch(t, expectedTags, fromSource2.CollectorTags)
-	fromSource2.Ports = nil
-	fromSource2.CollectorTags = nil
 	assert.Equal(t, expectedContainer, fromSource2)
-
-	// Test merging nil slice in src/dst
-	fromSource1 = container1(testTime)
-	fromSource2 = container2(testTime)
-	fromSource2.Ports = nil
-	err = merge(&fromSource1, &fromSource2)
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, container1(testTime).Ports, fromSource1.Ports)
-
-	fromSource1 = container1(testTime)
-	fromSource2 = container2(testTime)
-	fromSource2.Ports = nil
-	err = merge(&fromSource2, &fromSource1)
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, container1(testTime).Ports, fromSource2.Ports)
 }

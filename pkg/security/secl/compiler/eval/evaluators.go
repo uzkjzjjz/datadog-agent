@@ -98,6 +98,8 @@ type StringEvaluator struct {
 
 	// used during compilation of partial
 	isDeterministic bool
+
+	stringMatcher StringMatcher
 }
 
 // Eval returns the result of the evaluation
