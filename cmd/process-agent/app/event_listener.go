@@ -24,6 +24,7 @@ import (
 	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
 	"github.com/DataDog/datadog-agent/pkg/process/events"
+	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/security/api"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -60,18 +61,19 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 		return log.Criticalf("Error parsing config: %s", err)
 	}
 
-	// For system probe, there is an additional config file that is shared with the system-probe
-	syscfg, err := sysconfig.Merge(sysprobePath)
+	// Load system-probe.yaml file and merge it to the global Datadog config
+	sysCfg, err := sysconfig.Merge(sysprobePath)
 	if err != nil {
 		return log.Critical(err)
 	}
 
-	_, err = config.NewAgentConfig(loggerName, configPath, syscfg)
+	// Set up logger
+	_, err = config.NewAgentConfig(loggerName, configPath, sysCfg)
 	if err != nil {
 		return log.Criticalf("Error parsing config: %s", err)
 	}
 
-	// create gRPC client and connect to system-probe to listen for process events
+	// create a gRPC client and connect to system-probe to listen for process events
 	socketPath := ddconfig.Datadog.GetString("runtime_security_config.socket")
 	if socketPath == "" {
 		return errors.New("runtime_security_config.socket must be set")
@@ -85,21 +87,25 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewSecurityModuleClient(conn)
-	var connected atomic.Value
-	var running atomic.Value
+	var connected, running atomic.Value
 	connected.Store(false)
 
-	logTicker := newLogBackoffTicker()
+	exit := make(chan struct{})
+	go util.HandleSignals(exit)
+	go func() {
+		<-exit
+		log.Info("Stopping listening for process events")
+		running.Store(false)
+	}()
 
+	logTicker := newLogBackoffTicker()
 	running.Store(true)
 	for running.Load() == true {
 		stream, err := client.GetProcessEvents(context.Background(), &api.GetProcessEventParams{})
 		if err != nil {
 			connected.Store(false)
 
-			log.Warnf("Error while connecting to the runtime security module: %v", err)
 			select {
-			// TODO: Test exponential backoff
 			case <-logTicker.C:
 				log.Warnf("Error while connecting to the runtime security module: %v", err)
 			default:
@@ -133,6 +139,8 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Got event message \"%+v\"\n", e)
 		}
 	}
+
+	logTicker.Stop()
 	return nil
 }
 
