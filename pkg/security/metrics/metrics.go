@@ -183,6 +183,11 @@ var (
 	// MetricSecurityAgentFIMRunning is reported when the security agent `FIM` feature is enabled
 	MetricSecurityAgentFIMRunning = newAgentMetric(".fim.running")
 
+	// Process Agent metrics
+
+	// MetricProcessEventsRunning is reported when the runtime-security module is running only with process events collection enabled
+	MetricProcessEventsRunning = newAgentMetric(".process_events.running")
+
 	// MetricSecurityAgentRuntimeContainersRunning is used to report the count of running containers when the security agent
 	// `Runtime` feature is enabled
 	MetricSecurityAgentRuntimeContainersRunning = newAgentMetric(".runtime.containers_running")

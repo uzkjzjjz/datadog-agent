@@ -478,6 +478,8 @@ func (m *Module) metricsSender() {
 				_ = m.statsdClient.Gauge(metrics.MetricSecurityAgentRuntimeRunning, 1, tags, 1)
 			} else if m.config.FIMEnabled {
 				_ = m.statsdClient.Gauge(metrics.MetricSecurityAgentFIMRunning, 1, tags, 1)
+			} else if m.config.ProcessEventsEnabled {
+				_ = m.statsdClient.Gauge(metrics.MetricProcessEventsRunning, 1, tags, 1)
 			}
 		case <-m.ctx.Done():
 			return
