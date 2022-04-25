@@ -32,14 +32,14 @@ import (
 // EventsCmd is a command to interact with process lifecycle events
 var EventsCmd = &cobra.Command{
 	Use:          "events",
-	Short:        "Interact with process lifecycle events. This feature is currently in alpha version.",
+	Short:        "Interact with process lifecycle events. This feature is currently in alpha version and needs root privilege to run.",
 	SilenceUsage: true,
 }
 
 // EventsListenCmd is a command to listen for process lifecycle events
 var EventsListenCmd = &cobra.Command{
 	Use:          "listen",
-	Short:        "Open a session to listen for process lifecycle events. This feature is currently in alpha version.",
+	Short:        "Open a session to listen for process lifecycle events. This feature is currently in alpha version and needs root privilege to run.",
 	RunE:         runEventListener,
 	SilenceUsage: true,
 }
@@ -73,7 +73,7 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 		return log.Criticalf("Error parsing config: %s", err)
 	}
 
-	// create a gRPC client and connect to system-probe to listen for process events
+	// Create a gRPC client and connect to system-probe to listen for process events
 	socketPath := ddconfig.Datadog.GetString("runtime_security_config.socket")
 	if socketPath == "" {
 		return errors.New("runtime_security_config.socket must be set")
@@ -124,19 +124,17 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 		}
 
 		for {
-			// Get new process event from stream
 			in, err := stream.Recv()
 			if err == io.EOF || in == nil {
 				break
 			}
 
-			// Print event
 			var e events.ProcessEvent
 			if err := json.Unmarshal(in.Data, &e); err != nil {
 				log.Error("could not unmarshal process event: ", err.Error())
 			}
-			//fmt.Println("Got event message: ", string(in.Data))
-			fmt.Printf("Got event message \"%+v\"\n", e)
+
+			fmt.Printf("New process event: \"%+v\"\n", e)
 		}
 	}
 

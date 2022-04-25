@@ -13,21 +13,15 @@ type Event struct {
 	Outcome  string `json:"outcome"`
 }
 
-type User struct {
-	ID    string `json:"id"`
-	Group string `json:"group"`
-}
-
 type Executable struct {
-	Path  string `json:"path"`
-	Name  string `json:"name"`
-	User  string `json:"user"`
-	Group string `json:"group"`
+	Path string `json:"path"`
+	Name string `json:"name"`
 }
 
 type Process struct {
 	PID        int32      `json:"pid"`
 	PPID       int32      `json:"ppid"`
+	UID        int32      `json:"uid"`
 	GID        int32      `json:"gid"`
 	User       string     `json:"user"`
 	Group      string     `json:"group"`
@@ -40,7 +34,6 @@ type Process struct {
 
 type ProcessEvent struct {
 	Event   Event     `json:"evt"`
-	User    User      `json:"usr"`
 	Process Process   `json:"process"`
 	Date    time.Time `json:"date"`
 }
