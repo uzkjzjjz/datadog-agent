@@ -107,7 +107,7 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 
 			select {
 			case <-logTicker.C:
-				log.Warnf("Error while connecting to the runtime security module: %v", err)
+				log.Warnf("Error while connecting to the runtime-security module: %v", err)
 			default:
 				// do nothing
 			}
@@ -120,7 +120,7 @@ func runEventListener(cmd *cobra.Command, args []string) error {
 		if connected.Load() != true {
 			connected.Store(true)
 
-			log.Info("Successfully connected to the runtime security module")
+			log.Info("Successfully connected to the runtime-security module")
 		}
 
 		for {

@@ -156,7 +156,7 @@ func NewConfig(cfg *config.Config) (*Config, error) {
 		Config:                             *ebpf.NewConfig(),
 		RuntimeEnabled:                     aconfig.Datadog.GetBool("runtime_security_config.enabled"),
 		FIMEnabled:                         aconfig.Datadog.GetBool("runtime_security_config.fim_enabled"),
-		ProcessEventsEnabled:               aconfig.Datadog.GetBool("system_probe_config.process_config.events_collection.enabled"), //TODO: move to a new namespace?
+		ProcessEventsEnabled:               aconfig.Datadog.GetBool("runtime_security_config.process_events_enabled"),
 		EnableKernelFilters:                aconfig.Datadog.GetBool("runtime_security_config.enable_kernel_filters"),
 		EnableApprovers:                    aconfig.Datadog.GetBool("runtime_security_config.enable_approvers"),
 		EnableDiscarders:                   aconfig.Datadog.GetBool("runtime_security_config.enable_discarders"),
