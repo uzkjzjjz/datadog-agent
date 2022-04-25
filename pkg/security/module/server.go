@@ -475,7 +475,7 @@ func (a *APIServer) SendStats() error {
 	}
 
 	if count := atomic.SwapInt64(&a.expiredProcessEvents, 0); count > 0 {
-		if err := a.statsdClient.Count(metrics.MetricEventServerProcessEventExpired, count, []string{}, 1.0); err != nil {
+		if err := a.statsdClient.Count(metrics.MetricProcessEventsServerExpired, count, []string{}, 1.0); err != nil {
 			return err
 		}
 	}
