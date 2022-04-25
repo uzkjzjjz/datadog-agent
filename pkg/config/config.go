@@ -988,7 +988,8 @@ func InitConfig(config Config) {
 
 	// Datadog security agent (runtime)
 	config.BindEnvAndSetDefault("runtime_security_config.enabled", false)
-	config.SetKnown("runtime_security_config.fim_enabled")
+	config.BindEnvAndSetDefault("runtime_security_config.fim_enabled", false)
+	config.BindEnvAndSetDefault("runtime_security_config.process_events_enabled", false)
 	config.BindEnvAndSetDefault("runtime_security_config.erpc_dentry_resolution_enabled", true)
 	config.BindEnvAndSetDefault("runtime_security_config.map_dentry_resolution_enabled", true)
 	config.BindEnvAndSetDefault("runtime_security_config.dentry_cache_size", 1024)

@@ -213,12 +213,16 @@ func load(configPath string) (*Config, error) {
 		log.Info("system_probe_config.enable_oom_kill detected, will enable system-probe with OOM Kill check")
 		c.EnabledModules[OOMKillProbeModule] = struct{}{}
 	}
-	if cfg.GetBool("runtime_security_config.enabled") || cfg.GetBool("runtime_security_config.fim_enabled") ||
-		cfg.GetBool(key(spNS, "process_config.events_collection.enabled")) {
-		log.Info("runtime_security_config.enabled or runtime_security_config.fim_enabled or " +
-			"system_probe_config.process_config.events_collection.enabled detected, enabling system-probe")
+	if cfg.GetBool("runtime_security_config.enabled") || cfg.GetBool("runtime_security_config.fim_enabled") {
+		log.Info("runtime_security_config.enabled or runtime_security_config.fim_enabled detected, enabling system-probe")
 		c.EnabledModules[SecurityRuntimeModule] = struct{}{}
 	}
+
+	if cfg.GetBool("runtime_security_config.process_events_enabled") {
+		log.Info("runtime_security_config.process_events_enabled detected, enabling system-probe with process events collection")
+		c.EnabledModules[SecurityRuntimeModule] = struct{}{}
+	}
+
 	if cfg.GetBool(key(spNS, "process_config.enabled")) {
 		log.Info("process_config.enabled detected, enabling system-probe")
 		c.EnabledModules[ProcessModule] = struct{}{}
