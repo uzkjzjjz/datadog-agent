@@ -91,7 +91,7 @@ LOOP:
 	return nil
 }
 
-// GetProcessEvents waits for process events
+// GetProcessEvents sends process events through a gRPC stream
 func (a *APIServer) GetProcessEvents(params *api.GetProcessEventParams, stream api.SecurityModule_GetProcessEventsServer) error {
 	// Read 10 security events per call
 	msgs := 10
@@ -501,6 +501,8 @@ func (a *APIServer) Apply(ruleIDs []rules.RuleID) {
 	}
 }
 
+// SendProcessEvent forwards collected process events to the processMsgs channel so they can be consumed next time GetProcessEvents
+// is called
 func (a *APIServer) SendProcessEvent(event *sprobe.Event) {
 	eventJSON, err := json.Marshal(event)
 	if err != nil {

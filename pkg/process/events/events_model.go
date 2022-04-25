@@ -7,17 +7,20 @@ package events
 
 import "time"
 
+// Event holds metadata about an event sent by system-probe
 type Event struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Outcome  string `json:"outcome"`
 }
 
+// Executable holds information about the binary executed by a process
 type Executable struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
 }
 
+// Process holds metadata about a process
 type Process struct {
 	PID        int32      `json:"pid"`
 	PPID       int32      `json:"ppid"`
@@ -32,6 +35,7 @@ type Process struct {
 	Args       []string   `json:"args"`
 }
 
+// ProcessEvent represents a process event collected by system-probe
 type ProcessEvent struct {
 	Event   Event     `json:"evt"`
 	Process Process   `json:"process"`
