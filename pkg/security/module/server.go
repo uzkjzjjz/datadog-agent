@@ -538,7 +538,7 @@ func (a *APIServer) SendProcessEvent(event *sprobe.Event) {
 func NewAPIServer(cfg *config.Config, probe *sprobe.Probe, client statsd.ClientInterface) *APIServer {
 	es := &APIServer{
 		msgs:          make(chan *api.SecurityEventMessage, cfg.EventServerBurst*3),
-		processMsgs:   make(chan *api.SecurityProcessEventMessage, cfg.EventServerBurst*10),
+		processMsgs:   make(chan *api.SecurityProcessEventMessage, cfg.EventServerBurst*3),
 		expiredEvents: make(map[rules.RuleID]*int64),
 		rate:          NewLimiter(rate.Limit(cfg.EventServerRate), cfg.EventServerBurst),
 		statsdClient:  client,
