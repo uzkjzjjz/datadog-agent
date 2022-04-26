@@ -40,8 +40,12 @@ static __always_inline void get_tcp_segment_counts(struct sock* skp, __u32* pack
     *packets_out = 0;
 }
 
-SEC("kprobe/tcp_sendmsg")
-int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
+SEC("kretprobe/tcp_sendmsg")
+int kretprobe__tcp_sendmsg(struct pt_regs* ctx) {
+    int ret = PT_REGS_RC(ctx);
+    if (ret < 0) {
+        return 0;
+    }
     __u32 packets_in = 0;
     __u32 packets_out = 0;
     struct sock* skp = (struct sock*)PT_REGS_PARM1(ctx);
@@ -59,8 +63,13 @@ int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
     return handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, packets_out, packets_in, PACKET_COUNT_ABSOLUTE);
 }
 
-SEC("kprobe/tcp_sendmsg/pre_4_1_0")
-int kprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
+SEC("kretprobe/tcp_sendmsg/pre_4_1_0")
+int kretprobe__tcp_sendmsg__pre_4_1_0(struct pt_regs* ctx) {
+    int ret = PT_REGS_RC(ctx);
+    if (ret < 0) {
+        return 0;
+    }
+
     __u32 packets_in = 0;
     __u32 packets_out = 0;
 
@@ -381,8 +390,7 @@ SEC("kprobe/tcp_set_state")
 int kprobe__tcp_set_state(struct pt_regs* ctx) {
     u8 state = (u8)PT_REGS_PARM2(ctx);
 
-    // For now we're tracking only TCP_ESTABLISHED
-    if (state != TCP_ESTABLISHED) {
+    if (state != TCP_ESTABLISHED && state != TCP_CLOSE) {
         return 0;
     }
 
@@ -395,7 +403,23 @@ int kprobe__tcp_set_state(struct pt_regs* ctx) {
 
     tcp_stats_t stats = { .state_transitions = (1 << state) };
     update_tcp_stats(&t, stats);
+    if (state == TCP_CLOSE) {
+        clear_sockfd_maps(sk);
 
+        cleanup_conn(&t);
+    }
+
+    return 0;
+}
+
+SEC("kretprobe/tcp_set_state")
+int kretprobe__tcp_set_state(struct pt_regs* ctx) {
+    u8 state = (u8)PT_REGS_PARM2(ctx);
+    if (state != TCP_CLOSE) {
+        return 0;
+    }
+
+    flush_conn_close_if_full(ctx);
     return 0;
 }
 

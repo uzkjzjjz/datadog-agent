@@ -516,8 +516,8 @@ func (ns *networkState) updateConnWithStatWithActiveConn(client *client, key str
 		closed.LastRecvPackets = closed.MonotonicRecvPackets - st.totalRecvPackets
 
 		closed.LastRetransmits = closed.MonotonicRetransmits - st.totalRetransmits
-		closed.LastTCPEstablished = closed.LastTCPEstablished - st.totalTCPEstablished
-		closed.LastTCPClosed = closed.LastTCPClosed - st.totalTCPClosed
+		closed.LastTCPEstablished = closed.MonotonicTCPEstablished - st.totalTCPEstablished
+		closed.LastTCPClosed = closed.MonotonicTCPClosed - st.totalTCPClosed
 
 		// Update stats object with latest values
 		st.totalSent = active.MonotonicSentBytes

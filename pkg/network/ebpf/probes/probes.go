@@ -22,12 +22,9 @@ const (
 	// TCPv6ConnectReturn traces the return value for the v6 connect() system call
 	TCPv6ConnectReturn ProbeName = "kretprobe/tcp_v6_connect"
 
-	// TCPSendMsg traces the tcp_sendmsg() system call
-	TCPSendMsg ProbeName = "kprobe/tcp_sendmsg"
-
-	// TCPSendMsgPre410 traces the tcp_sendmsg() system call on kernels prior to 4.1.0. This is created because
+	// TCPSendMsgPre410Return traces the tcp_sendmsg() system call on kernels prior to 4.1.0. This is created because
 	// we need to load a different kprobe implementation
-	TCPSendMsgPre410 ProbeName = "kprobe/tcp_sendmsg/pre_4_1_0"
+	TCPSendMsgPre410Return ProbeName = "kretprobe/tcp_sendmsg/pre_4_1_0"
 
 	// TCPSendMsgReturn traces the return value for the tcp_sendmsg() system call
 	// XXX: This is only used for telemetry for now to count the number of errors returned
@@ -44,6 +41,9 @@ const (
 
 	// TCPSetState traces the tcp_set_state() kernel function
 	TCPSetState ProbeName = "kprobe/tcp_set_state"
+
+	// TCPSetStateReturn traces the return for the tcp_set_state() kernel function
+	TCPSetStateReturn ProbeName = "kretprobe/tcp_set_state"
 
 	// TCPCleanupRBuf traces the tcp_cleanup_rbuf() system call
 	TCPCleanupRBuf ProbeName = "kprobe/tcp_cleanup_rbuf"
