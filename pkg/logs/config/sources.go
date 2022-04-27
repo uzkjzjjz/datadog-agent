@@ -7,6 +7,8 @@ package config
 
 import (
 	"sync"
+
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // LogSources serves as the interface between Schedulers and Launchers, distributing
@@ -37,6 +39,7 @@ func NewLogSources() *LogSources {
 // One of the subscribers registered for this source's type (src.Config.Type) will be
 // notified.
 func (s *LogSources) AddSource(source *LogSource) {
+	log.Debugf("add source:\n%s", source)
 	s.mu.Lock()
 	s.sources = append(s.sources, source)
 	if source.Config == nil || source.Config.Validate() != nil {

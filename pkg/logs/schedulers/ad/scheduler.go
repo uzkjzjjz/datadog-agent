@@ -64,6 +64,7 @@ func (s *Scheduler) Schedule(configs []integration.Config) {
 		if !config.IsLogConfig() {
 			continue
 		}
+		fmt.Printf("scheduled integration.Config:\n%s\n", dumpIntegConfig(config))
 		if config.HasFilter(containers.LogsFilter) {
 			log.Debugf("Config %s is filtered out for logs collection, ignoring it", s.configName(config))
 			continue
@@ -146,6 +147,23 @@ func (s *Scheduler) Unschedule(configs []integration.Config) {
 			continue
 		}
 	}
+}
+
+func dumpIntegConfig(config integration.Config) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "integration.Config = {\n")
+	fmt.Fprintf(&b, "\tName: %#v,\n", config.Name)
+	if config.LogsConfig == nil {
+		fmt.Fprintf(&b, "\tLogsConfig: nil,\n")
+	} else {
+		fmt.Fprintf(&b, "\tLogsConfig: %#v,\n", string(config.LogsConfig))
+	}
+	fmt.Fprintf(&b, "\tADIdentifiers: %#v,\n", config.ADIdentifiers)
+	fmt.Fprintf(&b, "\tProvider: %s,\n", config.Provider)
+	fmt.Fprintf(&b, "\tServiceID: %s,\n", config.ServiceID)
+	fmt.Fprintf(&b, "\tSource: %s,\n", config.Source)
+	fmt.Fprintf(&b, "}")
+	return b.String()
 }
 
 // newSources returns true if the config can be mapped to sources.

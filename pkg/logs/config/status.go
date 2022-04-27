@@ -33,6 +33,24 @@ func NewLogStatus() *LogStatus {
 	}
 }
 
+func (s *LogStatus) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var status string
+	switch s.status {
+	case isPending:
+		status = "isPending"
+	case isSuccess:
+		status = "isSuccess"
+	case isError:
+		status = "isError"
+	default:
+		status = fmt.Sprintf("%d", s.status)
+	}
+	return fmt.Sprintf("&LogStatus{status: %s, err: %#v}", status, s.err)
+}
+
 // Success sets the status to success.
 func (s *LogStatus) Success() {
 	s.mu.Lock()

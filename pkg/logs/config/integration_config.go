@@ -83,6 +83,36 @@ type LogsConfig struct {
 	AutoMultiLineMatchThreshold float64 `mapstructure:"auto_multi_line_match_threshold" json:"auto_multi_line_match_threshold"`
 }
 
+// TODO: doc, move down
+func (c *LogsConfig) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "&LogsConfig{\n")
+	fmt.Fprintf(&b, "\tType: %#v,\n", c.Type)
+	switch c.Type {
+	case FileType:
+		fmt.Fprintf(&b, "\tPath: %#v,\n", c.Path)
+		fmt.Fprintf(&b, "\tEncoding: %#v,\n", c.Encoding)
+		fmt.Fprintf(&b, "\tExcludePaths: %#v,\n", c.ExcludePaths)
+		fmt.Fprintf(&b, "\tTailingMode: %#v,\n", c.TailingMode)
+	case DockerType:
+		fmt.Fprintf(&b, "\tImage: %#v,\n", c.Image)
+		fmt.Fprintf(&b, "\tLabel: %#v,\n", c.Label)
+		fmt.Fprintf(&b, "\tName: %#v,\n", c.Name)
+		fmt.Fprintf(&b, "\tIdentifier: %#v,\n", c.Identifier)
+	default:
+		// TODO: other Type's
+		fmt.Fprintf(&b, "\t...\n")
+	}
+	fmt.Fprintf(&b, "\tService: %#v,\n", c.Service)
+	fmt.Fprintf(&b, "\tSource: %#v,\n", c.Source)
+	fmt.Fprintf(&b, "\tSourceCategory: %#v,\n", c.SourceCategory)
+	fmt.Fprintf(&b, "\tTags: %#v,\n", c.Tags)
+	// TODO: more fields
+	fmt.Fprintf(&b, "\t...\n")
+	fmt.Fprintf(&b, "}")
+	return b.String()
+}
+
 // TailingMode type
 type TailingMode uint8
 
