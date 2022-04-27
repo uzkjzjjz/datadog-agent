@@ -96,30 +96,36 @@ func (l *Launcher) run(sourceProvider launchers.SourceProvider, pipelineProvider
 		return
 	}
 
-	log.Info("Starting Kubernetes launcher")
+	log.Info("Starting Kubernetes launcher") // got here
 	addedServices := l.services.GetAllAddedServices()
 	removedServices := l.services.GetAllRemovedServices()
 
 	for {
+		log.Info("THERE 1")
 		select {
 		case service := <-addedServices:
+			log.Info("THERE 2")
 			l.addSource(service)
 		case service := <-removedServices:
+			log.Info("THERE 3")
 			l.removeSource(service)
 		case <-l.stopped:
 			log.Info("Kubernetes launcher stopped")
 			return
 		}
+		log.Info("THERE 4")
 	}
 }
 
 // addSource creates a new log-source from a service by resolving the
 // pod linked to the entityID of the service
 func (l *Launcher) addSource(svc *service.Service) {
+	log.Info("Generating source for service %#v", svc)
 	// If the container is already tailed, we don't do anything
 	// That shoudn't happen
 	if _, exists := l.sourcesByContainer[svc.GetEntityID()]; exists {
 		log.Warnf("A source already exist for container %v", svc.GetEntityID())
+		log.Info("HERE 1")
 		return
 	}
 
@@ -128,6 +134,7 @@ func (l *Launcher) addSource(svc *service.Service) {
 		if err != errCollectAllDisabled {
 			log.Warnf("Invalid configuration for service %q: %v", svc.GetEntityID(), err)
 		}
+		log.Info("HERE 2")
 		return
 	}
 
@@ -139,7 +146,9 @@ func (l *Launcher) addSource(svc *service.Service) {
 	}
 
 	l.sourcesByContainer[svc.GetEntityID()] = source
+	log.Info("HERE 3")
 	l.sources.AddSource(source)
+	log.Info("HERE 4")
 }
 
 // removeSource removes a new log-source from a service
