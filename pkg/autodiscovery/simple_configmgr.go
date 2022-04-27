@@ -29,6 +29,7 @@ func newSimpleConfigManager() configManager {
 
 // processNewService implements configManager#processNewService.
 func (cm *simpleConfigManager) processNewService(adIdentifiers []string, svc listeners.Service) configChanges {
+	log.Infof("processNewService(%#v, %#v)", adIdentifiers, svc)
 	cm.m.Lock()
 	defer cm.m.Unlock()
 
@@ -62,11 +63,13 @@ func (cm *simpleConfigManager) processNewService(adIdentifiers []string, svc lis
 		changes.scheduleConfig(v)
 	}
 
+	log.Infof("result: %s", changes.Dump())
 	return changes
 }
 
 // processDelService implements configManager#processDelService.
 func (cm *simpleConfigManager) processDelService(svc listeners.Service) configChanges {
+	log.Infof("processDelService(%#v)", svc)
 	cm.m.Lock()
 	defer cm.m.Unlock()
 	changes := configChanges{}
@@ -79,11 +82,13 @@ func (cm *simpleConfigManager) processDelService(svc listeners.Service) configCh
 		}
 	}
 
+	log.Infof("result: %s", changes.Dump())
 	return changes
 }
 
 // processNewConfig implements configManager#processNewConfig.
 func (cm *simpleConfigManager) processNewConfig(config integration.Config) configChanges {
+	log.Infof("processNewConfig(%s)", config.Dump())
 	cm.m.Lock()
 	defer cm.m.Unlock()
 	changes := configChanges{}
@@ -100,9 +105,11 @@ func (cm *simpleConfigManager) processNewConfig(config integration.Config) confi
 			e := fmt.Sprintf("Can't resolve the template for %s at this moment.", config.Name)
 			errorStats.setResolveWarning(config.Name, e)
 			log.Debug(e)
+			log.Infof("result: %s", changes.Dump())
 			return changes // empty result
 		}
 
+		log.Infof("result: %s", resolvedConfigs.Dump())
 		return resolvedConfigs
 	}
 
@@ -115,6 +122,7 @@ func (cm *simpleConfigManager) processNewConfig(config integration.Config) confi
 	changes.scheduleConfig(config)
 	cm.store.setLoadedConfig(config)
 
+	log.Infof("result: %s", changes.Dump())
 	return changes
 }
 
@@ -125,6 +133,7 @@ func (cm *simpleConfigManager) processDelConfigs(configs []integration.Config) c
 	changes := configChanges{}
 
 	for _, c := range configs {
+		log.Infof("processDelConfigs(..%s)", c.Dump())
 		if c.IsTemplate() {
 			// Remove the resolved configurations
 			tplDigest := c.Digest()
@@ -146,6 +155,7 @@ func (cm *simpleConfigManager) processDelConfigs(configs []integration.Config) c
 		}
 	}
 
+	log.Infof("result: %s", changes.Dump())
 	return changes
 }
 
