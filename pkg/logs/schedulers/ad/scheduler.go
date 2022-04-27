@@ -60,6 +60,7 @@ func (s *Scheduler) Stop() {
 // An entity represents a unique identifier for a process that be reused to query logs.
 func (s *Scheduler) Schedule(configs []integration.Config) {
 	for _, config := range configs {
+		log.Infof("scheduling %s\n", config.Dump())
 		if !config.IsLogConfig() {
 			continue
 		}
@@ -105,6 +106,7 @@ func (s *Scheduler) Schedule(configs []integration.Config) {
 // Unschedule removes all the sources and services matching the integration configs.
 func (s *Scheduler) Unschedule(configs []integration.Config) {
 	for _, config := range configs {
+		log.Infof("unscheduling %s\n", config.Dump())
 		if !config.IsLogConfig() || config.HasFilter(containers.LogsFilter) {
 			continue
 		}
