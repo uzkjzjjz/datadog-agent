@@ -10,6 +10,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/scheduler"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 var (
@@ -85,6 +86,7 @@ func (l *ADListener) StartListener() {
 		select {
 		case sch := <-adMetaSchedulerCh:
 			l.adMetaScheduler = sch
+			log.Debugf("Registering with AD MetaScheduler %p", sch)
 			l.adMetaScheduler.Register(l.name, l)
 			close(l.registered)
 			// put the value back in the channel, in case it is needed again
