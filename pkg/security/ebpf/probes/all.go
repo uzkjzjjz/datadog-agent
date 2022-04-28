@@ -139,8 +139,14 @@ func AllMapSpecEditors(numCPU int, tracedCgroupsCount int, cgroupWaitListSize in
 			EditorFlag: manager.EditMaxEntries,
 		},
 		"pathnames": {
-			// max 600,000 | min 64,000 entrie => max ~180 MB | min ~27 MB
-			MaxEntries: uint32(math.Max(math.Min(640000, float64(64000*numCPU/4)), 96000)),
+			// max 128 000 | min 64,000 entrie => max ~54 MB | min ~27 MB
+			MaxEntries: func() uint32 {
+				maxEntries := math.Min(128000, float64(64000*numCPU)/4)
+				if maxEntries < 64000 {
+					maxEntries = 64000
+				}
+				return uint32(maxEntries)
+			}(),
 			EditorFlag: manager.EditMaxEntries,
 		},
 		"traced_cgroups": {
