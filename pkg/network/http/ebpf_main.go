@@ -9,9 +9,11 @@
 package http
 
 import (
+	"encoding"
 	"fmt"
 	"math"
 	"os"
+	"sync"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
@@ -52,7 +54,13 @@ type ebpfProgram struct {
 	offsets     []manager.ConstantEditor
 	subprograms []subprogram
 
-	batchCompletionHandler *ddebpf.PerfHandler
+	batchCompletionHandler *ddebpf.TypedPerfHandler
+}
+
+var notificationPool = sync.Pool{
+	New: func() interface{} {
+		return new(httpNotification)
+	},
 }
 
 type subprogram interface {
@@ -82,7 +90,7 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 		}
 	}
 
-	batchCompletionHandler := ddebpf.NewPerfHandler(batchNotificationsChanSize)
+	batchCompletionHandler := ddebpf.NewTypedPerfHandler(batchNotificationsChanSize)
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: httpInFlightMap},
@@ -99,8 +107,11 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 				PerfMapOptions: manager.PerfMapOptions{
 					PerfRingBufferSize: 8 * os.Getpagesize(),
 					Watermark:          1,
-					DataHandler:        batchCompletionHandler.DataHandler,
-					LostHandler:        batchCompletionHandler.LostHandler,
+					TypedDataHandler:   batchCompletionHandler.DataHandler,
+					DataFunc: func() encoding.BinaryUnmarshaler {
+						return notificationPool.Get().(*httpNotification)
+					},
+					LostHandler: batchCompletionHandler.LostHandler,
 				},
 			},
 		},

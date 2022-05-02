@@ -28,12 +28,13 @@ type httpNotification C.http_batch_notification_t
 type httpBatch C.http_batch_t
 type httpBatchKey C.http_batch_key_t
 
-func toHTTPNotification(data []byte) httpNotification {
-	return *(*httpNotification)(unsafe.Pointer(&data[0]))
+func (h *httpNotification) UnmarshalBinary(data []byte) error {
+	*h = *(*httpNotification)(unsafe.Pointer(&data[0]))
+	return nil
 }
 
 // Prepare the httpBatchKey for a map lookup
-func (k *httpBatchKey) Prepare(n httpNotification) {
+func (k *httpBatchKey) Prepare(n *httpNotification) {
 	k.cpu = n.cpu
 	k.page_num = C.uint(int(n.batch_idx) % HTTPBatchPages)
 }
@@ -87,7 +88,7 @@ func (tx *httpTX) Incomplete() bool {
 // valid.  A "dirty" page here means that between the time the
 // http_notification_t message was sent to userspace and the time we performed
 // the batch lookup the page was overridden.
-func (batch *httpBatch) IsDirty(notification httpNotification) bool {
+func (batch *httpBatch) IsDirty(notification *httpNotification) bool {
 	return batch.idx != notification.batch_idx
 }
 

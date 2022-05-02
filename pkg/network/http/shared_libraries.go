@@ -31,10 +31,11 @@ import "C"
 
 const pathMaxSize = int(C.LIB_PATH_MAX_SIZE)
 
-type libPath = C.lib_path_t
+type libPath C.lib_path_t
 
-func toLibPath(data []byte) C.lib_path_t {
-	return *(*C.lib_path_t)(unsafe.Pointer(&data[0]))
+func (l *libPath) UnmarshalBinary(data []byte) error {
+	*l = *(*libPath)(unsafe.Pointer(&data[0]))
+	return nil
 }
 
 func (l *libPath) Bytes() []byte {
@@ -60,14 +61,14 @@ type soWatcher struct {
 	all        *regexp.Regexp
 	rules      []soRule
 	registered map[string]func(string) error
-	loadEvents *ddebpf.PerfHandler
+	loadEvents *ddebpf.TypedPerfHandler
 }
 
 type seenKey struct {
 	pid, path string
 }
 
-func newSOWatcher(procRoot string, perfHandler *ddebpf.PerfHandler, rules ...soRule) *soWatcher {
+func newSOWatcher(procRoot string, perfHandler *ddebpf.TypedPerfHandler, rules ...soRule) *soWatcher {
 	allFilters := make([]string, len(rules))
 	for i, r := range rules {
 		allFilters[i] = r.re.String()
@@ -104,11 +105,12 @@ func (w *soWatcher) Start() {
 					return
 				}
 
-				lib := toLibPath(event.Data)
+				lib := event.Data.(*libPath)
 				// if this shared library was loaded by system-probe we ignore it.
 				// this is to avoid a feedback-loop since the shared libraries here monitored
 				// end up being opened by system-probe
 				if int(lib.pid) == thisPID {
+					libPathPool.Put(lib)
 					break
 				}
 
@@ -116,6 +118,7 @@ func (w *soWatcher) Start() {
 				for _, r := range w.rules {
 					if r.re.Match(path) {
 						var (
+							// this copies path's data, so safe to put it back into the pool later
 							libPath = string(path)
 							pidPath = fmt.Sprintf("%s/%d", w.procRoot, lib.pid)
 						)
@@ -143,6 +146,7 @@ func (w *soWatcher) Start() {
 						break
 					}
 				}
+				libPathPool.Put(lib)
 			case <-w.loadEvents.LostChannel:
 				// Nothing to do in this case
 				break
