@@ -114,7 +114,7 @@ func New(config *config.Config, constants []manager.ConstantEditor) (connection.
 	if config.ClosedChannelSize > 0 {
 		closedChannelSize = config.ClosedChannelSize
 	}
-	perfHandlerTCP := ddebpf.NewPerfHandler(closedChannelSize)
+	perfHandlerTCP := ddebpf.NewTypedPerfHandler(closedChannelSize)
 	m := newManager(perfHandlerTCP, runtimeTracer)
 	m.DumpHandler = dumpMapsHandler
 

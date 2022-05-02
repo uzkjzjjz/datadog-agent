@@ -68,7 +68,7 @@ require (
 	github.com/DataDog/datadog-agent/pkg/util/winutil v0.36.0-rc.4
 	github.com/DataDog/datadog-go/v5 v5.1.0
 	github.com/DataDog/datadog-operator v0.5.0-rc.2.0.20210402083916-25ba9a22e67a
-	github.com/DataDog/ebpf-manager v0.0.0-20220406140358-68e6b7f54dde
+	github.com/DataDog/ebpf-manager v0.0.0-20220502181205-88373c4e7d24
 	github.com/DataDog/gohai v0.0.0-20220329101230-3b6a804fdd24
 	github.com/DataDog/gopsutil v0.0.0-20220308095538-d086941833e3
 	github.com/DataDog/nikos v1.7.6
@@ -437,3 +437,5 @@ replace (
 	github.com/go-logr/logr/funcr => ./internal/patch/logr/funcr
 	github.com/go-logr/stdr => github.com/go-logr/stdr v0.4.0
 )
+
+replace github.com/cilium/ebpf => github.com/DataDog/ebpf v0.0.0-20220502163225-a3821585b97e

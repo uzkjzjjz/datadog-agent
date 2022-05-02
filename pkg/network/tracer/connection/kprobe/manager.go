@@ -9,8 +9,12 @@
 package kprobe
 
 import (
+	"encoding"
 	"os"
 	"strings"
+	"sync"
+
+	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
@@ -58,7 +62,13 @@ var altProbes = map[probes.ProbeName]string{
 	probes.TCPSendMsgPre410:    "kprobe__tcp_sendmsg__pre_4_1_0",
 }
 
-func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Manager {
+var batchPool = sync.Pool{
+	New: func() interface{} {
+		return new(netebpf.Batch)
+	},
+}
+
+func newManager(closedHandler *ebpf.TypedPerfHandler, runtimeTracer bool) *manager.Manager {
 	mgr := &manager.Manager{
 		Maps: []*manager.Map{
 			{Name: string(probes.ConnMap)},
@@ -81,8 +91,11 @@ func newManager(closedHandler *ebpf.PerfHandler, runtimeTracer bool) *manager.Ma
 				PerfMapOptions: manager.PerfMapOptions{
 					PerfRingBufferSize: 8 * os.Getpagesize(),
 					Watermark:          1,
-					DataHandler:        closedHandler.DataHandler,
-					LostHandler:        closedHandler.LostHandler,
+					TypedDataHandler:   closedHandler.DataHandler,
+					DataFunc: func() encoding.BinaryUnmarshaler {
+						return batchPool.Get().(*netebpf.Batch)
+					},
+					LostHandler: closedHandler.LostHandler,
 				},
 			},
 		},
