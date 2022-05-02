@@ -39,7 +39,7 @@ type Monitor struct {
 
 	ebpfProgram            *ebpfProgram
 	batchManager           *batchManager
-	batchCompletionHandler *ddebpf.PerfHandler
+	batchCompletionHandler *ddebpf.TypedPerfHandler
 	telemetry              *telemetry
 	telemetrySnapshot      *telemetry
 	pollRequests           chan chan HTTPMonitorStats
@@ -134,9 +134,10 @@ func (m *Monitor) Start() error {
 				}
 
 				// The notification we read from the perf ring tells us which HTTP batch of transactions is ready to be consumed
-				notification := toHTTPNotification(dataEvent.Data)
+				notification := dataEvent.Data.(*httpNotification)
 				transactions, err := m.batchManager.GetTransactionsFrom(notification)
 				m.process(transactions, err)
+				notificationPool.Put(notification)
 			case _, ok := <-m.batchCompletionHandler.LostChannel:
 				if !ok {
 					return

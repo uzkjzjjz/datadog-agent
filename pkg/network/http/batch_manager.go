@@ -57,7 +57,7 @@ func newBatchManager(batchMap, batchStateMap *ebpf.Map, numCPUs int) *batchManag
 	}
 }
 
-func (m *batchManager) GetTransactionsFrom(notification httpNotification) ([]httpTX, error) {
+func (m *batchManager) GetTransactionsFrom(notification *httpNotification) ([]httpTX, error) {
 	var (
 		state    = &m.stateByCPU[notification.cpu]
 		batch    = new(httpBatch)

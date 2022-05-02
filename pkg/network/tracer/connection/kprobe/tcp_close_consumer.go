@@ -25,7 +25,7 @@ const (
 )
 
 type tcpCloseConsumer struct {
-	perfHandler  *ddebpf.PerfHandler
+	perfHandler  *ddebpf.TypedPerfHandler
 	batchManager *perfBatchManager
 	requests     chan chan struct{}
 	buffer       *network.ConnectionBuffer
@@ -36,7 +36,7 @@ type tcpCloseConsumer struct {
 	perfLost     int64
 }
 
-func newTCPCloseConsumer(m *manager.Manager, perfHandler *ddebpf.PerfHandler) (*tcpCloseConsumer, error) {
+func newTCPCloseConsumer(m *manager.Manager, perfHandler *ddebpf.TypedPerfHandler) (*tcpCloseConsumer, error) {
 	connCloseEventMap, _, err := m.GetMap(string(probes.ConnCloseEventMap))
 	if err != nil {
 		return nil, err
@@ -101,10 +101,11 @@ func (c *tcpCloseConsumer) Start(callback func([]network.ConnectionStats)) {
 					return
 				}
 				atomic.AddInt64(&c.perfReceived, 1)
-				batch := netebpf.ToBatch(batchData.Data)
+				batch := batchData.Data.(*netebpf.Batch)
 				c.batchManager.ExtractBatchInto(c.buffer, batch, batchData.CPU)
 				callback(c.buffer.Connections())
 				c.buffer.Reset()
+				batchPool.Put(batch)
 			case lostCount, ok := <-c.perfHandler.LostChannel:
 				if !ok {
 					return

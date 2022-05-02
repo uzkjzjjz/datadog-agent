@@ -81,7 +81,7 @@ func (cs ConnStats) IsAssured() bool {
 	return cs.Flags&uint32(Assured) != 0
 }
 
-// ToBatch converts a byte slice to a Batch pointer.
-func ToBatch(data []byte) *Batch {
-	return (*Batch)(unsafe.Pointer(&data[0]))
+func (b *Batch) UnmarshalBinary(buf []byte) error {
+	*b = *(*Batch)(unsafe.Pointer(&buf[0]))
+	return nil
 }

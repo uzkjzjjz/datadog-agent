@@ -9,11 +9,13 @@
 package http
 
 import (
+	"encoding"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/twmb/murmur3"
 
@@ -61,7 +63,7 @@ const (
 type sslProgram struct {
 	cfg         *config.Config
 	sockFDMap   *ebpf.Map
-	perfHandler *ddebpf.PerfHandler
+	perfHandler *ddebpf.TypedPerfHandler
 	watcher     *soWatcher
 	manager     *manager.Manager
 }
@@ -76,8 +78,14 @@ func newSSLProgram(c *config.Config, sockFDMap *ebpf.Map) (*sslProgram, error) {
 	return &sslProgram{
 		cfg:         c,
 		sockFDMap:   sockFDMap,
-		perfHandler: ddebpf.NewPerfHandler(batchNotificationsChanSize),
+		perfHandler: ddebpf.NewTypedPerfHandler(batchNotificationsChanSize),
 	}, nil
+}
+
+var libPathPool = sync.Pool{
+	New: func() interface{} {
+		return new(libPath)
+	},
 }
 
 func (o *sslProgram) ConfigureManager(m *manager.Manager) {
@@ -93,8 +101,11 @@ func (o *sslProgram) ConfigureManager(m *manager.Manager) {
 			PerfMapOptions: manager.PerfMapOptions{
 				PerfRingBufferSize: 8 * os.Getpagesize(),
 				Watermark:          1,
-				DataHandler:        o.perfHandler.DataHandler,
-				LostHandler:        o.perfHandler.LostHandler,
+				TypedDataHandler:   o.perfHandler.DataHandler,
+				DataFunc: func() encoding.BinaryUnmarshaler {
+					return libPathPool.Get().(*libPath)
+				},
+				LostHandler: o.perfHandler.LostHandler,
 			},
 		})
 
