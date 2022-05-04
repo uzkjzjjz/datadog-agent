@@ -3,10 +3,16 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build !windows
+// +build !windows
+
 package bytecode
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"syscall"
 )
 
 // AssetReader describes the combination of both io.Reader and io.ReaderAt
@@ -14,4 +20,23 @@ type AssetReader interface {
 	io.Reader
 	io.ReaderAt
 	io.Closer
+}
+
+// VerifyAssetPermissions checks that the file at the given path is owned by root and has permissions 0644,
+// and returns an error if this isn't the case
+func VerifyAssetPermissions(assetPath string) error {
+	// Enforce that we only load root-writeable object files
+	info, err := os.Stat(assetPath)
+	if err != nil {
+		return fmt.Errorf("error stat-ing asset file %s: %w", assetPath, err)
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("error getting permissions for output file %s: %w", assetPath, err)
+	}
+	if stat.Uid != 0 || stat.Gid != 0 || info.Mode().Perm() != 0644 {
+		// dbfixme remove path
+		return fmt.Errorf("output file has incorrect permissions: %v user=%v, group=%v, permissions=%v", assetPath, stat.Uid, stat.Gid, info.Mode().Perm())
+	}
+	return nil
 }
