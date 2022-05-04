@@ -35,7 +35,8 @@ func VerifyAssetPermissions(assetPath string) error {
 		return fmt.Errorf("error getting permissions for output file %s: %w", assetPath, err)
 	}
 	if stat.Uid != 0 || stat.Gid != 0 || info.Mode().Perm() != 0644 {
-		return fmt.Errorf("output file has incorrect permissions: user=%v, group=%v, permissions=%v", stat.Uid, stat.Gid, info.Mode().Perm())
+		// dbfixme remove path
+		return fmt.Errorf("output file has incorrect permissions: %v user=%v, group=%v, permissions=%v", assetPath, stat.Uid, stat.Gid, info.Mode().Perm())
 	}
 	return nil
 }

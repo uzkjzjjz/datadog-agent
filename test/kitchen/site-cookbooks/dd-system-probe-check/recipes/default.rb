@@ -27,6 +27,14 @@ remote_directory testdir do
   end
 end
 
+if !platform?('windows')
+  directory '/tmp/system-probe-tests/pkg/ebpf/bytecode' do
+    owner 'root'
+    mode '0644'
+    action :create
+  end
+end
+
 if platform?('windows')
   include_recipe "::windows"
 else
