@@ -98,10 +98,12 @@ func (l *Launcher) run(sourceProvider launchers.SourceProvider, pipelineProvider
 	log.Info("Starting Kubernetes launcher")
 	addedServices := l.services.GetAllAddedServices()
 	removedServices := l.services.GetAllRemovedServices()
+	log.Info("Kubernetes launcher now listening for services")
 
 	for {
 		select {
 		case service := <-addedServices:
+			log.Infof("Kubernetes launcher got service %#v", service)
 			l.addSource(service)
 		case service := <-removedServices:
 			l.removeSource(service)
