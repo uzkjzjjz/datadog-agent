@@ -18,7 +18,7 @@ import (
 // Scheduler creates a single source to represent all containers collected due to
 // the `logs_config.container_collect_all` configuration.
 type Scheduler struct {
-	ac *autodiscovery.AutoConfig
+	getAC func() *autodiscovery.AutoConfig
 	// added is closed when the source is added (for testing)
 	added chan struct{}
 }
@@ -26,9 +26,9 @@ type Scheduler struct {
 var _ schedulers.Scheduler = &Scheduler{}
 
 // New creates a new scheduler.
-func New(ac *autodiscovery.AutoConfig) schedulers.Scheduler {
+func New(getAC func() *autodiscovery.AutoConfig) schedulers.Scheduler {
 	return &Scheduler{
-		ac:    ac,
+		getAC: getAC,
 		added: make(chan struct{}),
 	}
 }
@@ -62,8 +62,9 @@ func (s *Scheduler) Start(sourceMgr schedulers.SourceManager) {
 func (s *Scheduler) blockUntilAutoConfigRanOnce(timeout time.Duration) {
 	now := time.Now()
 	for {
+		ac := s.getAC()
 		time.Sleep(100 * time.Millisecond) // don't hog the CPU
-		if s.ac.HasRunOnce() {
+		if ac.HasRunOnce() {
 			return
 		}
 		if time.Since(now) > timeout {

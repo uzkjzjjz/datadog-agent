@@ -11,7 +11,6 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/DataDog/datadog-agent/pkg/autodiscovery"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers/names"
 	logsConfig "github.com/DataDog/datadog-agent/pkg/logs/config"
@@ -35,11 +34,11 @@ type Scheduler struct {
 var _ schedulers.Scheduler = &Scheduler{}
 
 // New creates a new scheduler.
-func New(ac *autodiscovery.AutoConfig) schedulers.Scheduler {
+func New() schedulers.Scheduler {
 	sch := &Scheduler{
 		sourcesByServiceID: make(map[string]*logsConfig.LogSource),
 	}
-	sch.listener = adlistener.NewADListener("logs-agent AD scheduler", ac, sch.Schedule, sch.Unschedule)
+	sch.listener = adlistener.NewADListener("logs-agent AD scheduler", sch.Schedule, sch.Unschedule)
 	return sch
 }
 

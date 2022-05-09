@@ -13,11 +13,13 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery"
 	"github.com/DataDog/datadog-agent/pkg/logs/client/http"
 	"github.com/DataDog/datadog-agent/pkg/logs/internal/metrics"
+	"github.com/DataDog/datadog-agent/pkg/logs/internal/util/adlistener"
 	"github.com/DataDog/datadog-agent/pkg/metadata/inventories"
 	"go.uber.org/atomic"
 
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 
+	metaScheduler "github.com/DataDog/datadog-agent/pkg/autodiscovery/scheduler"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/diagnostic"
 	adScheduler "github.com/DataDog/datadog-agent/pkg/logs/schedulers/ad"
@@ -53,13 +55,13 @@ var (
 // instead of directly using it.
 // The parameter serverless indicates whether or not this Logs Agent is running
 // in a serverless environment.
-func Start(ac *autodiscovery.AutoConfig) (*Agent, error) {
-	return start(ac, false)
+func Start(getAC func() *autodiscovery.AutoConfig) (*Agent, error) {
+	return start(getAC, false)
 }
 
 // StartServerless starts a Serverless instance of the Logs Agent.
-func StartServerless() (*Agent, error) {
-	return start(nil, true)
+func StartServerless(getAC func() *autodiscovery.AutoConfig) (*Agent, error) {
+	return start(getAC, true)
 }
 
 // buildEndpoints builds endpoints for the logs agent
@@ -74,7 +76,7 @@ func buildEndpoints(serverless bool) (*config.Endpoints, error) {
 	return config.BuildEndpointsWithVectorOverride(httpConnectivity, intakeTrackType, AgentJSONIntakeProtocol, config.DefaultIntakeOrigin)
 }
 
-func start(ac *autodiscovery.AutoConfig, serverless bool) (*Agent, error) {
+func start(getAC func() *autodiscovery.AutoConfig, serverless bool) (*Agent, error) {
 	if IsAgentRunning() {
 		return agent, nil
 	}
@@ -128,13 +130,8 @@ func start(ac *autodiscovery.AutoConfig, serverless bool) (*Agent, error) {
 	isRunning.Store(true)
 	log.Info("logs-agent started")
 
-	if !serverless {
-		if ac == nil {
-			panic("AutoConfig must be initialized before logs-agent")
-		}
-		agent.AddScheduler(adScheduler.New(ac))
-		agent.AddScheduler(ccaScheduler.New(ac))
-	}
+	agent.AddScheduler(adScheduler.New())
+	agent.AddScheduler(ccaScheduler.New(getAC))
 	agent.AddScheduler(trapsScheduler.New())
 
 	return agent, nil
@@ -175,6 +172,12 @@ func IsAgentRunning() bool {
 // GetStatus returns logs-agent status
 func GetStatus() status.Status {
 	return status.Get()
+}
+
+// SetADMetaScheduler supplies this package with a reference to the AD MetaScheduler,
+// once it has been started.
+func SetADMetaScheduler(sched *metaScheduler.MetaScheduler) {
+	adlistener.SetADMetaScheduler(sched)
 }
 
 // GetMessageReceiver returns the diagnostic message receiver
