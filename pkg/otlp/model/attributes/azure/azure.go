@@ -17,7 +17,7 @@ package azure
 import (
 	"strings"
 
-	conventions "go.opentelemetry.io/collector/model/semconv/v1.6.1"
+	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
