@@ -2,7 +2,7 @@
 docker_build_agent7_windows1809:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7
@@ -11,7 +11,7 @@ docker_build_agent7_windows1809:
 docker_build_agent7_windows1809_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7-jmx
@@ -20,7 +20,7 @@ docker_build_agent7_windows1809_jmx:
 docker_build_agent7_windows1909:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1909"]
+  tags: ["runner:windows-docker", "windowsversion:1909_test"]
   variables:
     VARIANT: 1909
     TAG_SUFFIX: -7
@@ -29,7 +29,7 @@ docker_build_agent7_windows1909:
 docker_build_agent7_windows1909_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:1909"]
+  tags: ["runner:windows-docker", "windowsversion:1909_test"]
   variables:
     VARIANT: 1909
     TAG_SUFFIX: -7-jmx
@@ -38,7 +38,7 @@ docker_build_agent7_windows1909_jmx:
 docker_build_agent7_windows2004:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:2004"]
+  tags: ["runner:windows-docker", "windowsversion:2004_test"]
   variables:
     VARIANT: 2004
     TAG_SUFFIX: "-7"
@@ -47,7 +47,7 @@ docker_build_agent7_windows2004:
 docker_build_agent7_windows2004_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:2004"]
+  tags: ["runner:windows-docker", "windowsversion:2004_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: 2004
@@ -57,7 +57,7 @@ docker_build_agent7_windows2004_jmx:
 docker_build_agent7_windows20h2:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:20h2"]
+  tags: ["runner:windows-docker", "windowsversion:20h2_test"]
   variables:
     VARIANT: 20h2
     TAG_SUFFIX: "-7"
@@ -66,7 +66,7 @@ docker_build_agent7_windows20h2:
 docker_build_agent7_windows2022_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:2022"]
+  tags: ["runner:windows-docker", "windowsversion:2022_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: ltsc2022
@@ -76,7 +76,7 @@ docker_build_agent7_windows2022_jmx:
 docker_build_agent7_windows2022:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:2022"]
+  tags: ["runner:windows-docker", "windowsversion:2022_test"]
   variables:
     VARIANT: ltsc2022
     TAG_SUFFIX: "-7"
@@ -85,7 +85,7 @@ docker_build_agent7_windows2022:
 docker_build_agent7_windows20h2_jmx:
   extends:
     - .docker_build_agent7_windows_common
-  tags: ["runner:windows-docker", "windowsversion:20h2"]
+  tags: ["runner:windows-docker", "windowsversion:20h2_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: 20h2
@@ -95,7 +95,7 @@ docker_build_agent7_windows20h2_jmx:
 docker_build_agent7_windows1809_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7
@@ -104,7 +104,7 @@ docker_build_agent7_windows1809_core:
 docker_build_agent7_windows1809_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1809"]
+  tags: ["runner:windows-docker", "windowsversion:1809_test"]
   variables:
     VARIANT: 1809
     TAG_SUFFIX: -7-jmx
@@ -113,7 +113,7 @@ docker_build_agent7_windows1809_core_jmx:
 docker_build_agent7_windows1909_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1909"]
+  tags: ["runner:windows-docker", "windowsversion:1909_test"]
   variables:
     VARIANT: 1909
     TAG_SUFFIX: -7
@@ -122,7 +122,7 @@ docker_build_agent7_windows1909_core:
 docker_build_agent7_windows1909_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:1909"]
+  tags: ["runner:windows-docker", "windowsversion:1909_test"]
   variables:
     VARIANT: 1909
     TAG_SUFFIX: -7-jmx
@@ -131,7 +131,7 @@ docker_build_agent7_windows1909_core_jmx:
 docker_build_agent7_windows2004_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:2004"]
+  tags: ["runner:windows-docker", "windowsversion:2004_test"]
   variables:
     VARIANT: 2004
     TAG_SUFFIX: "-7"
@@ -140,7 +140,7 @@ docker_build_agent7_windows2004_core:
 docker_build_agent7_windows2004_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:2004"]
+  tags: ["runner:windows-docker", "windowsversion:2004_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: 2004
@@ -150,7 +150,7 @@ docker_build_agent7_windows2004_core_jmx:
 docker_build_agent7_windows20h2_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:20h2"]
+  tags: ["runner:windows-docker", "windowsversion:20h2_test"]
   variables:
     VARIANT: 20h2
     TAG_SUFFIX: "-7"
@@ -159,7 +159,7 @@ docker_build_agent7_windows20h2_core:
 docker_build_agent7_windows20h2_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:20h2"]
+  tags: ["runner:windows-docker", "windowsversion:20h2_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: 20h2
@@ -169,7 +169,7 @@ docker_build_agent7_windows20h2_core_jmx:
 docker_build_agent7_windows2022_core:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:2022"]
+  tags: ["runner:windows-docker", "windowsversion:2022_test"]
   variables:
     VARIANT: ltsc2022
     TAG_SUFFIX: "-7"
@@ -178,7 +178,7 @@ docker_build_agent7_windows2022_core:
 docker_build_agent7_windows2022_core_jmx:
   extends:
     - .docker_build_agent7_windows_servercore_common
-  tags: ["runner:windows-docker", "windowsversion:2022"]
+  tags: ["runner:windows-docker", "windowsversion:2022_test"]
   needs: ["windows_msi_and_bosh_zip_x64-a7", "build_windows_container_entrypoint"]
   variables:
     VARIANT: ltsc2022
