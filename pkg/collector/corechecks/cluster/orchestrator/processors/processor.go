@@ -52,7 +52,7 @@ type Handlers interface {
 	// processing loop moves on to the next resource.
 	BuildMessageBody(ctx *ProcessorContext, resourceModels []interface{}, groupSize int) model.MessageBody
 
-	// ExtractResource is used to build the a resource model from the raw
+	// ExtractResource is used to build the resource model from the raw
 	// resource representation.
 	ExtractResource(ctx *ProcessorContext, resource interface{}) (resourceModel interface{})
 
