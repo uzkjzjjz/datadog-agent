@@ -65,6 +65,6 @@ func TestGetKeyByField(t *testing.T) {
 			"status": map[string]interface{}{},
 		},
 	}
-	field := GetKeyByField(key, unstructuredToConvert)
-	println(field)
+	actual := GetKeyByField(key, unstructuredToConvert)
+	assert.Equal(t, 10, actual)
 }
