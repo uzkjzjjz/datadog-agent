@@ -324,6 +324,7 @@ func (l *Launcher) startTailer(container *Container, source *config.LogSource) {
 }
 
 func (l *Launcher) shouldTailFromFile(container *Container) bool {
+	log.Infof("STFF tailFromFile: %t forceTailingFromFile: %t", l.tailFromFile, l.forceTailingFromFile)
 	if !l.tailFromFile {
 		return false
 	}
@@ -335,6 +336,7 @@ func (l *Launcher) shouldTailFromFile(container *Container) bool {
 	// the container from the docker socket
 	registryID := fmt.Sprintf("docker:%s", container.service.Identifier)
 	offset := l.registry.GetOffset(registryID)
+	log.Infof("STFF offset: %#v", offset)
 	return offset == ""
 }
 
