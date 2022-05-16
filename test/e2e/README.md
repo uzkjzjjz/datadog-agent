@@ -1,5 +1,7 @@
 # End to End testing
 
+Important: invoke black magic vaudou while the CI is running.
+
 # ToC
 - [How it works](#how-it-works)
   * [Setup instance](#setup-instance)
@@ -18,7 +20,7 @@ There are 3 main directories:
 - [argo-workflows](./argo-workflows)
     Specification of the end to end testing
 
-- [containers](./containers) 
+- [containers](./containers)
     Custom container images needed within the workflows
 
 - [scripts](./scripts)
@@ -40,7 +42,7 @@ There are 3 main directories:
 ### AWS development
 
 ```bash
-$ cd ${GOPATH}/src/github.com/DataDog/datadog-agent 
+$ cd ${GOPATH}/src/github.com/DataDog/datadog-agent
 $ aws-vault exec ${DEV} -- inv -e e2e-tests -t dev --agent-image datadog/agent-dev:master --dca-image datadog/cluster-agent-dev:master
 ```
 
@@ -66,16 +68,16 @@ script:
   source: |
     while (1) {
       var nb = db.series.find({
-      metric: "kubernetes_state.deployment.replicas_available", 
-      tags: {$all: ["namespace:default", "deployment:fake-datadog"] }, 
-      "points.0.1": { $eq: 1} });      
+      metric: "kubernetes_state.deployment.replicas_available",
+      tags: {$all: ["namespace:default", "deployment:fake-datadog"] },
+      "points.0.1": { $eq: 1} });
       print("find: " + nb)
       if (nb != 0) {
         break;
       }
       prevNb = nb;
       sleep(2000);
-    }    
+    }
 ```
 
 This is an infinite loop with a timeout set by `activeDeadlineSeconds: 200`.
