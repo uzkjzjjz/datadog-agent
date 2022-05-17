@@ -380,6 +380,7 @@ end
 shared_examples_for 'Agent install' do
   it_behaves_like 'an installed Agent'
   it_behaves_like 'an installed Datadog Signing Keys'
+  it_behaves_like 'an installed Agent with correct file permissions'
 end
 
 shared_examples_for 'Agent behavior' do
@@ -477,6 +478,24 @@ shared_examples_for "an installed Datadog Signing Keys" do
     skip unless has_dpkg
     # Only check on Debian-based systems, which have dpkg installed
     expect(is_dpkg_package_installed('datadog-signing-keys')).to be_truthy
+  end
+end
+
+shared_examples_for "an installed Agent with correct file permissions" do
+  it 'has a config directory owned by the dd-agent user' do
+    skip if os == :windows
+    expect(File).to exist('/etc/datadog-agent').with(
+      user:  'dd-agent',
+      group: 'dd-agent',
+    )
+  end
+
+  it 'has a main directory owned by the dd-agent user' do
+    skip if os == :windows
+    expect(File).to exist('/opt/datadog-agent').with(
+      user:  'dd-agent',
+      group: 'dd-agent',
+    )
   end
 end
 
