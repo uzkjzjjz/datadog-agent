@@ -123,17 +123,23 @@ func (ac *AutoConfig) serviceListening() {
 func (ac *AutoConfig) checkTagFreshness(ctx context.Context) {
 	// check if services tags are up to date
 	var servicesToRefresh []listeners.Service
+
 	for _, service := range ac.store.getServices() {
-		previousHash := ac.store.getTagsHashForService(service.GetTaggerEntity())
-		currentHash := tagger.GetEntityHash(service.GetTaggerEntity(), tagger.ChecksCardinality)
+		entity := service.GetTaggerEntity()
+		previousHash := ac.store.getTagsHashForService(entity)
+		currentHash := tagger.GetEntityHash(entity, tagger.ChecksCardinality)
 		// Since an empty hash is a valid value, and we are not able to differentiate
 		// an empty tagger or store with an empty value.
 		// So we only look at the difference between current and previous
+
+		log.Infof("tag freshness of %q: old: %q, new: %q", entity, previousHash, currentHash)
+
 		if currentHash != previousHash {
-			ac.store.setTagsHashForService(service.GetTaggerEntity(), currentHash)
+			ac.store.setTagsHashForService(entity, currentHash)
 			servicesToRefresh = append(servicesToRefresh, service)
 		}
 	}
+
 	for _, service := range servicesToRefresh {
 		log.Debugf("Tags changed for service %s, rescheduling associated checks if any", service.GetTaggerEntity())
 		ac.processDelService(service)
