@@ -35,6 +35,8 @@ func resolveAudit(_ context.Context, e env.Env, ruleID string, res compliance.Re
 		return nil, fmt.Errorf("audit client not configured")
 	}
 
+	log.Debug("start resolveAudit : %s", audit.Path)
+
 	path, err := resolvePath(e, audit.Path)
 	if err != nil {
 		return nil, err
@@ -44,6 +46,8 @@ func resolveAudit(_ context.Context, e env.Env, ruleID string, res compliance.Re
 	if _, err := os.Stat(normPath); err != nil && os.IsNotExist(err) {
 		return nil, fmt.Errorf("%s: audit resource path does not exist", ruleID)
 	}
+
+	log.Debug("resolveAudit normalized path : %s", normPath)
 
 	paths := []string{path}
 
@@ -81,6 +85,8 @@ func resolveAudit(_ context.Context, e env.Env, ruleID string, res compliance.Re
 			)
 		}
 	}
+
+	log.Debug("start resolveAudit : %s", audit.Path)
 
 	return newResolvedIterator(newInstanceIterator(instances)), nil
 }

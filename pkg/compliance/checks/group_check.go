@@ -36,6 +36,9 @@ func resolveGroup(_ context.Context, e env.Env, id string, res compliance.Resour
 		return nil, fmt.Errorf("%s: expecting group resource in group check", id)
 	}
 
+	log.Debug("start resolveGroup")
+	defer log.Debug("stop resolveGroup")
+
 	group := res.Group
 
 	f, err := os.Open(e.EtcGroupPath())

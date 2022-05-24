@@ -88,6 +88,9 @@ func resolveDocker(ctx context.Context, e env.Env, ruleID string, res compliance
 		err      error
 	)
 
+	log.Debug("start resolveDocker")
+	defer log.Debug("stop resolveDocker")
+
 	switch res.Docker.Kind {
 	case "image":
 		if iterator, err = newDockerImageIterator(ctx, client); err == nil {

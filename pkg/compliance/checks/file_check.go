@@ -52,6 +52,9 @@ func resolveFile(_ context.Context, e env.Env, ruleID string, res compliance.Res
 
 	var instances []resolvedInstance
 
+	log.Debugf("%s: running file check for %q and %+v", ruleID, paths)
+	defer log.Debugf("%s: running file check for %q done", ruleID, file.Path)
+
 	for _, path := range paths {
 		// Re-computing relative after glob filtering
 		relPath := e.RelativeToHostRoot(path)
@@ -61,6 +64,8 @@ func resolveFile(_ context.Context, e env.Env, ruleID string, res compliance.Res
 			log.Debugf("%s: file check failed to stat %s [%s]", ruleID, path, relPath)
 			continue
 		}
+
+		log.Debugf("%s: running file check reading %s", ruleID, path)
 
 		filePermissions := uint64(fi.Mode() & os.ModePerm)
 		vars := eval.VarMap{
@@ -83,6 +88,8 @@ func resolveFile(_ context.Context, e env.Env, ruleID string, res compliance.Res
 			log.Errorf("error reading file: %v", err)
 		}
 
+		log.Debugf("%s: running file check reading %s content done", ruleID, path)
+
 		user, err := getFileUser(fi)
 		if err == nil {
 			vars[compliance.FileFieldUser] = user
@@ -94,6 +101,8 @@ func resolveFile(_ context.Context, e env.Env, ruleID string, res compliance.Res
 			vars[compliance.FileFieldGroup] = group
 			regoInput["group"] = group
 		}
+
+		log.Debugf("%s: running file check reading %s done", ruleID, path)
 
 		functions := eval.FunctionMap{
 			compliance.FileFuncJQ:     fileJQ(path),

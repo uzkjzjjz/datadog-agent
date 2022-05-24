@@ -32,6 +32,7 @@ func resolveCommand(ctx context.Context, _ env.Env, ruleID string, res complianc
 	command := res.Command
 
 	log.Debugf("%s: running command check: %v", ruleID, command)
+	defer log.Debugf("%s: running command check done: %v", ruleID, command)
 
 	if command.BinaryCmd == nil && command.ShellCmd == nil {
 		return nil, fmt.Errorf("unable to execute commandCheck - need a binary or a shell command")

@@ -36,6 +36,7 @@ func resolveProcess(_ context.Context, e env.Env, id string, res compliance.Reso
 	process := res.Process
 
 	log.Debugf("%s: running process check: %s", id, process.Name)
+	defer log.Debugf("%s: running process check: %s done", id, process.Name)
 
 	processes, err := getProcesses(cacheValidity)
 

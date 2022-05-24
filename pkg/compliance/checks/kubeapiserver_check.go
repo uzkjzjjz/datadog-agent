@@ -40,6 +40,9 @@ func resolveKubeapiserver(ctx context.Context, e env.Env, ruleID string, res com
 		return nil, fmt.Errorf("expecting Kubeapiserver resource in Kubeapiserver check")
 	}
 
+	log.Debug("start resolveKubeapiserver")
+	defer log.Debug("stop resolveKubeapiserver")
+
 	kubeResource := res.KubeApiserver
 
 	if len(kubeResource.Kind) == 0 {
