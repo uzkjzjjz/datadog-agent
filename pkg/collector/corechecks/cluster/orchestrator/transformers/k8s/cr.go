@@ -10,28 +10,38 @@ package k8s
 
 import (
 	"fmt"
+	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/mitchellh/mapstructure"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	strings "strings"
 )
 
-func ExtractMetadata(cr *unstructured.Unstructured) *metav1.ObjectMeta {
-	a := metav1.ObjectMeta{}
-	nestedMap, _, err := unstructured.NestedMap(cr.Object, "metadata")
-	if err != nil {
-		return nil
+// ExtractCustomResource returns the protobuf model corresponding to a
+// Kubernetes ClusterRole resource.
+func ExtractCustomResource(u *unstructured.Unstructured) *model.ClusterRole {
+	clusterRole := &model.ClusterRole{
+		Metadata: extractUnstructuredMetadata(u),
 	}
-
-	err = mapstructure.Decode(nestedMap, &a)
-	if err != nil {
-		return nil
-	}
-
-	return &a
+	return clusterRole
 }
 
-func GetKeyByField(key string, cr *unstructured.Unstructured) interface{} {
+func extractUnstructuredMetadata(cr *unstructured.Unstructured) *model.Metadata {
+	a := metav1.ObjectMeta{}
+	nestedMap, _, err := unstructured.NestedMap(cr.Object, "metadata")
+	if err != nil { // TODO: surface err
+		return nil
+	}
+
+	err = mapstructure.Decode(nestedMap, &a) // TODO: this somehow fails, TBD
+	if err != nil {                          // TODO: surface err
+		return nil
+	}
+
+	return extractMetadata(&a)
+}
+
+func getKeyByField(key string, cr *unstructured.Unstructured) interface{} {
 	words := strings.Split(key, ".")
 	obj := cr.Object
 	for i, s := range words {

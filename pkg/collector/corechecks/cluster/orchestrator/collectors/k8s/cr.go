@@ -62,7 +62,7 @@ func (c *CRCollector) Informers() map[string]cache.SharedInformer {
 
 // Init is used to initialize the collector.
 func (c *CRCollector) Init(rcfg *collectors.CollectorRunConfig) {
-	// make GroupVersionResource configurable
+	// TODO: add message if activated but non collected
 	crs := config.GetCRsToCollect()
 	grvs := convertToGRV(crs)
 	// iterate through the crds and generate an informer per crd (given by the customer)

@@ -11,6 +11,7 @@ package k8s
 import (
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/transformers/k8s"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -42,8 +43,7 @@ func (h *CRHandlers) BuildMessageBody(ctx *processors.ProcessorContext, resource
 // ExtractResource is a handler called to extract the resource model out of a raw resource.
 func (h *CRHandlers) ExtractResource(ctx *processors.ProcessorContext, resource interface{}) (resourceModel interface{}) {
 	r := resource.(*unstructured.Unstructured)
-	return r
-	//return k8sTransformers.ExtractCRD(r)
+	return k8s.ExtractCustomResource(r)
 }
 
 // ResourceList is a handler called to convert a list passed as a generic

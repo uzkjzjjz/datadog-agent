@@ -42,7 +42,8 @@ func TestExtractMetadata(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, ExtractMetadata(tt.unstructuredToConvert), "ExtractMetadata(%v)", tt.want)
+			// TODO: fix types
+			assert.Equalf(t, tt.want, extractUnstructuredMetadata(tt.unstructuredToConvert), "extractMetadata(%v)", tt.want)
 		})
 	}
 }
@@ -65,6 +66,6 @@ func TestGetKeyByField(t *testing.T) {
 			"status": map[string]interface{}{},
 		},
 	}
-	actual := GetKeyByField(key, unstructuredToConvert)
+	actual := getKeyByField(key, unstructuredToConvert)
 	assert.Equal(t, 10, actual)
 }
