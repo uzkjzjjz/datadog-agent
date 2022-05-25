@@ -26,6 +26,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd/replay"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
+	"github.com/DataDog/datadog-agent/pkg/tagger/utils"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util"
@@ -286,7 +287,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 
 	// if the server is running in a context where static tags are required, add those
 	// to extraTags.
-	if staticTags := util.GetStaticTagsSlice(context.TODO()); staticTags != nil {
+	if staticTags := utils.GetStaticTagsSlice(context.TODO()); staticTags != nil {
 		extraTags = append(extraTags, staticTags...)
 	}
 	util.SortUniqInPlace(extraTags)

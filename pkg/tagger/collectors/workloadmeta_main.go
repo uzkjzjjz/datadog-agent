@@ -14,7 +14,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
 	"github.com/DataDog/datadog-agent/pkg/tagger/utils"
-	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 )
@@ -77,7 +76,7 @@ func (c *WorkloadMetaCollector) Run(ctx context.Context) {
 }
 
 func (c *WorkloadMetaCollector) collectStaticGlobalTags(ctx context.Context) {
-	c.staticTags = util.GetStaticTags(ctx)
+	c.staticTags = utils.GetStaticTags(ctx)
 	if len(c.staticTags) > 0 {
 		tags := utils.NewTagList()
 

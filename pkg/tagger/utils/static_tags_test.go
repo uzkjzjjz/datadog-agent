@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2022-present Datadog, Inc.
 
-package util
+package utils
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStaticTags(t *testing.T) {
+func TestGetStaticTags(t *testing.T) {
 	mockConfig := config.Mock()
 	mockConfig.Set("eks_fargate", true) // pretend this is a hostless environment
 	mockConfig.Set("kubernetes_kubelet_nodename", "eksnode")
