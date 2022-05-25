@@ -95,6 +95,8 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 			{Name: "bio_new_socket_args"},
 			{Name: "fd_by_ssl_bio"},
 			{Name: "ssl_ctx_by_pid_tgid"},
+			{Name: "crypto_bio_by_pid_tgid"},
+			{Name: "ssl_ctx_by_crypto_wbio"},
 		},
 		PerfMaps: []*manager.PerfMap{
 			{

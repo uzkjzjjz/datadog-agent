@@ -82,11 +82,20 @@ static __always_inline void init_ssl_sock(void *ssl_ctx, u32 socket_fd) {
     bpf_map_update_elem(&ssl_sock_by_ctx, &ssl_ctx, &ssl_sock, BPF_ANY);
 }
 
-static __always_inline void init_ssl_sock_from_do_handshake(struct sock *skp) {
+static __always_inline void init_ssl_sock_from_sock(struct sock *skp) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
+
     void **ssl_ctx_map_val = bpf_map_lookup_elem(&ssl_ctx_by_pid_tgid, &pid_tgid);
     if (ssl_ctx_map_val == NULL) {
-        return;
+        void **bio_map_val = bpf_map_lookup_elem(&crypto_bio_by_pid_tgid, &pid_tgid);
+        if (bio_map_val == NULL) {
+            return;
+        }
+        void *bio = *bio_map_val;
+        ssl_ctx_map_val = bpf_map_lookup_elem(&ssl_ctx_by_crypto_wbio, &bio);
+        if (ssl_ctx_map_val == NULL) {
+            return;
+        }
     }
 
     ssl_sock_t ssl_sock = {};

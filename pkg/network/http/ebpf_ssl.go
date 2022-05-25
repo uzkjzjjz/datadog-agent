@@ -38,6 +38,8 @@ var openSSLProbes = map[string]string{
 var cryptoProbes = map[string]string{
 	"uprobe/BIO_new_socket":    "uprobe__BIO_new_socket",
 	"uretprobe/BIO_new_socket": "uretprobe__BIO_new_socket",
+	"uprobe/BIO_write":         "uprobe__BIO_write",
+	"uretprobe/BIO_write":      "uretprobe__BIO_write",
 }
 
 var gnuTLSProbes = map[string]string{

@@ -65,8 +65,8 @@ int socket__http_filter(struct __sk_buff* skb) {
 
 SEC("kprobe/tcp_sendmsg")
 int kprobe__tcp_sendmsg(struct pt_regs* ctx) {
-    // map connection tuple during SSL_do_handshake(ctx)
-    init_ssl_sock_from_do_handshake((struct sock*)PT_REGS_PARM1(ctx));
+    // map connection tuple during SSL_do_handshake(ctx) or BIO_write() in async mode
+    init_ssl_sock_from_sock((struct sock*)PT_REGS_PARM1(ctx));
     return 0;
 }
 
@@ -133,13 +133,38 @@ int uretprobe__BIO_new_socket(struct pt_regs* ctx) {
 SEC("uprobe/SSL_set_bio")
 int uprobe__SSL_set_bio(struct pt_regs* ctx) {
     void *ssl_ctx = (void *)PT_REGS_PARM1(ctx);
-    void *bio = (void *)PT_REGS_PARM2(ctx);
-    u32 *socket_fd = bpf_map_lookup_elem(&fd_by_ssl_bio, &bio);
+    void *rbio = (void *)PT_REGS_PARM2(ctx);
+    void *wbio = (void *)PT_REGS_PARM3(ctx);
+
+    if (wbio != NULL) {
+        bpf_map_update_elem(&ssl_ctx_by_crypto_wbio, &wbio, &ssl_ctx, BPF_ANY);
+    }
+    u32 *socket_fd = bpf_map_lookup_elem(&fd_by_ssl_bio, &rbio);
     if (socket_fd == NULL)  {
-        return 0;
+        socket_fd = bpf_map_lookup_elem(&fd_by_ssl_bio, &wbio);
+        if (socket_fd == NULL)  {
+            return 0;
+        }
     }
     init_ssl_sock(ssl_ctx, *socket_fd);
-    bpf_map_delete_elem(&fd_by_ssl_bio, &bio);
+    bpf_map_delete_elem(&fd_by_ssl_bio, &rbio);
+    bpf_map_delete_elem(&fd_by_ssl_bio, &wbio);
+    return 0;
+}
+
+SEC("uprobe/BIO_write")
+int uprobe__BIO_write(struct pt_regs* ctx) {
+    return 0;
+ /*    u64 pid_tgid = bpf_get_current_pid_tgid(); */
+/*     void *bio = (void *)PT_REGS_PARM1(ctx); */
+/*     bpf_map_update_elem(&crypto_bio_by_pid_tgid, &pid_tgid, &bio, BPF_ANY); */
+/*     return 0; */
+}
+
+SEC("uretprobe/BIO_write")
+int uretprobe__BIO_write(struct pt_regs* ctx) {
+    /* u64 pid_tgid = bpf_get_current_pid_tgid(); */
+    /* bpf_map_delete_elem(&crypto_bio_by_pid_tgid, &pid_tgid); */
     return 0;
 }
 

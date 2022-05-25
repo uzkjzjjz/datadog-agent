@@ -90,6 +90,24 @@ struct bpf_map_def SEC("maps/ssl_ctx_by_pid_tgid") ssl_ctx_by_pid_tgid = {
     .namespace = "",
 };
 
+struct bpf_map_def SEC("maps/ssl_ctx_by_crypto_wbio") ssl_ctx_by_crypto_wbio = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(void *),
+    .value_size = sizeof(void *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
+struct bpf_map_def SEC("maps/crypto_bio_by_pid_tgid") crypto_bio_by_pid_tgid = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(__u64),
+    .value_size = sizeof(void *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
 struct bpf_map_def SEC("maps/open_at_args") open_at_args = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(__u64), // pid_tgid
