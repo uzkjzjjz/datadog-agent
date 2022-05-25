@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/version"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -41,11 +40,10 @@ func versionString() string {
 	if av.Meta != "" {
 		meta = fmt.Sprintf("- Meta: %s ", color.YellowString(av.Meta))
 	}
-	return fmt.Sprintf("Agent %s %s- Commit: %s - Serialization version: %s - Go version: %s",
+	return fmt.Sprintf("Agent %s %s- Commit: %s - Go version: %s",
 		color.CyanString(av.GetNumberAndPre()),
 		meta,
 		color.GreenString(av.Commit),
-		color.YellowString(serializer.AgentPayloadVersion),
 		color.RedString(runtime.Version()),
 	)
 }
