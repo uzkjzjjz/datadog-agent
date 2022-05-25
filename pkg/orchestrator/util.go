@@ -54,8 +54,8 @@ const (
 	K8sServiceAccount
 	// K8sIngress represents a Kubernetes Ingress
 	K8sIngress
-	// K8sCRD represents a Kubernetes Custom Resource
-	K8sCRD
+	// K8sCR represents a Kubernetes Custom Resource
+	K8sCR
 )
 
 // NodeTypes returns the current existing NodesTypes as a slice to iterate over.
@@ -79,7 +79,7 @@ func NodeTypes() []NodeType {
 		K8sClusterRoleBinding,
 		K8sServiceAccount,
 		K8sIngress,
-		K8sCRD,
+		K8sCR,
 	}
 }
 
@@ -121,7 +121,7 @@ func (n NodeType) String() string {
 		return "ServiceAccount"
 	case K8sIngress:
 		return "Ingress"
-	case K8sCRD:
+	case K8sCR:
 		return "Crd"
 	default:
 		log.Errorf("Trying to convert unknown NodeType iota: %d", n)
@@ -150,7 +150,7 @@ func (n NodeType) Orchestrator() string {
 		K8sClusterRoleBinding,
 		K8sServiceAccount,
 		K8sIngress,
-		K8sCRD:
+		K8sCR:
 		return "k8s"
 	default:
 		log.Errorf("Unknown NodeType %v", n)

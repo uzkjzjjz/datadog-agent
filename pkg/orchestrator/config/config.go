@@ -176,3 +176,13 @@ func NewOrchestratorForwarder() *forwarder.DefaultForwarder {
 
 	return forwarder.NewDefaultForwarder(orchestratorForwarderOpts)
 }
+
+func GetCRsToCollect() []string {
+	if k := key(orchestratorNS, "crd", "gvr"); config.Datadog.IsSet(k) {
+		stringMap := config.Datadog.GetStringSlice(k)
+		if stringMap != nil {
+			return stringMap
+		}
+	}
+	return nil
+}

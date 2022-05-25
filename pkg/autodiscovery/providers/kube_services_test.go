@@ -184,7 +184,7 @@ func TestInvalidateIfChanged(t *testing.T) {
 			invalidate: true,
 		},
 		{
-			// Informer resync, don't invalidate
+			// Informers resync, don't invalidate
 			old:        s89,
 			obj:        s89,
 			invalidate: false,

@@ -13,6 +13,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator/config"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/client-go/tools/cache"
 )
@@ -20,8 +21,8 @@ import (
 // Collector is an interface that represents the collection process for a
 // resource type.
 type Collector interface {
-	// Informer returns the shared informer for that resource.
-	Informer() cache.SharedInformer
+	// Informers returns the shared informer for that resource.
+	Informers() map[string]cache.SharedInformer
 
 	// Init is where the collector initialization happens. It is used to create
 	// informers and listers.
@@ -51,10 +52,11 @@ type CollectorMetadata struct {
 // CollectorRunConfig is the configuration used to initialize or run the
 // collector.
 type CollectorRunConfig struct {
-	APIClient   *apiserver.APIClient
-	ClusterID   string
-	Config      *config.OrchestratorConfig
-	MsgGroupRef *int32
+	APIClient       *apiserver.APIClient
+	ClusterID       string
+	Config          *config.OrchestratorConfig
+	MsgGroupRef     *int32
+	CustomResources *[]schema.GroupVersionResource
 }
 
 // CollectorRunResult contains information about what the collector has done.

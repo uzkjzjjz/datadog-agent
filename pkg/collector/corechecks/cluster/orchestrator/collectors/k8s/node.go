@@ -43,8 +43,9 @@ func NewNodeCollector() *NodeCollector {
 }
 
 // Informer returns the shared informer.
-func (c *NodeCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *NodeCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

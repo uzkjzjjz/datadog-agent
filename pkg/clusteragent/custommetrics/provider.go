@@ -169,7 +169,7 @@ func (p *datadogProvider) GetExternalMetric(namespace string, metricSelector lab
 			Value:        metric.value.Value,
 		}
 		// Datadog metrics are not case sensitive but the Autoscaler Controller lower cases the metric name as it queries the metrics provider.
-		// Lowering the metric name retrieved by the Autoscaler Informer here, allows for users to use metrics with capital letters.
+		// Lowering the metric name retrieved by the Autoscaler Informers here, allows for users to use metrics with capital letters.
 		// Datadog tags are lower cased, but metrics labels are not case sensitive.
 		// If tags with capital letters are used (as the label selector in the Autoscaler), no metrics will be retrieved from Datadog.
 		if info.Metric == strings.ToLower(metric.info.Metric) &&

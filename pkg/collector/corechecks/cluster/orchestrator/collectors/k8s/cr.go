@@ -10,6 +10,7 @@ package k8s
 
 import (
 	"context"
+	"github.com/DataDog/datadog-agent/pkg/orchestrator/config"
 	v1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -23,64 +24,45 @@ import (
 	k8sProcessors "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors/k8s"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 )
 
-// CRDCollector is a collector for Kubernetes clusters.
-type CRDCollector struct {
-	informer        informers.GenericInformer
+// CRCollector is a collector for Kubernetes clusters.
+type CRCollector struct {
+	informers       map[string]informers.GenericInformer
 	informerFactory dynamicinformer.DynamicSharedInformerFactory
 	lister          dynamiclister.Lister
 	metadata        *collectors.CollectorMetadata
 	processor       *processors.Processor
 }
 
-// NewCRDCollector creates a new collector for the Kubernetes Cluster
+// NewCRCollector creates a new collector for the Kubernetes Cluster
 // resource.
-func NewCRDCollector() *CRDCollector {
-	return &CRDCollector{
+func NewCRCollector() *CRCollector {
+	return &CRCollector{
 		metadata: &collectors.CollectorMetadata{
 			IsStable: true,
-			Name:     "crds",
-			NodeType: orchestrator.K8sCRD,
+			Name:     "crs",
+			NodeType: orchestrator.K8sCR,
 		},
-		processor: processors.NewProcessor(new(k8sProcessors.CRDHandlers)),
+		processor: processors.NewProcessor(new(k8sProcessors.CRHandlers)),
 	}
 }
 
-// Informer returns the shared informer.
-func (c *CRDCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+// Informers returns the shared informers.
+func (c *CRCollector) Informers() map[string]cache.SharedInformer {
+	infs := make(map[string]cache.SharedInformer, len(c.informers))
+	for gvr, informer := range c.informers {
+		infs[gvr] = informer.Informer()
+	}
+	return infs
 }
 
-/**
-apiVersion: datadoghq.com/v1alpha1
-kind: DatadogMetric
-metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"datadoghq.com/v1alpha1","kind":"DatadogMetric","metadata":{"annotations":{},"name":"orchestrator-intake-external-metric","namespace":"orchestrator"},"spec":{"query":"100*(ewma_10(max:kubernetes.cpu.usage.total{service:orchestrator-intake,datacenter:eu1.prod.dog,kube_cluster_name:spirou}))/(1000000000*avg:kubernetes.cpu.limits{service:orchestrator-intake,datacenter:eu1.prod.dog,kube_cluster_name:spirou})"}}
-    meta.helm.sh/release-name: orchestrator-intake
-    meta.helm.sh/release-namespace: orchestrator
-  creationTimestamp: "2021-02-09T14:36:09Z"
-  generation: 3
-  labels:
-    admission.datadoghq.com/mutate-pods: "true"
-    admission.datadoghq.com/validate-pods: "true"
-    admission.datadoghq.com/validate-services: "true"
-    app.kubernetes.io/managed-by: Helm
-  name: orchestrator-intake-external-metric
-  namespace: orchestrator
-  resourceVersion: "8162835308"
-  uid: 1c171bfe-7d44-4096-8a07-14a2e0a06588
-spec:
-*/
-
 // Init is used to initialize the collector.
-func (c *CRDCollector) Init(rcfg *collectors.CollectorRunConfig) {
+func (c *CRCollector) Init(rcfg *collectors.CollectorRunConfig) {
 	// make GroupVersionResource configurable
-	groupVersion := schema.GroupVersion{Group: "datadoghq.com", Version: "v1alpha1"}
+	crs := config.GetCRsToCollect()
+	println(crs)
 	apiextensionsV1Client := v1.New(rcfg.APIClient.DiscoveryCl.RESTClient())
 	customResourceDefinitions := apiextensionsV1Client.CustomResourceDefinitions()
 	crds, err := customResourceDefinitions.List(context.Background(), metav1.ListOptions{})
@@ -92,23 +74,22 @@ func (c *CRDCollector) Init(rcfg *collectors.CollectorRunConfig) {
 		return
 	}
 	c.informerFactory = dynamicinformer.NewDynamicSharedInformerFactory(rcfg.APIClient.DynamicCl, 300)
-	r := groupVersion.WithResource("datadogagents")
 
-	c.informer = c.informerFactory.ForResource(r)
-	indexer := c.informer.Informer().GetIndexer()
-	c.lister = dynamiclister.New(indexer, r)
+	//c.informers[r.String()] = c.informerFactory.ForResource(r)
+	//indexer := c.informers.Informer().GetIndexer()
+	//c.lister = dynamiclister.New(indexer, r)
 }
 
 // IsAvailable returns whether the collector is available.
-func (c *CRDCollector) IsAvailable() bool { return true }
+func (c *CRCollector) IsAvailable() bool { return true }
 
 // Metadata is used to access information about the collector.
-func (c *CRDCollector) Metadata() *collectors.CollectorMetadata {
+func (c *CRCollector) Metadata() *collectors.CollectorMetadata {
 	return c.metadata
 }
 
 // Run triggers the collection process.
-func (c *CRDCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
+func (c *CRCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
 	list, err := c.lister.List(labels.Everything())
 	if err != nil {
 		return nil, collectors.NewListingError(err)

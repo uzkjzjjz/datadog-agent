@@ -44,8 +44,9 @@ func NewDaemonSetCollector() *DaemonSetCollector {
 }
 
 // Informer returns the shared informer.
-func (c *DaemonSetCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *DaemonSetCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

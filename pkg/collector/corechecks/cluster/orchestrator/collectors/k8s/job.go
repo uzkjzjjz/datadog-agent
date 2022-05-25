@@ -43,8 +43,9 @@ func NewJobCollector() *JobCollector {
 }
 
 // Informer returns the shared informer.
-func (c *JobCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *JobCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

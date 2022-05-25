@@ -44,8 +44,9 @@ func NewReplicaSetCollector() *ReplicaSetCollector {
 }
 
 // Informer returns the shared informer.
-func (c *ReplicaSetCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *ReplicaSetCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

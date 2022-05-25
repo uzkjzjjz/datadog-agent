@@ -44,8 +44,8 @@ func NewPersistentVolumeClaimCollector() *PersistentVolumeClaimCollector {
 }
 
 // Informer returns the shared informer.
-func (c *PersistentVolumeClaimCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *PersistentVolumeClaimCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
 }
 
 // Init is used to initialize the collector.

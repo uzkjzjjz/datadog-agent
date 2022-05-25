@@ -416,6 +416,8 @@ require (
 	google.golang.org/grpc/credentials/insecure v0.0.0 // indirect
 )
 
+require k8s.io/apiextensions-apiserver v0.20.2
+
 require github.com/Sirupsen/logrus v1.0.6 // indirect
 
 // Fixing a CVE on a transitive dep of k8s/etcd, should be cleaned-up once k8s.io/apiserver dep is removed (but double-check with `go mod why` that no other dep pulls it)

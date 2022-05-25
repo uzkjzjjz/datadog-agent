@@ -43,7 +43,7 @@ func NewCollectorInventory() *CollectorInventory {
 			k8sCollectors.NewServiceAccountCollector(),
 			k8sCollectors.NewStatefulSetCollector(),
 			k8sCollectors.NewUnassignedPodCollector(),
-			k8sCollectors.NewCRDCollector(),
+			k8sCollectors.NewCRCollector(),
 		},
 	}
 }

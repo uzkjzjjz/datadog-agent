@@ -352,7 +352,7 @@ func (c *APIClient) connect() error {
 
 	if config.Datadog.GetBool("external_metrics_provider.wpa_controller") {
 		if c.WPAInformerFactory, err = getWPAInformerFactory(); err != nil {
-			log.Errorf("Error getting WPA Informer Factory: %s", err.Error())
+			log.Errorf("Error getting WPA Informers Factory: %s", err.Error())
 			return err
 		}
 		if c.WPAClient, err = getKubeDynamicClient(time.Duration(c.timeoutSeconds) * time.Second); err != nil {
@@ -366,7 +366,7 @@ func (c *APIClient) connect() error {
 			return err
 		}
 		if c.DDClient, err = getDDClient(time.Duration(c.timeoutSeconds) * time.Second); err != nil {
-			log.Errorf("Error getting datadoghq Informer Factory: %s", err.Error())
+			log.Errorf("Error getting datadoghq Informers Factory: %s", err.Error())
 			return err
 		}
 	}

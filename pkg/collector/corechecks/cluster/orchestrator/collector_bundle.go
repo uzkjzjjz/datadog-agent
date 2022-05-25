@@ -51,10 +51,11 @@ func NewCollectorBundle(chk *OrchestratorCheck) *CollectorBundle {
 		check:     chk,
 		inventory: inventory.NewCollectorInventory(),
 		runCfg: &collectors.CollectorRunConfig{
-			APIClient:   chk.apiClient,
-			ClusterID:   chk.clusterID,
-			Config:      chk.orchestratorConfig,
-			MsgGroupRef: &chk.groupID,
+			APIClient:       chk.apiClient,
+			ClusterID:       chk.clusterID,
+			Config:          chk.orchestratorConfig,
+			MsgGroupRef:     &chk.groupID,
+			CustomResources: nil,
 		},
 		stopCh: make(chan struct{}),
 	}
@@ -111,7 +112,7 @@ func (cb *CollectorBundle) prepareExtraSyncTimeout() {
 // synced.
 func (cb *CollectorBundle) Initialize() error {
 	informersToSync := make(map[apiserver.InformerName]cache.SharedInformer)
-	availableCollectors := []collectors.Collector{}
+	var availableCollectors []collectors.Collector
 
 	for _, collector := range cb.collectors {
 		collector.Init(cb.runCfg)
@@ -122,13 +123,14 @@ func (cb *CollectorBundle) Initialize() error {
 
 		availableCollectors = append(availableCollectors, collector)
 
-		informer := collector.Informer()
-		informersToSync[apiserver.InformerName(collector.Metadata().Name)] = informer
-
-		// we run each enabled informer individually as starting them through the factory
-		// would prevent us to restarting them again if the check is unscheduled/rescheduled
-		// see https://github.com/kubernetes/client-go/blob/3511ef41b1fbe1152ef5cab2c0b950dfd607eea7/informers/factory.go#L64-L66
-		go informer.Run(cb.stopCh)
+		informers := collector.Informers()
+		for name, sharedInformer := range informers {
+			informersToSync[apiserver.InformerName(name)] = sharedInformer
+			// we run each enabled informers individually as starting them through the factory
+			// would prevent us to restarting them again if the check is unscheduled/rescheduled
+			// see https://github.com/kubernetes/client-go/blob/3511ef41b1fbe1152ef5cab2c0b950dfd607eea7/informers/factory.go#L64-L66
+			go sharedInformer.Run(cb.stopCh)
+		}
 	}
 
 	cb.collectors = availableCollectors

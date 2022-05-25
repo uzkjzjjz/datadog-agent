@@ -44,8 +44,9 @@ func NewServiceAccountCollector() *ServiceAccountCollector {
 }
 
 // Informer returns the shared informer.
-func (c *ServiceAccountCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *ServiceAccountCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

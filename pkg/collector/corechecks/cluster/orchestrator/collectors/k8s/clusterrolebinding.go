@@ -44,8 +44,9 @@ func NewClusterRoleBindingCollector() *ClusterRoleBindingCollector {
 }
 
 // Informer returns the shared informer.
-func (c *ClusterRoleBindingCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *ClusterRoleBindingCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.

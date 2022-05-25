@@ -15,32 +15,32 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// CRDHandlers implements the Handlers interface for Kubernetes ClusterRoles.
-type CRDHandlers struct{}
+// CRHandlers implements the Handlers interface for Kubernetes ClusterRoles.
+type CRHandlers struct{}
 
 // AfterMarshalling is a handler called after resource marshalling.
-func (h *CRDHandlers) AfterMarshalling(ctx *processors.ProcessorContext, resource, resourceModel interface{}, yaml []byte) (skip bool) {
+func (h *CRHandlers) AfterMarshalling(ctx *processors.ProcessorContext, resource, resourceModel interface{}, yaml []byte) (skip bool) {
 	return
 }
 
 // BeforeCacheCheck is a handler called before cache lookup.
-func (h *CRDHandlers) BeforeCacheCheck(ctx *processors.ProcessorContext, resource, resourceModel interface{}) (skip bool) {
+func (h *CRHandlers) BeforeCacheCheck(ctx *processors.ProcessorContext, resource, resourceModel interface{}) (skip bool) {
 	return
 }
 
 // BeforeMarshalling is a handler called before resource marshalling.
-func (h *CRDHandlers) BeforeMarshalling(ctx *processors.ProcessorContext, resource, resourceModel interface{}) (skip bool) {
+func (h *CRHandlers) BeforeMarshalling(ctx *processors.ProcessorContext, resource, resourceModel interface{}) (skip bool) {
 	return
 }
 
 // BuildMessageBody is a handler called to build a message body out of a list of
 // extracted resources.
-func (h *CRDHandlers) BuildMessageBody(ctx *processors.ProcessorContext, resourceModels []interface{}, groupSize int) model.MessageBody {
+func (h *CRHandlers) BuildMessageBody(ctx *processors.ProcessorContext, resourceModels []interface{}, groupSize int) model.MessageBody {
 	return nil
 }
 
 // ExtractResource is a handler called to extract the resource model out of a raw resource.
-func (h *CRDHandlers) ExtractResource(ctx *processors.ProcessorContext, resource interface{}) (resourceModel interface{}) {
+func (h *CRHandlers) ExtractResource(ctx *processors.ProcessorContext, resource interface{}) (resourceModel interface{}) {
 	r := resource.(*unstructured.Unstructured)
 	return r
 	//return k8sTransformers.ExtractCRD(r)
@@ -48,7 +48,7 @@ func (h *CRDHandlers) ExtractResource(ctx *processors.ProcessorContext, resource
 
 // ResourceList is a handler called to convert a list passed as a generic
 // interface to a list of generic interfaces.
-func (h *CRDHandlers) ResourceList(ctx *processors.ProcessorContext, list interface{}) (resources []interface{}) {
+func (h *CRHandlers) ResourceList(ctx *processors.ProcessorContext, list interface{}) (resources []interface{}) {
 	resourceList := list.([]*unstructured.Unstructured)
 	resources = make([]interface{}, 0, len(resourceList))
 
@@ -60,21 +60,21 @@ func (h *CRDHandlers) ResourceList(ctx *processors.ProcessorContext, list interf
 }
 
 // ResourceUID is a handler called to retrieve the resource UID.
-func (h *CRDHandlers) ResourceUID(ctx *processors.ProcessorContext, resource, resourceModel interface{}) types.UID {
+func (h *CRHandlers) ResourceUID(ctx *processors.ProcessorContext, resource, resourceModel interface{}) types.UID {
 	return resource.(*unstructured.Unstructured).GetUID()
 }
 
 // ResourceVersion is a handler called to retrieve the resource version.
-func (h *CRDHandlers) ResourceVersion(ctx *processors.ProcessorContext, resource, resourceModel interface{}) string {
+func (h *CRHandlers) ResourceVersion(ctx *processors.ProcessorContext, resource, resourceModel interface{}) string {
 	return resource.(*unstructured.Unstructured).GetResourceVersion()
 }
 
 // ScrubBeforeExtraction is a handler called to redact the raw resource before
 // it is extracted as an internal resource model.
-func (h *CRDHandlers) ScrubBeforeExtraction(ctx *processors.ProcessorContext, resource interface{}) {
+func (h *CRHandlers) ScrubBeforeExtraction(ctx *processors.ProcessorContext, resource interface{}) {
 }
 
 // ScrubBeforeMarshalling is a handler called to redact the raw resource before
 // it is marshalled to generate a manifest.
-func (h *CRDHandlers) ScrubBeforeMarshalling(ctx *processors.ProcessorContext, resource interface{}) {
+func (h *CRHandlers) ScrubBeforeMarshalling(ctx *processors.ProcessorContext, resource interface{}) {
 }

@@ -43,8 +43,9 @@ func NewRoleCollector() *RoleCollector {
 }
 
 // Informer returns the shared informer.
-func (c *RoleCollector) Informer() cache.SharedInformer {
-	return c.informer.Informer()
+func (c *RoleCollector) Informers() map[string]cache.SharedInformer {
+	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
+
 }
 
 // Init is used to initialize the collector.
