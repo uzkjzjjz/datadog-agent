@@ -12,6 +12,7 @@ import (
 
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
+	"github.com/DataDog/datadog-agent/pkg/process/containers"
 	"github.com/DataDog/datadog-agent/pkg/process/statsd"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/cloudproviders"
@@ -30,8 +31,8 @@ type ContainerCheck struct {
 	sync.Mutex
 
 	sysInfo           *model.SystemInfo
-	containerProvider util.ContainerProvider
-	lastRates         map[string]*util.ContainerRateMetrics
+	containerProvider containers.ContainerProvider
+	lastRates         map[string]*containers.ContainerRateMetrics
 	networkID         string
 
 	containerFailedLogLimit *util.LogLimit
@@ -41,7 +42,7 @@ type ContainerCheck struct {
 
 // Init initializes a ContainerCheck instance.
 func (c *ContainerCheck) Init(cfg *config.AgentConfig, info *model.SystemInfo) {
-	c.containerProvider = util.GetSharedContainerProvider()
+	c.containerProvider = containers.GetSharedContainerProvider()
 	c.sysInfo = info
 
 	networkID, err := cloudproviders.GetNetworkID(context.TODO())
@@ -68,29 +69,29 @@ func (c *ContainerCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.Me
 	startTime := time.Now()
 
 	var err error
-	var containers []*model.Container
+	var cntrs []*model.Container
 	var pidToCid map[int]string
-	var lastRates map[string]*util.ContainerRateMetrics
-	containers, lastRates, pidToCid, err = c.containerProvider.GetContainers(cacheValidityNoRT, c.lastRates)
+	var lastRates map[string]*containers.ContainerRateMetrics
+	cntrs, lastRates, pidToCid, err = c.containerProvider.GetContainers(cacheValidityNoRT, c.lastRates)
 	if err == nil {
 		c.lastRates = lastRates
 	} else {
 		log.Debugf("Unable to gather stats for containers, err: %v", err)
 	}
 
-	if len(containers) == 0 {
+	if len(cntrs) == 0 {
 		log.Trace("No containers found")
 		return nil, nil
 	}
 
 	// Keep track of containers addresses
-	LocalResolver.LoadAddrs(containers, pidToCid)
+	LocalResolver.LoadAddrs(cntrs, pidToCid)
 
-	groupSize := len(containers) / c.maxBatchSize
-	if len(containers)%c.maxBatchSize != 0 {
+	groupSize := len(cntrs) / c.maxBatchSize
+	if len(cntrs)%c.maxBatchSize != 0 {
 		groupSize++
 	}
-	chunked := chunkContainers(containers, groupSize)
+	chunked := chunkContainers(cntrs, groupSize)
 	messages := make([]model.MessageBody, 0, groupSize)
 	for i := 0; i < groupSize; i++ {
 		messages = append(messages, &model.CollectorContainer{
@@ -104,7 +105,7 @@ func (c *ContainerCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.Me
 		})
 	}
 
-	numContainers := float64(len(containers))
+	numContainers := float64(len(cntrs))
 	statsd.Client.Gauge("datadog.process.containers.host_count", numContainers, []string{}, 1) //nolint:errcheck
 	log.Debugf("collected %d containers in %s", int(numContainers), time.Now().Sub(startTime))
 	return messages, nil

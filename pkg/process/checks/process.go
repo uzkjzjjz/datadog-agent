@@ -12,6 +12,7 @@ import (
 
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
+	"github.com/DataDog/datadog-agent/pkg/process/containers"
 	"github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
 	"github.com/DataDog/datadog-agent/pkg/process/statsd"
@@ -43,9 +44,9 @@ type ProcessCheck struct {
 	lastCPUTime                cpu.TimesStat
 	lastProcs                  map[int32]*procutil.Process
 	lastRun                    time.Time
-	containerProvider          util.ContainerProvider
-	lastContainerRates         map[string]*util.ContainerRateMetrics
-	realtimeLastContainerRates map[string]*util.ContainerRateMetrics
+	containerProvider          containers.ContainerProvider
+	lastContainerRates         map[string]*containers.ContainerRateMetrics
+	realtimeLastContainerRates map[string]*containers.ContainerRateMetrics
 	networkID                  string
 
 	realtimeLastCPUTime cpu.TimesStat
@@ -72,7 +73,7 @@ type ProcessCheck struct {
 func (p *ProcessCheck) Init(_ *config.AgentConfig, info *model.SystemInfo) {
 	p.sysInfo = info
 	p.probe = getProcessProbe()
-	p.containerProvider = util.GetSharedContainerProvider()
+	p.containerProvider = containers.GetSharedContainerProvider()
 
 	p.notInitializedLogLimit = util.NewLogLimit(1, time.Minute*10)
 
@@ -151,15 +152,15 @@ func (p *ProcessCheck) run(cfg *config.AgentConfig, groupID int32, collectRealTi
 		mergeProcWithSysprobeStats(p.lastPIDs, procs, sysProbeUtil)
 	}
 
-	var containers []*model.Container
+	var cntrs []*model.Container
 	var pidToCid map[int]string
-	var lastContainerRates map[string]*util.ContainerRateMetrics
+	var lastContainerRates map[string]*containers.ContainerRateMetrics
 	cacheValidity := cacheValidityNoRT
 	if collectRealTime {
 		cacheValidity = cacheValidityRT
 	}
 
-	containers, lastContainerRates, pidToCid, err = p.containerProvider.GetContainers(cacheValidity, p.lastContainerRates)
+	cntrs, lastContainerRates, pidToCid, err = p.containerProvider.GetContainers(cacheValidity, p.lastContainerRates)
 	if err == nil {
 		p.lastContainerRates = lastContainerRates
 	} else {
@@ -167,7 +168,7 @@ func (p *ProcessCheck) run(cfg *config.AgentConfig, groupID int32, collectRealTi
 	}
 
 	// Keep track of containers addresses
-	LocalResolver.LoadAddrs(containers, pidToCid)
+	LocalResolver.LoadAddrs(cntrs, pidToCid)
 
 	// End check early if this is our first run.
 	if p.lastProcs == nil {
@@ -186,7 +187,7 @@ func (p *ProcessCheck) run(cfg *config.AgentConfig, groupID int32, collectRealTi
 
 	connsByPID := Connections.getLastConnectionsByPID()
 	procsByCtr := fmtProcesses(cfg, procs, p.lastProcs, pidToCid, cpuTimes[0], p.lastCPUTime, p.lastRun, connsByPID)
-	messages, totalProcs, totalContainers := createProcCtrMessages(procsByCtr, containers, cfg, p.maxBatchSize, p.maxBatchBytes, p.sysInfo, groupID, p.networkID)
+	messages, totalProcs, totalContainers := createProcCtrMessages(procsByCtr, cntrs, cfg, p.maxBatchSize, p.maxBatchBytes, p.sysInfo, groupID, p.networkID)
 
 	// Store the last state for comparison on the next run.
 	// Note: not storing the filtered in case there are new processes that haven't had a chance to show up twice.
@@ -205,7 +206,7 @@ func (p *ProcessCheck) run(cfg *config.AgentConfig, groupID int32, collectRealTi
 			// TODO: deduplicate chunking with RT collection
 			chunkedStats := fmtProcessStats(cfg, p.maxBatchSize, stats, p.realtimeLastProcs, pidToCid, cpuTimes[0], p.realtimeLastCPUTime, p.realtimeLastRun, connsByPID)
 			groupSize := len(chunkedStats)
-			chunkedCtrStats := convertAndChunkContainers(containers, groupSize)
+			chunkedCtrStats := convertAndChunkContainers(cntrs, groupSize)
 
 			messages := make([]model.MessageBody, 0, groupSize)
 			for i := 0; i < groupSize; i++ {

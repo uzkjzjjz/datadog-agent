@@ -10,7 +10,7 @@ import (
 
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/DataDog/datadog-agent/pkg/process/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/system"
 )
@@ -26,15 +26,15 @@ var RTContainer = &RTContainerCheck{}
 type RTContainerCheck struct {
 	maxBatchSize      int
 	sysInfo           *model.SystemInfo
-	containerProvider util.ContainerProvider
-	lastRates         map[string]*util.ContainerRateMetrics
+	containerProvider containers.ContainerProvider
+	lastRates         map[string]*containers.ContainerRateMetrics
 }
 
 // Init initializes a RTContainerCheck instance.
 func (r *RTContainerCheck) Init(_ *config.AgentConfig, sysInfo *model.SystemInfo) {
 	r.maxBatchSize = getMaxBatchSize()
 	r.sysInfo = sysInfo
-	r.containerProvider = util.GetSharedContainerProvider()
+	r.containerProvider = containers.GetSharedContainerProvider()
 }
 
 // Name returns the name of the RTContainerCheck.
@@ -46,25 +46,25 @@ func (r *RTContainerCheck) RealTime() bool { return true }
 // Run runs the real-time container check getting container-level stats from the Cgroups and Docker APIs.
 func (r *RTContainerCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageBody, error) {
 	var err error
-	var containers []*model.Container
-	var lastRates map[string]*util.ContainerRateMetrics
-	containers, lastRates, _, err = r.containerProvider.GetContainers(cacheValidityRT, r.lastRates)
+	var cntrs []*model.Container
+	var lastRates map[string]*containers.ContainerRateMetrics
+	cntrs, lastRates, _, err = r.containerProvider.GetContainers(cacheValidityRT, r.lastRates)
 	if err == nil {
 		r.lastRates = lastRates
 	} else {
 		log.Debugf("Unable to gather stats for containers, err: %v", err)
 	}
 
-	if len(containers) == 0 {
+	if len(cntrs) == 0 {
 		log.Trace("No containers found")
 		return nil, nil
 	}
 
-	groupSize := len(containers) / r.maxBatchSize
-	if len(containers)%r.maxBatchSize != 0 {
+	groupSize := len(cntrs) / r.maxBatchSize
+	if len(cntrs)%r.maxBatchSize != 0 {
 		groupSize++
 	}
-	chunked := convertAndChunkContainers(containers, groupSize)
+	chunked := convertAndChunkContainers(cntrs, groupSize)
 	messages := make([]model.MessageBody, 0, groupSize)
 	for i := 0; i < groupSize; i++ {
 		messages = append(messages, &model.CollectorContainerRealTime{

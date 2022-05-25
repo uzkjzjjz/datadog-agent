@@ -12,7 +12,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/process/config"
 	"github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
-	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/gopsutil/cpu"
 )
@@ -58,7 +57,7 @@ func (p *ProcessCheck) runRealtime(cfg *config.AgentConfig, groupID int32) (*Run
 
 	var containers []*model.Container
 	var pidToCid map[int]string
-	var lastContainerRates map[string]*util.ContainerRateMetrics
+	var lastContainerRates map[string]*containers.ContainerRateMetrics
 	containers, lastContainerRates, pidToCid, err = p.containerProvider.GetContainers(cacheValidityRT, p.realtimeLastContainerRates)
 	if err == nil {
 		p.realtimeLastContainerRates = lastContainerRates
