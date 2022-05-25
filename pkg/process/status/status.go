@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2022-present Datadog, Inc.
 
-package util
+package status
 
 import (
 	"context"
@@ -148,8 +148,8 @@ func getExpvars(expVarURL string) (s ProcessExpvars, err error) {
 	return
 }
 
-// GetStatus returns a Status object with runtime information about process-agent
-func GetStatus(expVarURL string) (*Status, error) {
+// Get returns a Status object with runtime information about process-agent
+func Get(expVarURL string) (*Status, error) {
 	coreStatus := getCoreStatus()
 	processExpVars, err := getExpvars(expVarURL)
 	if err != nil {

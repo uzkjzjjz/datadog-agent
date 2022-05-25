@@ -3,7 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2022-present Datadog, Inc.
 
-package util
+package status
 
 import (
 	"context"
@@ -93,7 +93,7 @@ func TestGetStatus(t *testing.T) {
 	expVarSrv := fakeExpVarServer(t, expectedExpVars)
 	defer expVarSrv.Close()
 
-	stats, err := GetStatus(expVarSrv.URL)
+	stats, err := Get(expVarSrv.URL)
 	require.NoError(t, err)
 
 	OverrideTime(testTime)(stats)
