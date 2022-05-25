@@ -9,11 +9,11 @@
 package k8s
 
 import (
-	"context"
+	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator/config"
-	v1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/spf13/cast"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -31,7 +31,7 @@ import (
 type CRCollector struct {
 	informers       map[string]informers.GenericInformer
 	informerFactory dynamicinformer.DynamicSharedInformerFactory
-	lister          dynamiclister.Lister
+	listers         map[string]dynamiclister.Lister
 	metadata        *collectors.CollectorMetadata
 	processor       *processors.Processor
 }
@@ -46,6 +46,8 @@ func NewCRCollector() *CRCollector {
 			NodeType: orchestrator.K8sCR,
 		},
 		processor: processors.NewProcessor(new(k8sProcessors.CRHandlers)),
+		informers: map[string]informers.GenericInformer{},
+		listers:   map[string]dynamiclister.Lister{},
 	}
 }
 
@@ -62,22 +64,35 @@ func (c *CRCollector) Informers() map[string]cache.SharedInformer {
 func (c *CRCollector) Init(rcfg *collectors.CollectorRunConfig) {
 	// make GroupVersionResource configurable
 	crs := config.GetCRsToCollect()
-	println(crs)
-	apiextensionsV1Client := v1.New(rcfg.APIClient.DiscoveryCl.RESTClient())
-	customResourceDefinitions := apiextensionsV1Client.CustomResourceDefinitions()
-	crds, err := customResourceDefinitions.List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return
-	}
+	grvs := convertToGRV(crs)
 	// iterate through the crds and generate an informer per crd (given by the customer)
-	for _, _ = range crds.Items {
-		return
-	}
 	c.informerFactory = dynamicinformer.NewDynamicSharedInformerFactory(rcfg.APIClient.DynamicCl, 300)
 
-	//c.informers[r.String()] = c.informerFactory.ForResource(r)
-	//indexer := c.informers.Informer().GetIndexer()
-	//c.lister = dynamiclister.New(indexer, r)
+	for _, grv := range grvs {
+		informer := c.informerFactory.ForResource(grv)
+		c.informers[grv.String()] = informer
+		indexer := informer.Informer().GetIndexer()
+		c.listers[grv.String()] = dynamiclister.New(indexer, grv)
+	}
+
+}
+
+func convertToGRV(i interface{}) []schema.GroupVersionResource {
+	var grvs []schema.GroupVersionResource
+	slice := cast.ToSlice(i)
+	for _, v := range slice {
+		e, err := cast.ToStringMapStringE(v)
+		if err != nil {
+			return nil
+		}
+		grvs = append(grvs, schema.GroupVersionResource{
+			Group:    e["group"],
+			Version:  e["version"],
+			Resource: e["resource"],
+		})
+	}
+
+	return grvs
 }
 
 // IsAvailable returns whether the collector is available.
@@ -90,39 +105,47 @@ func (c *CRCollector) Metadata() *collectors.CollectorMetadata {
 
 // Run triggers the collection process.
 func (c *CRCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
-	list, err := c.lister.List(labels.Everything())
-	if err != nil {
-		return nil, collectors.NewListingError(err)
-	}
+	var messages []model.MessageBody
+	var processed int
+	for _, lister := range c.listers { // TODO: or let each of the collection run in a go routine and join below
+		list, err := lister.List(labels.Everything())
+		if err != nil {
+			return nil, collectors.NewListingError(err)
+		}
 
-	ctx := &processors.ProcessorContext{
-		APIClient:  rcfg.APIClient,
-		Cfg:        rcfg.Config,
-		ClusterID:  rcfg.ClusterID,
-		MsgGroupID: atomic.AddInt32(rcfg.MsgGroupRef, 1),
-		NodeType:   c.metadata.NodeType,
-	}
+		ctx := &processors.ProcessorContext{
+			APIClient:  rcfg.APIClient,
+			Cfg:        rcfg.Config,
+			ClusterID:  rcfg.ClusterID,
+			MsgGroupID: atomic.AddInt32(rcfg.MsgGroupRef, 1),
+			NodeType:   c.metadata.NodeType,
+		}
 
-	messages, processed := c.processor.Process(ctx, list)
+		m, p := c.processor.Process(ctx, list)
 
-	// This would happen when recovering from a processor panic. In the nominal
-	// case we would have a positive integer set at the very end of processing.
-	// If this is not the case then it means code execution stopped sooner.
-	// Panic recovery will log more information about the error so we can figure
-	// out the root cause.
-	if processed == -1 {
-		return nil, collectors.ErrProcessingPanic
-	}
+		// This would happen when recovering from a processor panic. In the nominal
+		// case we would have a positive integer set at the very end of processing.
+		// If this is not the case then it means code execution stopped sooner.
+		// Panic recovery will log more information about the error so we can figure
+		// out the root cause.
+		if p == -1 {
+			return nil, collectors.ErrProcessingPanic
+		}
 
-	// The cluster processor can return errors since it has to grab extra
-	// information from the API server during processing.
-	if err != nil {
-		return nil, collectors.NewProcessingError(err)
+		messages = append(messages, m...)
+		processed += p
+
+		// The cluster processor can return errors since it has to grab extra
+		// information from the API server during processing.
+		if err != nil {
+			return nil, collectors.NewProcessingError(err)
+		}
+
 	}
 
 	result := &collectors.CollectorRunResult{
 		Messages:           messages,
-		ResourcesListed:    1,
+		ResourcesListed:    len(c.listers),
 		ResourcesProcessed: processed,
 	}
 
