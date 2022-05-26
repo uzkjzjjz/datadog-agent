@@ -180,6 +180,7 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 
 	var bytesRead uint32
 	var totalBytesRead uint32
+	var totalConns uint32
 	// keep reading while driver says there is more data available
 	for err := error(windows.ERROR_MORE_DATA); err == windows.ERROR_MORE_DATA; {
 		err = windows.ReadFile(di.driverFlowHandle.Handle, di.readBuffer, &bytesRead, nil)
@@ -198,7 +199,11 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 		for bytesUsed := uint32(0); bytesUsed < bytesRead; bytesUsed += driver.PerFlowDataSize {
 			buf = di.readBuffer[bytesUsed:]
 			pfd := (*driver.PerFlowData)(unsafe.Pointer(&(buf[0])))
-
+			if pfd.LocalPort == 80 {
+				if pfd.TransportBytesIn > 130 {
+					log.Infof("Unexpected bytes in %v %v", pfd.RemotePort, pfd.TransportBytesIn)
+				}
+			}
 			if isFlowClosed(pfd.Flags) {
 				c := closedBuf.Next()
 				FlowToConnStat(c, pfd, di.enableMonotonicCounts)
@@ -214,9 +219,10 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 					continue
 				}
 			}
+			totalConns++
 		}
 	}
-
+	log.Infof("Received total conns: %v\n", totalConns)
 	di.readBuffer = resizeDriverBuffer(int(totalBytesRead), di.readBuffer)
 	atomic.StoreInt64(&di.bufferSize, int64(len(di.readBuffer)))
 
@@ -259,17 +265,30 @@ func (di *DriverInterface) setFlowParams() error {
 
 	// this makes it so that the config can clamp down, but can never make it
 	// larger than the coded defaults above.
-	maxFlows := minUint64(defaultMaxOpenFlows+defaultMaxClosedFlows, di.maxOpenFlows+di.maxClosedFlows)
-	log.Debugf("Setting max flows in driver to %v", maxFlows)
+	maxOpenFlows := minUint64(defaultMaxOpenFlows, di.maxOpenFlows)
+	log.Infof("Setting max open flows in driver to %v", maxOpenFlows)
 	err := windows.DeviceIoControl(di.driverFlowHandle.Handle,
-		driver.SetMaxFlowsIOCTL,
-		(*byte)(unsafe.Pointer(&maxFlows)),
-		uint32(unsafe.Sizeof(maxFlows)),
+		driver.SetMaxOpenFlowsIOCTL,
+		(*byte)(unsafe.Pointer(&maxOpenFlows)),
+		uint32(unsafe.Sizeof(maxOpenFlows)),
 		nil,
 		uint32(0), nil, nil)
 	if err != nil {
-		log.Warnf("Failed to set max number of flows to %v %v", maxFlows, err)
+		log.Warnf("Failed to set max number of open flows to %v %v", maxOpenFlows, err)
 	}
+
+	maxClosedFlows := minUint64(defaultMaxClosedFlows, di.maxClosedFlows)
+	log.Infof("Setting max closed flows in driver to %v", maxClosedFlows)
+	err = windows.DeviceIoControl(di.driverFlowHandle.Handle,
+		driver.SetMaxClosedFlowsIOCTL,
+		(*byte)(unsafe.Pointer(&maxClosedFlows)),
+		uint32(unsafe.Sizeof(maxClosedFlows)),
+		nil,
+		uint32(0), nil, nil)
+	if err != nil {
+		log.Warnf("Failed to set max number of closed flows to %v %v", maxClosedFlows, err)
+	}
+
 	return err
 }
 

@@ -159,37 +159,43 @@ func (dh *Handle) GetStatsForHandle() (map[string]int64, error) {
 			"packets_processed_flow":      stats.Total.Flow_stats.Packets_processed,
 			"open_flows":                  stats.Total.Flow_stats.Open_flows,
 			"total_flows":                 stats.Total.Flow_stats.Total_flows,
-			"num_flow_searches":           stats.Total.Flow_stats.Num_flow_searches,
-			"num_flow_search_misses":      stats.Total.Flow_stats.Num_flow_search_misses,
 			"num_flow_collisions":         stats.Total.Flow_stats.Num_flow_collisions,
+			"num_flows_no_handle":         stats.Total.Flow_stats.Num_flows_no_handle,
 			"packets_processed_transport": stats.Total.Transport_stats.Packets_processed,
 			"read_packets_skipped":        stats.Total.Transport_stats.Read_packets_skipped,
 			"packets_reported":            stats.Total.Transport_stats.Packets_reported,
 		}, nil
 	// A FlowHandle handle returns the flow stats specific to this handle
 	case FlowHandle:
-		if dh.lastNumFlowsMissed < uint64(stats.Handle.Flow_stats.Num_flows_missed_max_exceeded) {
-			log.Warnf("Flows missed due to maximum flow limit. %v", stats.Handle.Flow_stats.Num_flows_missed_max_exceeded)
+		if dh.lastNumFlowsMissed < uint64(stats.Handle.Flow_stats.Num_flow_alloc_skipped_max_exceeded) {
+			log.Warnf("Flows missed due to maximum flow limit. %v", stats.Handle.Flow_stats.Num_flow_alloc_skipped_max_exceeded)
 		}
-		dh.lastNumFlowsMissed = uint64(stats.Handle.Flow_stats.Num_flows_missed_max_exceeded)
+		log.Infof("Open flow structures (stats) %v", stats.Handle.Flow_stats.Num_flow_structures)
+		log.Infof("Closed flow structures (stats) %v", stats.Handle.Flow_stats.Num_flow_closed_structures)
+		dh.lastNumFlowsMissed = uint64(stats.Handle.Flow_stats.Num_flow_alloc_skipped_max_exceeded)
 		return map[string]int64{
-			"read_calls":                    stats.Handle.Handle_stats.Read_calls,
-			"read_calls_outstanding":        stats.Handle.Handle_stats.Read_calls_outstanding,
-			"read_calls_completed":          stats.Handle.Handle_stats.Read_calls_completed,
-			"read_calls_cancelled":          stats.Handle.Handle_stats.Read_calls_cancelled,
-			"write_calls":                   stats.Handle.Handle_stats.Write_calls,
-			"write_bytes":                   stats.Handle.Handle_stats.Write_bytes,
-			"ioctl_calls":                   stats.Handle.Handle_stats.Ioctl_calls,
-			"packets_observed":              stats.Handle.Flow_stats.Packets_observed,
-			"packets_processed_flow":        stats.Handle.Flow_stats.Packets_processed,
-			"open_flows":                    stats.Handle.Flow_stats.Open_flows,
-			"total_flows":                   stats.Handle.Flow_stats.Total_flows,
-			"num_flow_searches":             stats.Handle.Flow_stats.Num_flow_searches,
-			"num_flow_search_misses":        stats.Handle.Flow_stats.Num_flow_search_misses,
-			"num_flow_collisions":           stats.Handle.Flow_stats.Num_flow_collisions,
-			"num_flow_structures":           stats.Handle.Flow_stats.Num_flow_structures,
-			"peak_num_flow_structures":      stats.Handle.Flow_stats.Peak_num_flow_structures,
-			"num_flows_missed_max_exceeded": stats.Handle.Flow_stats.Num_flows_missed_max_exceeded,
+			"read_calls":                           stats.Handle.Handle_stats.Read_calls,
+			"read_calls_outstanding":               stats.Handle.Handle_stats.Read_calls_outstanding,
+			"read_calls_completed":                 stats.Handle.Handle_stats.Read_calls_completed,
+			"read_calls_cancelled":                 stats.Handle.Handle_stats.Read_calls_cancelled,
+			"write_calls":                          stats.Handle.Handle_stats.Write_calls,
+			"write_bytes":                          stats.Handle.Handle_stats.Write_bytes,
+			"ioctl_calls":                          stats.Handle.Handle_stats.Ioctl_calls,
+			"packets_observed":                     stats.Handle.Flow_stats.Packets_observed,
+			"packets_processed_flow":               stats.Handle.Flow_stats.Packets_processed,
+			"open_flows":                           stats.Handle.Flow_stats.Open_flows,
+			"total_flows":                          stats.Handle.Flow_stats.Total_flows,
+			"num_flow_collisions":                  stats.Handle.Flow_stats.Num_flow_collisions,
+			"num_flows_no_handle":                  stats.Handle.Flow_stats.Num_flows_no_handle,
+			"num_flow_structures":                  stats.Handle.Flow_stats.Num_flow_structures,
+			"num_flow_closed_structures":           stats.Handle.Flow_stats.Num_flow_closed_structures,
+			"peak_num_flow_structures":             stats.Handle.Flow_stats.Peak_num_flow_structures,
+			"num_flow_alloc_skipped_max_exceeded":  stats.Handle.Flow_stats.Num_flow_alloc_skipped_max_exceeded,
+			"num_flow_closed_dropped_max_exceeded": stats.Handle.Flow_stats.Num_flow_closed_dropped_max_exceeded,
+			"open_table_adds":                      stats.Handle.Flow_stats.Open_table_adds,
+			"open_table_removes":                   stats.Handle.Flow_stats.Open_table_removes,
+			"closed_table_adds":                    stats.Handle.Flow_stats.Closed_table_adds,
+			"closed_table_removes":                 stats.Handle.Flow_stats.Closed_table_removes,
 		}, nil
 	// A DataHandle handle returns transfer stats specific to this handle
 	case DataHandle:

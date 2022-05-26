@@ -3,13 +3,16 @@
 
 package driver
 
-const Signature = 0xddfd00000010
+const Signature = 0xddfd00000011
 
 const (
-	GetStatsIOCTL             = 0x122004
-	SetFlowFilterIOCTL        = 0x122010
-	SetDataFilterIOCTL        = 0x12200c
-	SetMaxFlowsIOCTL          = 0x122018
+	GetStatsIOCTL      = 0x122004
+	SetFlowFilterIOCTL = 0x122010
+	SetDataFilterIOCTL = 0x12200c
+
+	SetMaxOpenFlowsIOCTL      = 0x122024
+	SetMaxClosedFlowsIOCTL    = 0x122028
+	SetMaxHTTPFlowsIOCTL      = 0x12202c
 	FlushPendingHttpTxnsIOCTL = 0x122020
 )
 
@@ -65,12 +68,16 @@ type FlowStats struct {
 	Packets_processed                       int64
 	Open_flows                              int64
 	Total_flows                             int64
-	Num_flow_searches                       int64
-	Num_flow_search_misses                  int64
 	Num_flow_collisions                     int64
 	Num_flow_structures                     int64
+	Num_flow_closed_structures              int64
 	Peak_num_flow_structures                int64
-	Num_flows_missed_max_exceeded           int64
+	Num_flow_alloc_skipped_max_exceeded     int64
+	Num_flow_closed_dropped_max_exceeded    int64
+	Open_table_adds                         int64
+	Open_table_removes                      int64
+	Closed_table_adds                       int64
+	Closed_table_removes                    int64
 	Num_flows_no_handle                     int64
 	Peak_num_flows_no_handle                int64
 	Num_flows_missed_max_no_handle_exceeded int64
@@ -99,7 +106,7 @@ type DriverStats struct {
 	Handle        Stats
 }
 
-const DriverStatsSize = 0x1c8
+const DriverStatsSize = 0x208
 
 type PerFlowData struct {
 	FlowHandle         uint64
