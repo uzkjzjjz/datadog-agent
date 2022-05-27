@@ -76,7 +76,7 @@ func TestGetStatus(t *testing.T) {
 		metadata = host.GetPayloadFromCache(context.Background(), hostnameData)
 	}
 
-	expectedStatus := &Status{
+	expectedStatus := &ProcessAgentStatus{
 		Date: float64(testTime.UnixNano()),
 		Core: CoreStatus{
 			AgentVersion: version.AgentVersion,

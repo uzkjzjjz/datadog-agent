@@ -75,7 +75,7 @@ func fetchStatus(statusURL string) ([]byte, error) {
 }
 
 // getAndWriteStatus calls the status server and writes it to `w`
-func getAndWriteStatus(statusURL string, w io.Writer, options ...status.StatusOption) {
+func getAndWriteStatus(statusURL string, w io.Writer, options ...status.ProcessAgentStatusOption) {
 	body, err := fetchStatus(statusURL)
 	if err != nil {
 		switch err.(type) {
@@ -89,7 +89,7 @@ func getAndWriteStatus(statusURL string, w io.Writer, options ...status.StatusOp
 
 	// If options to override the status are provided, we need to deserialize and serialize it again
 	if len(options) > 0 {
-		var s status.Status
+		var s status.ProcessAgentStatus
 		err = json.Unmarshal(body, &s)
 		if err != nil {
 			writeError(w, err)

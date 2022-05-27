@@ -89,15 +89,15 @@ type ProcessExpvars struct {
 	DropCheckPayloads   []string            `json:"drop_check_payloads"`
 }
 
-// Status holds runtime information from process-agent
-type Status struct {
+// ProcessAgentStatus holds runtime information from process-agent
+type ProcessAgentStatus struct {
 	Date    float64        `json:"date"`
 	Core    CoreStatus     `json:"core"`    // Contains fields that are collected similarly to the core agent in pkg/status
 	Expvars ProcessExpvars `json:"expvars"` // Contains the expvars retrieved from the process agent
 }
 
-// StatusOption is a function that acts on a Status object
-type StatusOption func(s *Status)
+// ProcessAgentStatusOption is a function that acts on a ProcessAgentStatus object
+type ProcessAgentStatusOption func(s *ProcessAgentStatus)
 
 // ConnectionError represents an error to connect to an HTTP server
 type ConnectionError struct {
@@ -109,9 +109,9 @@ func NewConnectionError(err error) ConnectionError {
 	return ConnectionError{err}
 }
 
-// OverrideTime overrides the Date from a Status object
-func OverrideTime(t time.Time) StatusOption {
-	return func(s *Status) {
+// OverrideTime overrides the Date from a ProcessAgentStatus object
+func OverrideTime(t time.Time) ProcessAgentStatusOption {
+	return func(s *ProcessAgentStatus) {
 		s.Date = float64(t.UnixNano())
 	}
 }
@@ -148,15 +148,15 @@ func getExpvars(expVarURL string) (s ProcessExpvars, err error) {
 	return
 }
 
-// Get returns a Status object with runtime information about process-agent
-func Get(expVarURL string) (*Status, error) {
+// Get returns a ProcessAgentStatus object with runtime information about process-agent
+func Get(expVarURL string) (*ProcessAgentStatus, error) {
 	coreStatus := getCoreStatus()
 	processExpVars, err := getExpvars(expVarURL)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Status{
+	return &ProcessAgentStatus{
 		Date:    float64(time.Now().UnixNano()),
 		Core:    coreStatus,
 		Expvars: processExpVars,

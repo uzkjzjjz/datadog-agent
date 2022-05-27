@@ -25,7 +25,7 @@ import (
 	ddstatus "github.com/DataDog/datadog-agent/pkg/status"
 )
 
-func fakeStatusServer(t *testing.T, stats status.Status) *httptest.Server {
+func fakeStatusServer(t *testing.T, stats status.ProcessAgentStatus) *httptest.Server {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		b, err := json.Marshal(stats)
@@ -40,7 +40,7 @@ func fakeStatusServer(t *testing.T, stats status.Status) *httptest.Server {
 
 func TestStatus(t *testing.T) {
 	testTime := time.Now()
-	expectedStatus := status.Status{
+	expectedStatus := status.ProcessAgentStatus{
 		Date: float64(testTime.UnixNano()),
 		Core: status.CoreStatus{
 			Metadata: host.Payload{
