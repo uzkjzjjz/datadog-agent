@@ -18,7 +18,7 @@ import (
 	manager "github.com/DataDog/ebpf-manager"
 	"github.com/mailru/easyjson/jwriter"
 
-	pconfig "github.com/DataDog/datadog-agent/pkg/process/config"
+	"github.com/DataDog/datadog-agent/pkg/process/scrubber"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/constantfetch"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
@@ -76,7 +76,7 @@ type Event struct {
 
 	resolvers           *Resolvers
 	pathResolutionError error
-	scrubber            *pconfig.DataScrubber
+	scrubber            *scrubber.DataScrubber
 	probe               *Probe
 }
 
@@ -543,7 +543,7 @@ func (ev *Event) ResolveNetworkDeviceIfName(device *model.NetworkDeviceContext) 
 }
 
 // NewEvent returns a new event
-func NewEvent(resolvers *Resolvers, scrubber *pconfig.DataScrubber, probe *Probe) *Event {
+func NewEvent(resolvers *Resolvers, scrubber *scrubber.DataScrubber, probe *Probe) *Event {
 	return &Event{
 		Event:     model.Event{},
 		resolvers: resolvers,

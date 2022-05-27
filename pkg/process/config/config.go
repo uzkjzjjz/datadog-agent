@@ -25,6 +25,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/config/settings"
 	oconfig "github.com/DataDog/datadog-agent/pkg/orchestrator/config"
+	"github.com/DataDog/datadog-agent/pkg/process/scrubber"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo"
 	"github.com/DataDog/datadog-agent/pkg/util/fargate"
@@ -69,7 +70,7 @@ type cmdFunc = func(name string, arg ...string) *exec.Cmd
 type AgentConfig struct {
 	HostName           string
 	Blacklist          []*regexp.Regexp
-	Scrubber           *DataScrubber
+	Scrubber           *scrubber.DataScrubber
 	MaxConnsPerMessage int
 	Transport          *http.Transport `json:"-"`
 
@@ -143,7 +144,7 @@ func NewDefaultAgentConfig() *AgentConfig {
 		},
 
 		// DataScrubber to hide command line sensitive words
-		Scrubber:  NewDefaultDataScrubber(),
+		Scrubber:  scrubber.NewDefaultDataScrubber(),
 		Blacklist: make([]*regexp.Regexp, 0),
 	}
 

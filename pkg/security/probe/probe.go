@@ -29,7 +29,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	aconfig "github.com/DataDog/datadog-agent/pkg/config"
-	pconfig "github.com/DataDog/datadog-agent/pkg/process/config"
+	"github.com/DataDog/datadog-agent/pkg/process/scrubber"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/security/config"
 	"github.com/DataDog/datadog-agent/pkg/security/ebpf"
@@ -73,7 +73,7 @@ type Probe struct {
 	event     *Event
 	perfMap   *manager.PerfMap
 	reOrderer *ReOrderer
-	scrubber  *pconfig.DataScrubber
+	scrubber  *scrubber.DataScrubber
 
 	// Approvers / discarders section
 	erpc               *ERPC
@@ -1351,7 +1351,7 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 			MetricRate: 5 * time.Second,
 		})
 
-	p.scrubber = pconfig.NewDefaultDataScrubber()
+	p.scrubber = scrubber.NewDefaultDataScrubber()
 	p.scrubber.AddCustomSensitiveWords(config.CustomSensitiveWords)
 
 	p.event = NewEvent(p.resolvers, p.scrubber, p)
