@@ -10,22 +10,23 @@ package probe
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestOrder(t *testing.T) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	heap := &reOrdererHeap{
 		pool: &reOrdererNodePool{},
 	}
 	metric := ReOrdererMetric{}
 
 	for i := 0; i != 200; i++ {
-		n := rand.Int()%254 + 1
+		n := rng.Int()%254 + 1
 		heap.enqueue(0, []byte{byte(n)}, uint64(n), 1, &metric)
 	}
 
