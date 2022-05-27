@@ -10,6 +10,7 @@ import (
 
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
+	"github.com/DataDog/datadog-agent/pkg/process/containers"
 	"github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -55,10 +56,10 @@ func (p *ProcessCheck) runRealtime(cfg *config.AgentConfig, groupID int32) (*Run
 		mergeStatWithSysprobeStats(p.lastPIDs, procs, sysProbeUtil)
 	}
 
-	var containers []*model.Container
+	var cntrs []*model.Container
 	var pidToCid map[int]string
 	var lastContainerRates map[string]*containers.ContainerRateMetrics
-	containers, lastContainerRates, pidToCid, err = p.containerProvider.GetContainers(cacheValidityRT, p.realtimeLastContainerRates)
+	cntrs, lastContainerRates, pidToCid, err = p.containerProvider.GetContainers(cacheValidityRT, p.realtimeLastContainerRates)
 	if err == nil {
 		p.realtimeLastContainerRates = lastContainerRates
 	} else {
@@ -78,7 +79,7 @@ func (p *ProcessCheck) runRealtime(cfg *config.AgentConfig, groupID int32) (*Run
 
 	chunkedStats := fmtProcessStats(cfg, p.maxBatchSize, procs, p.realtimeLastProcs, pidToCid, cpuTimes[0], p.realtimeLastCPUTime, p.realtimeLastRun, connsByPID)
 	groupSize := len(chunkedStats)
-	chunkedCtrStats := convertAndChunkContainers(containers, groupSize)
+	chunkedCtrStats := convertAndChunkContainers(cntrs, groupSize)
 
 	messages := make([]model.MessageBody, 0, groupSize)
 	for i := 0; i < groupSize; i++ {
