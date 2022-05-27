@@ -69,6 +69,15 @@ func HostVersion() (Version, error) {
 	return ParseReleaseString(unix.ByteSliceToString(uname.Release[:]))
 }
 
+func unameVersion() (string, error) {
+	var utsname unix.Utsname
+	err := unix.Uname(&utsname)
+	if err != nil {
+		return "", err
+	}
+	return unix.ByteSliceToString(utsname.Release[:]), nil
+}
+
 // ParseVersion parses a string in the format of x.x.x to a Version
 func ParseVersion(s string) Version {
 	var a, b, c byte

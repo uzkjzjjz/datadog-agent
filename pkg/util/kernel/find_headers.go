@@ -22,7 +22,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/DataDog/datadog-agent/pkg/metadata/host"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/mholt/archiver/v3"
 )
@@ -236,17 +235,16 @@ func parseHeaderVersion(r io.Reader) (Version, error) {
 }
 
 func getDefaultHeaderDirs() []string {
-	// KernelVersion == uname -r
-	hi := host.GetStatusInformation()
-	if hi.KernelVersion == "" {
+	kv, err := unameVersion()
+	if err != nil || kv == "" {
 		return []string{}
 	}
 
 	dirs := []string{
-		fmt.Sprintf(kernelModulesPath, hi.KernelVersion),
-		fmt.Sprintf(debKernelModulesPath, hi.KernelVersion),
-		fmt.Sprintf(cosKernelModulesPath, hi.KernelVersion),
-		fmt.Sprintf(centosKernelModulesPath, hi.KernelVersion),
+		fmt.Sprintf(kernelModulesPath, kv),
+		fmt.Sprintf(debKernelModulesPath, kv),
+		fmt.Sprintf(cosKernelModulesPath, kv),
+		fmt.Sprintf(centosKernelModulesPath, kv),
 		fedoraKernelModulesPath,
 	}
 	return dirs
