@@ -11,8 +11,7 @@ package k8s
 import (
 	"fmt"
 	model "github.com/DataDog/agent-payload/v5/process"
-	"github.com/mitchellh/mapstructure"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	strings "strings"
 )
@@ -21,24 +20,18 @@ import (
 // Kubernetes ClusterRole resource.
 func ExtractCustomResource(u *unstructured.Unstructured) *model.ClusterRole {
 	clusterRole := &model.ClusterRole{
-		Metadata: extractUnstructuredMetadata(u),
+		Metadata: extractUnstructuredMetadata(u.Object),
 	}
 	return clusterRole
 }
 
-func extractUnstructuredMetadata(cr *unstructured.Unstructured) *model.Metadata {
-	a := metav1.ObjectMeta{}
-	nestedMap, _, err := unstructured.NestedMap(cr.Object, "metadata")
-	if err != nil { // TODO: surface err
+func extractUnstructuredMetadata(cr map[string]interface{}) *model.Metadata {
+	meta, _, err := objectmeta.GetObjectMeta(cr, true)
+	if err != nil {
 		return nil
 	}
 
-	err = mapstructure.Decode(nestedMap, &a) // TODO: this somehow fails, TBD
-	if err != nil {                          // TODO: surface err
-		return nil
-	}
-
-	return extractMetadata(&a)
+	return extractMetadata(meta)
 }
 
 func getKeyByField(key string, cr *unstructured.Unstructured) interface{} {

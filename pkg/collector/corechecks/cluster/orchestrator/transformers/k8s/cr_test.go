@@ -8,10 +8,14 @@
 package k8s
 
 import (
+	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
+	"time"
 )
 
 func TestExtractMetadata(t *testing.T) {
@@ -19,7 +23,7 @@ func TestExtractMetadata(t *testing.T) {
 	tests := []struct {
 		name                  string
 		unstructuredToConvert *unstructured.Unstructured
-		want                  *metav1.ObjectMeta
+		want                  *model.Metadata
 	}{
 		{
 			name: "convert valid versioned unstructured to versioned object should work",
@@ -37,15 +41,46 @@ func TestExtractMetadata(t *testing.T) {
 					"status": map[string]interface{}{},
 				},
 			},
-			want: &metav1.ObjectMeta{Name: "noxu"},
+			want: &model.Metadata{
+				Name: "noxu",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// TODO: fix types
-			assert.Equalf(t, tt.want, extractUnstructuredMetadata(tt.unstructuredToConvert), "extractMetadata(%v)", tt.want)
+			assert.Equalf(t, tt.want, extractUnstructuredMetadata(tt.unstructuredToConvert.Object), "extractMetadata(%v)", tt.want)
 		})
 	}
+}
+
+func TestExtractMetadataRoundTrip(t *testing.T) {
+	now := time.Now()
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test",
+			Namespace:         "a",
+			UID:               "uid",
+			ResourceVersion:   "rv",
+			Generation:        2,
+			CreationTimestamp: metav1.Time{Time: now},
+		},
+	}
+
+	expected := model.Metadata{
+		Name:              "test",
+		Namespace:         "a",
+		Uid:               "uid",
+		CreationTimestamp: now.Unix(),
+		ResourceVersion:   "rv",
+	}
+
+	us, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
+	assert.NoError(t, err)
+	metadata := extractUnstructuredMetadata(us)
+	assert.Equal(t, &expected, metadata)
+
 }
 
 func TestGetKeyByField(t *testing.T) {
