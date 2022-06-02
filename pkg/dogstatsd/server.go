@@ -21,8 +21,8 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	"github.com/DataDog/datadog-agent/pkg/aggregator/ckey"
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/dogstatsd/internal/mapper"
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd/listeners"
-	"github.com/DataDog/datadog-agent/pkg/dogstatsd/mapper"
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd/packets"
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd/replay"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
@@ -198,8 +198,7 @@ type metricsCountBuckets struct {
 }
 
 // NewServer returns a running DogStatsD server.
-// If extraTags is nil, they will be read from DD_DOGSTATSD_TAGS if set.
-func NewServer(demultiplexer aggregator.Demultiplexer, extraTags []string) (*Server, error) {
+func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server, error) {
 	// This needs to be done after the configuration is loaded
 	once.Do(initLatencyTelemetry)
 
@@ -284,9 +283,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, extraTags []string) (*Ser
 	histToDist := config.Datadog.GetBool("histogram_copy_to_distribution")
 	histToDistPrefix := config.Datadog.GetString("histogram_copy_to_distribution_prefix")
 
-	if extraTags == nil {
-		extraTags = config.Datadog.GetStringSlice("dogstatsd_tags")
-	}
+	extraTags := config.Datadog.GetStringSlice("dogstatsd_tags")
 
 	// if the server is running in a context where static tags are required, add those
 	// to extraTags.
@@ -350,6 +347,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, extraTags []string) (*Ser
 		TCapture:           capture,
 		UdsListenerRunning: udsListenerRunning,
 		cachedTlmOriginIds: make(map[string]cachedTagsOriginMap),
+		ServerlessMode:     serverless,
 	}
 
 	// packets forwarding
@@ -371,7 +369,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, extraTags []string) (*Ser
 	// start the workers processing the packets read on the socket
 	// ----------------------
 
-	s.handleMessages()
+	s.handleMessages(serverless)
 
 	// start the debug loop
 	// ----------------------
@@ -399,7 +397,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, extraTags []string) (*Ser
 	return s, nil
 }
 
-func (s *Server) handleMessages() {
+func (s *Server) handleMessages(serverless bool) {
 	if s.Statistics != nil {
 		go s.Statistics.Process()
 		go s.Statistics.Update(&dogstatsdPacketsLastSec)
@@ -455,7 +453,7 @@ func (s *Server) forwarder(fcon net.Conn, packetsChannel chan packets.Packets) {
 func (s *Server) ServerlessFlush() {
 	log.Debug("Received a Flush trigger")
 
-	// make all workers flush their aggregated data (in the batchers) to the aggregator.
+	// make all workers flush their aggregated data (in the batchers) into the time samplers
 	s.serverlessFlushChan <- true
 
 	start := time.Now()
