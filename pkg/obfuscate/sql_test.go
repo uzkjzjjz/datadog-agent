@@ -1861,6 +1861,40 @@ func TestUnicodeDigit(t *testing.T) {
 	o.ObfuscateSQLString(hangStr)
 }
 
+func TestParseNumber(t *testing.T) {
+	var testCases = []struct {
+		in       string
+		expected string
+		error    string
+	}{
+		{"1234", "?", ""},
+		{"-1234", "?", ""},
+		{"1234e12", "?", ""},
+		{"0xfa", "?", ""},
+		{"01234567", "?", ""},
+		{"09", "", "at position 2: invalid number"},
+		// Negatives are always parsed as decimals (not octal).
+		{"-01234567", "?", ""},
+		{"-012345678", "?", ""},
+	}
+
+	o := NewObfuscator(Config{})
+	for _, testCase := range testCases {
+		t.Run(testCase.in, func(t *testing.T) {
+			assert := assert.New(t)
+			oq, err := o.ObfuscateSQLString(testCase.in)
+			if testCase.error != "" {
+				assert.Equal(testCase.error, err.Error())
+			} else {
+				assert.NoError(err)
+				if assert.NotNil(oq) {
+					assert.Equal(testCase.expected, oq.Query)
+				}
+			}
+		})
+	}
+}
+
 // TestToUpper contains test data lifted from Go's bytes/bytes_test.go, but we test
 // that our toUpper returns the same values as bytes.ToUpper.
 func TestToUpper(t *testing.T) {
