@@ -196,6 +196,7 @@ func (dh *Handle) GetStatsForHandle() (map[string]int64, error) {
 			"open_table_removes":                   stats.Handle.Flow_stats.Open_table_removes,
 			"closed_table_adds":                    stats.Handle.Flow_stats.Closed_table_adds,
 			"closed_table_removes":                 stats.Handle.Flow_stats.Closed_table_removes,
+			"num_packets_after_flow_closed":        stats.Handle.Flow_stats.Num_packets_after_flow_closed,
 		}, nil
 	// A DataHandle handle returns transfer stats specific to this handle
 	case DataHandle:
