@@ -37,7 +37,7 @@ type Stats struct {
 }
 
 // HTTP returns a debug-friendly representation of map[http.Key]http.RequestStats
-func HTTP(stats map[http.Key]http.RequestStats, dns map[util.Address][]dns.Hostname) []RequestSummary {
+func HTTP(stats map[http.Key]*http.RequestStats, dns map[util.Address][]dns.Hostname) []RequestSummary {
 	all := make([]RequestSummary, 0, len(stats))
 	for k, v := range stats {
 		clientAddr := formatIP(k.SrcIPLow, k.SrcIPHigh)
@@ -53,17 +53,17 @@ func HTTP(stats map[http.Key]http.RequestStats, dns map[util.Address][]dns.Hostn
 				Port: k.DstPort,
 			},
 			DNS:      getDNS(dns, serverAddr),
-			Path:     k.Path,
+			Path:     k.Path.Content,
 			Method:   k.Method.String(),
 			ByStatus: make(map[int]Stats),
 		}
 
-		for i, stat := range v {
-			if stat.Count == 0 {
+		for status := 100; status <= 500; status += 100 {
+			if !v.HasStats(status) {
 				continue
 			}
+			stat := v.Stats(status)
 
-			status := (i + 1) * 100
 			debug.ByStatus[status] = Stats{
 				Count:              stat.Count,
 				FirstLatencySample: stat.FirstLatencySample,

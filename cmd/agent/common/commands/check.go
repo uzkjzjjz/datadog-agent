@@ -148,7 +148,7 @@ func Check(loggerName config.LoggerName, confFilePath *string, flagNoColor *bool
 			opts.FlushInterval = 0
 			opts.UseNoopForwarder = true
 			opts.UseNoopEventPlatformForwarder = true
-			opts.UseOrchestratorForwarder = false
+			opts.UseNoopOrchestratorForwarder = true
 			demux := aggregator.InitAndStartAgentDemultiplexer(opts, hostname)
 
 			common.LoadComponents(context.Background(), config.Datadog.GetString("confd_path"))
@@ -417,9 +417,6 @@ func Check(loggerName config.LoggerName, confFilePath *string, flagNoColor *bool
 			}
 
 			if formatJSON {
-				fmt.Fprintln(color.Output, fmt.Sprintf("=== %s ===", color.BlueString("JSON")))
-				checkFileOutput.WriteString("=== JSON ===\n")
-
 				instancesJSON, _ := json.MarshalIndent(instancesData, "", "  ")
 				instanceJSONString := string(instancesJSON)
 

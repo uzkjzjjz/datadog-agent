@@ -7,6 +7,7 @@ package configresolver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/listeners"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers/names"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 
@@ -67,24 +69,28 @@ func Resolve(tpl integration.Config, svc listeners.Service) (integration.Config,
 	copy(resolvedConfig.InitConfig, tpl.InitConfig)
 	copy(resolvedConfig.Instances, tpl.Instances)
 
-	// Ignore the config from file if it's overridden by an empty config
-	// or by a different config for the same check
-	if tpl.Provider == names.File && svc.GetCheckNames(ctx) != nil {
-		checkNames := svc.GetCheckNames(ctx)
-		lenCheckNames := len(checkNames)
-		if lenCheckNames == 0 || (lenCheckNames == 1 && checkNames[0] == "") {
-			// Empty check names on k8s annotations or container labels override the check config from file
-			// Used to deactivate unneeded OOTB autodiscovery checks defined in files
-			// The checkNames slice is considered empty also if it contains one single empty string
-			return resolvedConfig, fmt.Errorf("ignoring config from %s: another empty config is defined with the same AD identifier: %v", tpl.Source, tpl.ADIdentifiers)
-		}
-		for _, checkName := range checkNames {
-			if tpl.Name == checkName {
-				// Ignore config from file when the same check is activated on the same service via other config providers (k8s annotations or container labels)
-				return resolvedConfig, fmt.Errorf("ignoring config from %s: another config is defined for the check %s", tpl.Source, tpl.Name)
+	// Ignore the config from file if it's overridden by an empty config or by
+	// a different config for the same check.  If
+	// `logs_config.cca_in_ad` is set, this is not necessary as the
+	// relevant services will filter out these configs.
+	if !util.CcaInAD() {
+		if tpl.Provider == names.File && svc.GetCheckNames(ctx) != nil {
+			checkNames := svc.GetCheckNames(ctx)
+			lenCheckNames := len(checkNames)
+			if lenCheckNames == 0 || (lenCheckNames == 1 && checkNames[0] == "") {
+				// Empty check names on k8s annotations or container labels override the check config from file
+				// Used to deactivate unneeded OOTB autodiscovery checks defined in files
+				// The checkNames slice is considered empty also if it contains one single empty string
+				return resolvedConfig, fmt.Errorf("ignoring config from %s: another empty config is defined with the same AD identifier: %v", tpl.Source, tpl.ADIdentifiers)
 			}
-		}
+			for _, checkName := range checkNames {
+				if tpl.Name == checkName {
+					// Ignore config from file when the same check is activated on the same service via other config providers (k8s annotations or container labels)
+					return resolvedConfig, fmt.Errorf("ignoring config from %s: another config is defined for the check %s", tpl.Source, tpl.Name)
+				}
+			}
 
+		}
 	}
 
 	if resolvedConfig.IsCheckConfig() && !svc.IsReady(ctx) {
@@ -125,7 +131,7 @@ func substituteTemplateVariables(ctx context.Context, config *integration.Config
 		if toResolve.dtype == dataInstance {
 			pp = postProcessor
 		}
-		*toResolve.data, err = resolveDataWithTemplateVars(ctx, *toResolve.data, svc, pp)
+		*toResolve.data, err = resolveDataWithTemplateVars(ctx, *toResolve.data, svc, toResolve.parser, pp)
 		if err != nil {
 			return err
 		}
@@ -142,37 +148,60 @@ const (
 	dataLogs
 )
 
+type parser struct {
+	marshal   func(interface{}) ([]byte, error)
+	unmarshal func([]byte, interface{}) error
+}
+
+var jsonp = parser{
+	marshal:   json.Marshal,
+	unmarshal: json.Unmarshal,
+}
+
+var yamlp = parser{
+	marshal:   yaml.Marshal,
+	unmarshal: yaml.Unmarshal,
+}
+
 type dataToResolve struct {
-	data  *integration.Data
-	dtype dataType
+	data   *integration.Data
+	dtype  dataType
+	parser parser
 }
 
 func listDataToResolve(config *integration.Config) []dataToResolve {
 	res := []dataToResolve{
 		{
-			data:  &config.InitConfig,
-			dtype: dataInit,
+			data:   &config.InitConfig,
+			dtype:  dataInit,
+			parser: yamlp,
 		},
 	}
 
 	for i := 0; i < len(config.Instances); i++ {
 		res = append(res, dataToResolve{
-			data:  &config.Instances[i],
-			dtype: dataInstance,
+			data:   &config.Instances[i],
+			dtype:  dataInstance,
+			parser: yamlp,
 		})
 	}
 
 	if config.IsLogConfig() {
+		p := yamlp
+		if config.Provider == names.Container || config.Provider == names.Kubernetes {
+			p = jsonp
+		}
 		res = append(res, dataToResolve{
-			data:  &config.LogsConfig,
-			dtype: dataLogs,
+			data:   &config.LogsConfig,
+			dtype:  dataLogs,
+			parser: p,
 		})
 	}
 
 	return res
 }
 
-func resolveDataWithTemplateVars(ctx context.Context, data integration.Data, svc listeners.Service, postProcessor func(interface{}) error) ([]byte, error) {
+func resolveDataWithTemplateVars(ctx context.Context, data integration.Data, svc listeners.Service, parser parser, postProcessor func(interface{}) error) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -181,7 +210,7 @@ func resolveDataWithTemplateVars(ctx context.Context, data integration.Data, svc
 
 	// Percent character is not allowed in unquoted yaml strings.
 	data2 := strings.ReplaceAll(string(data), "%%", "‰")
-	if err := yaml.Unmarshal([]byte(data2), &tree); err != nil {
+	if err := parser.unmarshal([]byte(data2), &tree); err != nil {
 		return data, err
 	}
 
@@ -209,6 +238,19 @@ func resolveDataWithTemplateVars(ctx context.Context, data integration.Data, svc
 		switch elem := top.get().(type) {
 
 		case map[interface{}]interface{}:
+			for k, v := range elem {
+				k2, v2 := k, v
+				stack = append(stack, treePointer{
+					get: func() interface{} {
+						return v2
+					},
+					set: func(x interface{}) {
+						elem[k2] = x
+					},
+				})
+			}
+
+		case map[string]interface{}:
 			for k, v := range elem {
 				k2, v2 := k, v
 				stack = append(stack, treePointer{
@@ -254,7 +296,7 @@ func resolveDataWithTemplateVars(ctx context.Context, data integration.Data, svc
 		}
 	}
 
-	return yaml.Marshal(&tree)
+	return parser.marshal(&tree)
 }
 
 var ipv6Re = regexp.MustCompile(`^[0-9a-f:]+$`)
@@ -406,11 +448,20 @@ func tagsAdder(tags []string) func(interface{}) error {
 		}
 
 		if typedTree, ok := tree.(map[interface{}]interface{}); ok {
-			tagList, _ := typedTree["tags"].([]string)
 			// Use a set to remove duplicates
 			tagSet := make(map[string]struct{})
-			for _, t := range tagList {
-				tagSet[t] = struct{}{}
+			if typedTreeTags, ok := typedTree["tags"]; ok {
+				if tagList, ok := typedTreeTags.([]interface{}); !ok {
+					log.Errorf("Wrong type for `tags` in config. Expected []interface{}, got %T", typedTree["tags"])
+				} else {
+					for _, tag := range tagList {
+						if t, ok := tag.(string); !ok {
+							log.Errorf("Wrong type for tag \"%#v\". Expected string, got %T", tag, tag)
+						} else {
+							tagSet[t] = struct{}{}
+						}
+					}
+				}
 			}
 			for _, t := range tags {
 				tagSet[t] = struct{}{}

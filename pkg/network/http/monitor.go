@@ -12,7 +12,6 @@ import (
 	"fmt"
 
 	"sync"
-	"time"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
@@ -25,7 +24,7 @@ import (
 // * requestsStats which are the http data stats
 // * telemetry which are telemetry stats
 type HTTPMonitorStats struct {
-	requestStats map[Key]RequestStats
+	requestStats map[Key]*RequestStats
 	telemetry    telemetry
 }
 
@@ -124,8 +123,6 @@ func (m *Monitor) Start() error {
 	m.eventLoopWG.Add(1)
 	go func() {
 		defer m.eventLoopWG.Done()
-		report := time.NewTicker(30 * time.Second)
-		defer report.Stop()
 		for {
 			select {
 			case dataEvent, ok := <-m.batchCompletionHandler.DataChannel:
@@ -161,9 +158,6 @@ func (m *Monitor) Start() error {
 					requestStats: m.statkeeper.GetAndResetAllStats(),
 					telemetry:    delta,
 				}
-			case <-report.C:
-				transactions := m.batchManager.GetPendingTransactions()
-				m.process(transactions, nil)
 			}
 		}
 	}()
@@ -173,7 +167,7 @@ func (m *Monitor) Start() error {
 
 // GetHTTPStats returns a map of HTTP stats stored in the following format:
 // [source, dest tuple, request path] -> RequestStats object
-func (m *Monitor) GetHTTPStats() map[Key]RequestStats {
+func (m *Monitor) GetHTTPStats() map[Key]*RequestStats {
 	if m == nil {
 		return nil
 	}

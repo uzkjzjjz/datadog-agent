@@ -9,6 +9,7 @@ import (
 	"errors"
 	"html/template"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -404,6 +405,12 @@ func TestFullYamlConfig(t *testing.T) {
 	c, err := prepareConfig("./testdata/full.yaml")
 	assert.NoError(err)
 	assert.NoError(applyDatadogConfig(c))
+
+	req, err := http.NewRequest(http.MethodGet, "https://someplace.test", nil)
+	assert.NoError(err)
+	proxyURL, err := c.Proxy(req)
+	assert.NoError(err)
+	assert.Equal("proxy_for_https:1234", proxyURL.Host)
 
 	assert.Equal("mymachine", c.Hostname)
 	assert.Equal("https://user:password@proxy_for_https:1234", c.ProxyURL.String())
@@ -829,6 +836,17 @@ func TestLoadEnv(t *testing.T) {
 		assert.Equal(cfg.RequireTags, []*config.Tag{{K: "important1", V: ""}, {K: "important2", V: "value1"}})
 	})
 
+	t.Run(env, func(t *testing.T) {
+		defer cleanConfig()()
+		assert := assert.New(t)
+		err := os.Setenv(env, `["important1:value with a space"]`)
+		assert.NoError(err)
+		defer os.Unsetenv(env)
+		cfg, err := LoadConfigFile("./testdata/full.yaml")
+		assert.NoError(err)
+		assert.Equal(cfg.RequireTags, []*config.Tag{{K: "important1", V: "value with a space"}})
+	})
+
 	env = "DD_APM_FILTER_TAGS_REJECT"
 	t.Run(env, func(t *testing.T) {
 		defer cleanConfig()()
@@ -839,6 +857,17 @@ func TestLoadEnv(t *testing.T) {
 		cfg, err := LoadConfigFile("./testdata/full.yaml")
 		assert.NoError(err)
 		assert.Equal(cfg.RejectTags, []*config.Tag{{K: "bad1", V: "value1"}})
+	})
+
+	t.Run(env, func(t *testing.T) {
+		defer cleanConfig()()
+		assert := assert.New(t)
+		err := os.Setenv(env, `["bad1:value with a space"]`)
+		assert.NoError(err)
+		defer os.Unsetenv(env)
+		cfg, err := LoadConfigFile("./testdata/full.yaml")
+		assert.NoError(err)
+		assert.Equal(cfg.RejectTags, []*config.Tag{{K: "bad1", V: "value with a space"}})
 	})
 
 	for _, envKey := range []string{

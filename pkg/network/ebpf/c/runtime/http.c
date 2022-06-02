@@ -3,11 +3,14 @@
 #include "bpf_helpers.h"
 #include "ip.h"
 #include "ipv6.h"
+#include "http.h"
+#include "http-buffer.h"
 #include "sockfd.h"
 #include "conn-tuple.h"
+#include "tags-types.h"
 #include "port_range.h"
-#include "http.h"
 #include "https.h"
+#include "conn-tuple.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 #error "http runtime compilation is only supported for kernel >= 4.5"
@@ -19,13 +22,58 @@
 static __always_inline void read_into_buffer_skb(char *buffer, struct __sk_buff* skb, skb_info_t *info) {
     u64 offset = (u64)info->data_off;
 
+#define BLK_SIZE (16)
+    const u32 iter = HTTP_BUFFER_SIZE / BLK_SIZE;
+    const u32 len = HTTP_BUFFER_SIZE < (skb->len - (u32)offset) ? (u32)offset + HTTP_BUFFER_SIZE : skb->len;
+
+    unsigned i = 0;
+
 #pragma unroll
-    for (int i = 0; i < HTTP_BUFFER_SIZE; i++) {
-        if (offset < skb->len) {
-            bpf_skb_load_bytes(skb, offset, &buffer[i], 1);
-        }
-        offset++;
+    for (; i < iter; i++) {
+        if (offset + BLK_SIZE - 1 >= len) break;
+
+        bpf_skb_load_bytes(skb, offset, &buffer[i * BLK_SIZE], BLK_SIZE);
+        offset += BLK_SIZE;
     }
+
+    // This part is very hard to write in a loop and unroll it.
+    // Indeed, mostly because of older kernel verifiers, we want to make sure the offset into the buffer is not
+    // stored on the stack, so that the verifier is able to verify that we're not doing out-of-bound on
+    // the stack.
+    // Basically, we should get a register from the code block above containing an fp relative address. As
+    // we are doing `buffer[0]` here, there is not dynamic computation on that said register after this,
+    // and thus the verifier is able to ensure that we are in-bound.
+    void *buf = &buffer[i * BLK_SIZE];
+    if (offset + 14 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 15);
+    else if (offset + 13 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 14);
+    else if (offset + 12 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 13);
+    else if (offset + 11 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 12);
+    else if (offset + 10 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 11);
+    else if (offset + 9 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 10);
+    else if (offset + 8 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 9);
+    else if (offset + 7 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 8);
+    else if (offset + 6 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 7);
+    else if (offset + 5 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 6);
+    else if (offset + 4 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 5);
+    else if (offset + 3 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 4);
+    else if (offset + 2 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 3);
+    else if (offset + 1 < len)
+        bpf_skb_load_bytes(skb, offset, buf, 2);
+    else if (offset < len)
+        bpf_skb_load_bytes(skb, offset, buf, 1);
 }
 
 SEC("socket/http_filter")
@@ -55,7 +103,7 @@ int socket__http_filter(struct __sk_buff* skb) {
     normalize_tuple(&http.tup);
 
     read_into_buffer_skb((char *)http.request_fragment, skb, &skb_info);
-    http_process(&http, &skb_info);
+    http_process(&http, &skb_info, NO_TAGS);
     return 0;
 }
 
@@ -141,7 +189,7 @@ int uretprobe__SSL_read(struct pt_regs* ctx) {
     }
 
     u32 len = (u32)PT_REGS_RC(ctx);
-    https_process(t, args->buf, len);
+    https_process(t, args->buf, len, LIBSSL);
  cleanup:
     bpf_map_delete_elem(&ssl_read_args, &pid_tgid);
     return 0;
@@ -158,7 +206,7 @@ int uprobe__SSL_write(struct pt_regs* ctx) {
 
     void *ssl_buffer = (void *)PT_REGS_PARM2(ctx);
     size_t len = (size_t)PT_REGS_PARM3(ctx);
-    https_process(t, ssl_buffer, len);
+    https_process(t, ssl_buffer, len, LIBSSL);
     return 0;
 }
 
@@ -252,7 +300,7 @@ int uretprobe__gnutls_record_recv(struct pt_regs* ctx) {
         goto cleanup;
     }
 
-    https_process(t, args->buf, read_len);
+    https_process(t, args->buf, read_len, LIBGNUTLS);
  cleanup:
     bpf_map_delete_elem(&ssl_read_args, &pid_tgid);
     return 0;
@@ -271,7 +319,7 @@ int uprobe__gnutls_record_send(struct pt_regs* ctx) {
         return 0;
     }
 
-    https_process(t, data, data_size);
+    https_process(t, data, data_size, LIBGNUTLS);
     return 0;
 }
 

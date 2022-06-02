@@ -48,6 +48,7 @@ func FormatConnection(
 	httpEncoder *httpEncoder,
 	dnsFormatter *dnsFormatter,
 	ipc ipCache,
+	tagsSet *network.TagsSet,
 ) *model.Connection {
 	c := connPool.Get().(*model.Connection)
 	c.Pid = int32(conn.Pid)
@@ -57,11 +58,11 @@ func FormatConnection(
 	c.Type = formatType(conn.Type)
 	c.IsLocalPortEphemeral = formatEphemeralType(conn.SPortIsEphemeral)
 	c.PidCreateTime = 0
-	c.LastBytesSent = conn.LastSentBytes
-	c.LastBytesReceived = conn.LastRecvBytes
-	c.LastPacketsSent = conn.LastSentPackets
-	c.LastPacketsReceived = conn.LastRecvPackets
-	c.LastRetransmits = conn.LastRetransmits
+	c.LastBytesSent = conn.Last.SentBytes
+	c.LastBytesReceived = conn.Last.RecvBytes
+	c.LastPacketsSent = conn.Last.SentPackets
+	c.LastPacketsReceived = conn.Last.RecvPackets
+	c.LastRetransmits = conn.Last.Retransmits
 	c.Direction = formatDirection(conn.Direction)
 	c.NetNS = conn.NetNS
 	c.RemoteNetworkId = ""
@@ -69,15 +70,19 @@ func FormatConnection(
 	c.Rtt = conn.RTT
 	c.RttVar = conn.RTTVar
 	c.IntraHost = conn.IntraHost
-	c.LastTcpEstablished = conn.LastTCPEstablished
-	c.LastTcpClosed = conn.LastTCPClosed
+	c.LastTcpEstablished = conn.Last.TCPEstablished
+	c.LastTcpClosed = conn.Last.TCPClosed
 
 	c.RouteIdx = formatRouteIdx(conn.Via, routes)
 	dnsFormatter.FormatConnectionDNS(conn, c)
 
-	if httpStats := httpEncoder.GetHTTPAggregations(conn); httpStats != nil {
+	httpStats, tags := httpEncoder.GetHTTPAggregationsAndTags(conn)
+	if httpStats != nil {
 		c.HttpAggregations, _ = proto.Marshal(httpStats)
 	}
+
+	conn.Tags |= tags
+	c.Tags = formatTags(tagsSet, conn)
 
 	return c
 }
@@ -129,7 +134,7 @@ func returnToPool(c *model.Connections) {
 }
 
 func formatAddr(addr util.Address, port uint16, ipc ipCache) *model.Addr {
-	if addr == nil {
+	if addr.IsZero() {
 		return nil
 	}
 
@@ -225,4 +230,11 @@ func formatRouteIdx(v *network.Via, routes map[string]RouteIdx) int32 {
 
 func routeKey(v *network.Via) string {
 	return v.Subnet.Alias
+}
+
+func formatTags(tagsSet *network.TagsSet, c network.ConnectionStats) (tagsIdx []uint32) {
+	for _, tag := range network.GetStaticTags(c.Tags) {
+		tagsIdx = append(tagsIdx, tagsSet.Add(tag))
+	}
+	return tagsIdx
 }
