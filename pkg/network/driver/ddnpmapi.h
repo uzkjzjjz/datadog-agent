@@ -127,6 +127,8 @@ typedef struct _flow_handle_stats {
     volatile LONG64         peak_num_flows_no_handle;
     volatile LONG64         num_flows_missed_max_no_handle_exceeded;
 
+    volatile LONG64         num_packets_after_flow_closed;
+
 } FLOW_STATS;
 
 typedef struct _transport_handle_stats {

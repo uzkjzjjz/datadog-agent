@@ -35,7 +35,7 @@ const (
 	// set default max open & closed flows for windows.  See note in setParams(),
 	// these are only sort-of honored for now
 	defaultMaxOpenFlows   = uint64(32767)
-	defaultMaxClosedFlows = uint64(32767)
+	defaultMaxClosedFlows = uint64(65535)
 )
 
 // DriverExpvarNames is a list of all the DriverExpvar names returned from GetStats

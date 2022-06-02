@@ -81,6 +81,7 @@ type FlowStats struct {
 	Num_flows_no_handle                     int64
 	Peak_num_flows_no_handle                int64
 	Num_flows_missed_max_no_handle_exceeded int64
+	Num_packets_after_flow_closed           int64
 }
 type TransportStats struct {
 	Packets_processed    int64
@@ -106,7 +107,7 @@ type DriverStats struct {
 	Handle        Stats
 }
 
-const DriverStatsSize = 0x208
+const DriverStatsSize = 0x218
 
 type PerFlowData struct {
 	FlowHandle         uint64
