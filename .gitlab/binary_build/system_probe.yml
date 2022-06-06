@@ -37,6 +37,7 @@
     - $S3_CP_CMD $SRC_PATH/pkg/ebpf/bytecode/build/runtime/conntrack.c $S3_ARTIFACTS_URI/conntrack.c.$ARCH
     - $S3_CP_CMD $SRC_PATH/pkg/ebpf/bytecode/build/runtime/oom-kill.c $S3_ARTIFACTS_URI/oom-kill.c.$ARCH
     - $S3_CP_CMD $SRC_PATH/pkg/ebpf/bytecode/build/runtime/tcp-queue-length.c $S3_ARTIFACTS_URI/tcp-queue-length.c.$ARCH
+    - mkdir -p $CI_PROJECT_DIR/.tmp
     - cp /tmp/nikos.tar.gz $CI_PROJECT_DIR/.tmp/nikos-$ARCH.tar.gz
   artifacts:
     expire_in: 2 weeks
