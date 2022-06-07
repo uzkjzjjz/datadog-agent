@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	_ "expvar" // Blank import used because this isn't directly used in this file
 
@@ -158,6 +159,17 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 }
 
+func allStack() []byte {
+	buf := make([]byte, 1024)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			return buf[:n]
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+}
+
 // StartAgent Initializes the agent process
 func StartAgent() error {
 	var (
@@ -236,6 +248,11 @@ func StartAgent() error {
 			)
 		}
 	}
+
+	go func() {
+		time.Sleep(40 * time.Second)
+		log.Infof("All stacks: %s", string(allStack()))
+	}()
 
 	if configSetupErr != nil {
 		log.Errorf("Failed to setup config %v", configSetupErr)
