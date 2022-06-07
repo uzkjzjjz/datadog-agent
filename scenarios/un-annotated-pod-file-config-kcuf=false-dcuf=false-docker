@@ -1,0 +1,135 @@
+# Settings
+
+datadog-values.yaml
+  logs:
+    enabled: true
+    containerCollectAll: false
+    containerCollectUsingFiles: false  // kcuf
+  env:
+    - name: DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE
+      value: "false"
+  confd:
+    "bash.yaml": |-
+      ad_identifiers:
+       - bash
+      logs:
+        service: testy
+        source: testy
+
+---
+
+k run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// kcuf = false -> docker launcher
+2022-05-25 15:17:20 UTC | CORE | INFO | (pkg/logs/internal/launchers/docker/launcher.go:136 in run) | Starting Docker launcher
+
+// schedule resolved config for container
+2022-05-25 15:18:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "bash",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("logs:\n  service: testy\n  source: testy\n"),
+        ADIdentifiers: []string{"bash"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "file",
+        ServiceID: "docker://39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: file:/etc/datadog-agent/conf.d/bash.yaml,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 83f7b58d2b20cda)
+
+// logs-agent ad scheduler adds a source for that config; docker launcher will use
+// socket and add a tailer to this source directly
+2022-05-25 15:18:40 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000980cb0 = {
+        Name: "bash",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794",
+                Service: "testy",
+                Source: "testy",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc001c6f0d0)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// schedule service config (docker)
+2022-05-25 15:18:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794",
+        TaggerEntity: "container_id://39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 3036eba42da48781)
+
+// add logs-agent service
+2022-05-25 15:18:40 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794"}
+
+// schedule service config (kubernetes)
+2022-05-25 15:18:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://e2cbfe92-1742-4206-b52d-f7519ead914c",
+        TaggerEntity: "kubernetes_pod_uid://e2cbfe92-1742-4206-b52d-f7519ead914c",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 42bba218fe0998ee)
+
+# Status
+
+  bash
+  ----
+    - Type: docker
+      Status: OK
+      Inputs:
+        39c31dd78aac85c64bc1ab60151a319ecf0924c976d0ddc44a77b6cc15512794
+      BytesRead: 9112
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

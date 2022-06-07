@@ -1,0 +1,112 @@
+# Settings
+
+Agent 7.36.0-rc.10 with additional logging
+
+logs_enabled: true
+logs_config:
+  container_collect_all: true
+  docker_container_use_file: true
+
+user dustin in 'root' group
+
+no conf.d setup
+
+docker run -ti --rm bash
+
+# Results
+
+// abstract CCA source
+2022-05-16 15:08:50 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0002c2770 = {
+        Name: "container_collect_all",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "",
+                Service: "docker",
+                Source: "docker",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc000e64910)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// service config (docker)
+2022-05-16 15:08:55 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff",
+        TaggerEntity: "container_id://e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest df9170cd277aeb7)
+
+// logs-agent service
+2022-05-16 15:08:55 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff"}
+
+// source with type=file, child of CCA source
+2022-05-16 15:08:55 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000bbb420 = {
+        Name: "container_collect_all",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/lib/docker/containers/e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff/e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff-json.log",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "bash",
+                Source: "bash",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "docker",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0xc0002c2770,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc0006c3e70)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  container_collect_all
+  ---------------------
+    - Type: docker
+      Status: OK
+      Inputs:
+        e65c5d5a0af9766714b44bfc1749aa68e6bfb1ac63b1f7f4d358b3aed800a5ff
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+      Container Info: Container ID: 4f990ff516c5, Image: bash, Created: 2022-05-16T20:59:34.495828633Z, Tailing from the Docker socket

@@ -1,0 +1,134 @@
+# Settings
+
+Agent 7.36.0-rc.10 with additional logging
+
+logs_enabled: true
+logs_config:
+  docker_container_use_file: true
+
+nothing in conf.d
+
+dustin added to group 'root' to allow reading logs
+
+---
+
+docker run -ti --rm \
+    --label com.datadoghq.ad.logs='[{"source": "foo"}]' \
+    bash
+
+# Results
+
+// service config (docker)
+2022-05-16 15:01:27 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd",
+        TaggerEntity: "container_id://d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest fd0634aa6dc95dec)
+
+// resolved config
+2022-05-16 15:01:33 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"source\":\"foo\"}]"),
+        ADIdentifiers: []string{"docker://d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "container",
+        ServiceID: "docker://d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: container:docker://d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 7da96da013b6e635)
+
+// logs-agent source (type "docker")
+2022-05-16 15:01:33 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000b9bab0 = {
+        Name: "docker",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd",
+                Service: "",
+                Source: "foo",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc000716778)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// logs-agent child source of previous
+2022-05-16 15:01:33 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000540690 = {
+        Name: "docker",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/lib/docker/containers/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd-json.log",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "bash",
+                Source: "foo",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "docker",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0xc000b9bab0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc000d64a10)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  docker
+  ------
+    - Type: file
+      Identifier: d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd
+      Path: /var/lib/docker/containers/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd-json.log
+      Status: OK
+      Inputs:
+        /var/lib/docker/containers/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd/d30d160a98e2370cd2b97e273556339121c59f063ff50f35b7c790dcf02a18bd-json.log
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

@@ -1,0 +1,123 @@
+# Settings
+
+In GKE
+
+datadog-values.yaml
+  logs:
+    enabled: true
+    containerCollectAll: false
+    containerCollectUsingFiles: false  // kcuf
+  confd:
+    "bash.yaml": |-
+      ad_identifiers:
+       - bash
+      logs:
+        service: testy
+        source: testy
+
+---
+
+k run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+2022-05-26 15:58:50 UTC | CORE | INFO | (pkg/logs/internal/launchers/docker/launcher.go:136 in run) | Starting Docker launcher
+
+// schedule resolved config
+2022-05-26 15:59:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "bash",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("logs:\n  service: test\n  source: test\n"),
+        ADIdentifiers: []string{"bash"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "file",
+        ServiceID: "containerd://79863a6c29cedfdda0b1909d885db041f76fad2362696bb7c535277432dbcaf1",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: file:/etc/datadog-agent/conf.d/bash.yaml,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 89c9ed0dfe8f9355)
+
+// logs-agent ad scheduler creates a source for it, with type containerd
+2022-05-26 15:59:40 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000a7caf0 = {
+        Name: "bash",
+        Config: &LogsConfig{
+                Type: "containerd",
+                Service: "test",
+                Source: "test",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc0007a9690)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+2022-05-26 15:59:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "containerd://79863a6c29cedfdda0b1909d885db041f76fad2362696bb7c535277432dbcaf1",
+        TaggerEntity: "container_id://79863a6c29cedfdda0b1909d885db041f76fad2362696bb7c535277432dbcaf1",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 57424b219802aee8)
+
+2022-05-26 15:59:40 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"containerd", Identifier:"79863a6c29cedfdda0b1909d885db041f76fad2362696bb7c535277432dbcaf1"}
+
+2022-05-26 15:59:40 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://4ab66a4f-04fc-444a-80dd-96a4f73347df",
+        TaggerEntity: "kubernetes_pod_uid://4ab66a4f-04fc-444a-80dd-96a4f73347df",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 38597ef280252f1e)
+
+# Status
+
+  bash
+  ----
+    - Type: containerd
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

@@ -1,0 +1,83 @@
+# Settings
+
+Agent 7.36.0-rc.10 with additional logging
+
+logs_enabled: true
+logs_config:
+  container_collect_all: true
+  docker_container_use_file: false
+
+no conf.d setup
+
+docker run -ti --rm bash
+
+# Results
+
+// abstract CCA source
+2022-05-16 15:04:56 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0002c0000 = {
+        Name: "container_collect_all",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "",
+                Service: "docker",
+                Source: "docker",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc00012e408)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// service config (docker)
+2022-05-16 15:05:09 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://25d62a660248ec762be97a9d870b494090c4fa4322c9f240da4bcd24f124671f",
+        TaggerEntity: "container_id://25d62a660248ec762be97a9d870b494090c4fa4322c9f240da4bcd24f124671f",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 98592682eff9567)
+
+// logs-agent service
+2022-05-16 15:05:09 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"25d62a660248ec762be97a9d870b494090c4fa4322c9f240da4bcd24f124671f"}
+
+# Status
+
+// docker tailer added to container_collect_all source
+
+  container_collect_all
+  ---------------------
+    - Type: docker
+      Status: OK
+      Inputs:
+        25d62a660248ec762be97a9d870b494090c4fa4322c9f240da4bcd24f124671f
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+      Container Info: Container ID: 25d62a660248, Image: bash, Created: 2022-05-16T15:05:09.493779805Z, Tailing from the Docker socket

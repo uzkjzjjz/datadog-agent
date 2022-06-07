@@ -1,0 +1,146 @@
+# Settings
+
+minikube start --container-runtime=docker
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: true
+    #containerCollectUsingFiles: true  // kcuf, default
+
+k run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// kcuf = true -> use k8s launcher
+2022-05-24 20:18:12 UTC | CORE | INFO | (pkg/logs/internal/launchers/kubernetes/launcher.go:110 in run) | Starting Kubernetes launcher
+
+// CCA scheduler adds CCA source, but k8s launcher ignores this
+2022-05-24 20:18:14 UTC | CORE | DEBUG | (pkg/logs/schedulers/cca/scheduler.go:54 in func1) | Adding ContainerCollectAll source to the Logs Agent
+2022-05-24 20:18:14 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc00091bea0 = {
+        Name: "container_collect_all",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "",
+                Service: "docker",
+                Source: "docker",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc001249ef8)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// schedule service config (docker)
+2022-05-24 20:18:32 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://da18f3a40d7e0e5e5645859e83040f7c75da6c8d7b573a1e4f412142bc94135e",
+        TaggerEntity: "container_id://da18f3a40d7e0e5e5645859e83040f7c75da6c8d7b573a1e4f412142bc94135e",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 8bff4818b23d25b0)
+
+// Add logs-agent service
+2022-05-24 20:18:32 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"da18f3a40d7e0e5e5645859e83040f7c75da6c8d7b573a1e4f412142bc94135e"}
+
+// schedule service config (kubernetes)
+2022-05-24 20:18:32 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://d8614b5d-23e2-4d1b-b103-d50a76c29f03",
+        TaggerEntity: "kubernetes_pod_uid://d8614b5d-23e2-4d1b-b103-d50a76c29f03",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 635a35f3dee09203)
+
+// k8s launcher examines the container annotations based on the service and creates a file source
+2022-05-24 20:18:32 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0002380e0 = {
+        Name: "default/bash/bash",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/log/pods/default_bash_d8614b5d-23e2-4d1b-b103-d50a76c29f03/bash/*.log",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "bash",
+                Source: "bash",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "docker",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc0022b74d0)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  container_collect_all
+  ---------------------
+    - Type: docker
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+  default/bash/bash
+  -----------------
+    - Type: file
+      Identifier: da18f3a40d7e0e5e5645859e83040f7c75da6c8d7b573a1e4f412142bc94135e
+      Path: /var/log/pods/default_bash_d8614b5d-23e2-4d1b-b103-d50a76c29f03/bash/*.log
+      Status: OK
+        1 files tailed out of 1 files matching
+      Inputs:
+        /var/log/pods/default_bash_d8614b5d-23e2-4d1b-b103-d50a76c29f03/bash/0.log
+      BytesRead: 50622
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

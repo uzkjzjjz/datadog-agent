@@ -1,0 +1,45 @@
+# Settings
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: true
+    containerCollectUsingFiles: false  // kcuf
+
+---
+
+k run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+2022-05-06 18:42:02 UTC | CORE | INFO | (pkg/logs/internal/launchers/docker/launcher.go:142 in run) | Starting Docker launcher
+
+// service config for container
+integration.Config = {
+        Name: "",
+        LogsConfig: "",
+        ADIdentifiers: []string(nil),
+        Provider: ,
+        ServiceID: containerd://3709ba6d6d8fcf0f6c132d2540bc3cead3d1b6f71a2a13ff0cdd39c7167e9676,
+        Source: ,
+}
+
+// service config for pod
+integration.Config = {
+        Name: "",
+        LogsConfig: "",
+        ADIdentifiers: []string(nil),
+        Provider: ,
+        ServiceID: kubernetes_pod://a07b1d44-27a9-4ce4-9e63-5b4f1e526dda,
+        Source: ,
+}
+
+// (imagined)
+service.Service = {
+    Type: "containerd",
+    Identifier: "3709ba6d6d8fcf0f6c132d2540bc3cead3d1b6f71a2a13ff0cdd39c7167e9676",
+}
+
+// expect to see an input attached to the cca source, but nothing -- docker
+// launcher ignores Type="containerd", and has in many versions of the agent.

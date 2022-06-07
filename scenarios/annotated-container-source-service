@@ -1,0 +1,103 @@
+# Settings
+
+Agent 7.36.0-rc.10 with additional logging
+
+logs_enabled: true
+logs_config:
+  container_collect_all: false
+  docker_container_use_file: false
+
+nothing in conf.d
+
+---
+
+docker run -ti --rm \
+    --label com.datadoghq.ad.logs='[{"source": "foo"}]' \
+    bash 
+
+# Results
+
+// service config (docker)
+2022-05-16 20:25:35 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207",
+        TaggerEntity: "container_id://c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 2f7aa4cbca18d461)
+
+// resolved config
+2022-05-16 20:25:41 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"source\":\"foo\"}]"),
+        ADIdentifiers: []string{"docker://c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "container",
+        ServiceID: "docker://c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: container:docker://c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 954d1301330a2dab)
+
+// logs-agent source
+2022-05-16 20:25:41 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000b6e310 = {
+        Name: "docker",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207",
+                Service: "",
+                Source: "foo",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*
+util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc000c12ed8)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  docker
+  ------
+    - Type: docker
+      Status: OK
+      Inputs:
+        c2c01aafc806e3d71a91f1114e8f723cb354882f6772aa65577fa24309dd7207
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

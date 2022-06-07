@@ -1,0 +1,130 @@
+# Settings
+
+In minikube --container-runtime docker
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: false
+    containerCollectUsingFiles: false  // kcuf
+  env:
+    - name: DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE
+      value: "false"
+
+k run bash --image=bash \
+	--annotations ad.datadoghq.com/bash.logs='[{"source":"dustin", "service":"dustin"}]' \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// use docker launcher
+2022-05-24 22:39:05 UTC | CORE | INFO | (pkg/logs/internal/launchers/docker/launcher.go:136 in run) | Starting Docker launcher
+
+// schedule service config (docker)
+2022-05-24 22:40:06 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134",
+        TaggerEntity: "container_id://3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 4270fdf2981e3964)
+
+// add logs service
+2022-05-24 22:40:06 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134"}
+
+// schedule service config (kubernetes) (actually unscheduled and re-scheduled, but ignored anyway)
+2022-05-24 22:40:06 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://d7972b41-d04b-4db8-b814-d968e6d370b1",
+        TaggerEntity: "kubernetes_pod_uid://d7972b41-d04b-4db8-b814-d968e6d370b1",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 7001ea1d37c7f1f6)
+
+// schedule resolved  config
+2022-05-24 22:40:06 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"docker://3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "docker://3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:docker://3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest fbfb4eb76cc20168)
+
+// AD scheduler creates a new logs source for it
+2022-05-24 22:40:06 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0001cc620 = {
+        Name: "docker",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc00320bd18)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// docker launcher tails that from socket
+
+# Status
+
+  docker
+  ------
+    - Type: docker
+      Status: OK
+      Inputs:
+        3212e0824c8f66a14ee32fe1c08691aa8ea65e389ee7c3fc63ec9a49bfc7f134
+      BytesRead: 33728
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

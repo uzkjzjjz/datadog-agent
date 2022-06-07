@@ -1,0 +1,120 @@
+# Settings
+
+In minikube --container-runtime docker
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: false
+    containerCollectUsingFiles: false  // kcuf
+  env:
+    - name: DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE
+      value: "false"
+
+k run bash --image=bash \
+	--annotations ad.datadoghq.com/bash.logs='[{"source":"dustin", "service":"dustin"}]' \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// schedule service config (containerd)
+2022-05-26 15:50:43 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "containerd://613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea",
+        TaggerEntity: "container_id://613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 1fe944c0a5952ff9)
+
+// add logs-agent service
+2022-05-26 15:50:43 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"containerd", Identifier:"613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea"}
+
+// schedule service config (kubernetes)
+2022-05-26 15:50:43 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://eabcd133-6fb1-4008-a525-39346129b95f",
+        TaggerEntity: "kubernetes_pod_uid://eabcd133-6fb1-4008-a525-39346129b95f",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 560263f90007297b)
+
+// schedule resolved config
+2022-05-26 15:50:48 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"containerd://613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "containerd://613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:containerd://613cde2c207e833f93f9c11d342bfcbb09533632558b7920145ca725dfbba5ea,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 98f7062309fedc02)
+
+// add logs source
+2022-05-26 15:50:48 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0007d4770 = {
+        Name: "containerd",
+        Config: &LogsConfig{
+                Type: "containerd",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints
+:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc001be0448)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  containerd
+  ----------
+    - Type: containerd
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

@@ -1,0 +1,166 @@
+# Settings
+
+In minikube --container-runtime docker
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: false
+
+minikube kubectl -- run bash --image=bash \
+	--annotations ad.datadoghq.com/bash.logs='[{"source":"dustin", "service":"dustin"}]' \
+	--annotations ad.datadoghq.com/bash.tags={"dustin":"testing"} \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// schedule service config (docker)
+2022-05-24 15:30:26 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015",
+        TaggerEntity: "container_id://19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest c8701a70ac7e67c5)
+
+// add logs service
+2022-05-24 15:30:26 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015"}
+
+// schedule service config (kubernetes)
+2022-05-24 15:30:26 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://5a7176a8-cd4b-4bb2-ada2-4349bb1a2a36",
+        TaggerEntity: "kubernetes_pod_uid://5a7176a8-cd4b-4bb2-ada2-4349bb1a2a36",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest c4d45ce06fdf2f4d)
+
+// (no logs service because TaggerEntity does not start with `container_id`)
+
+// kubernetes launcher reacts to logs service, parses pod annotations, creates source
+2022-05-24 15:30:26 UTC | CORE | DEBUG | (pkg/logs/internal/launchers/kubernetes/launcher.go:381 in getPath) | Using the latest kubernetes logs path for container bash
+2022-05-24 15:30:26 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0009f53b0 = {
+        Name: "default/bash/bash",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/log/pods/default_bash_5a7176a8-cd4b-4bb2-ada2-4349bb1a2a36/bash/*.log",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "docker",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc001b152d0)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// resolved config for container
+2022-05-24 15:30:28 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"docker://19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "docker://19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:docker://19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest b4c83d9735683b2e)
+
+// logs-agent AD scheduler adds docker source for resolved config, but docker launcher is not running
+2022-05-24 15:30:28 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc000c4eaf0 = {
+        Name: "docker",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc003c10400)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  default/bash/bash
+  -----------------
+    - Type: file
+      Identifier: 19c881b5713628a414fd90b8d3e35400ba0bb6d32dbf69ee47c688431439a015
+      Path: /var/log/pods/default_bash_5a7176a8-cd4b-4bb2-ada2-4349bb1a2a36/bash/*.log
+      Status: OK
+      Inputs:
+        /var/log/pods/default_bash_5a7176a8-cd4b-4bb2-ada2-4349bb1a2a36/bash/0.log
+      BytesRead: 792
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+  docker
+  ------
+    - Type: docker
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

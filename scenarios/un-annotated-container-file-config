@@ -1,0 +1,106 @@
+# Settings
+
+Agent 7.36.0-rc.10 with additional logging
+
+logs_enabled: true
+logs_config:
+  container_collect_all: false
+  docker_container_use_file: false
+
+testy.yaml:
+ad_identifiers:
+ - bash
+logs:
+  service: TEST
+  source: TEST
+
+docker run -ti --rm bash
+
+# Results
+
+// resolved config
+2022-05-17 23:04:41 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "testy",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("logs:\n  service: TEST\n  source: TEST\n"),
+        ADIdentifiers: []string{"bash"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "file",
+        ServiceID: "docker://29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: file:/etc/datadog-agent/conf.d/testy.yaml,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 210a1d74e3899591)
+
+// log source for resolved config
+2022-05-17 23:04:41 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0000e3960 = {
+        Name: "testy",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2",
+                Service: "TEST",
+                Source: "TEST",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31be3c0), lock:(*sync.Mutex)(0xc000abec60)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// service config (docker)
+2022-05-17 23:04:41 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2",
+        TaggerEntity: "container_id://29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 40b0e4b8ba409457)
+
+// logs service
+2022-05-17 23:04:41 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"docker", Identifier:"29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2"}
+
+# Status
+
+  testy
+  -----
+    - Type: docker
+      Status: OK
+      Inputs:
+        29897ff5c2255af356ec3c82a673bc24d035200397cf18eac7f63cab4c3348d2
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0

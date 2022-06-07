@@ -1,0 +1,110 @@
+# Settings
+
+minikube start --container-runtime=docker
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: true
+    containerCollectUsingFiles: false  // kcuf
+  env:
+    - name: DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE
+      value: "false"
+
+---
+
+minikube kubectl -- run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// kcuf=false -> docker launcher
+2022-05-25 15:28:03 UTC | CORE | INFO | (pkg/logs/internal/launchers/docker/launcher.go:136 in run) | Starting Docker launcher
+
+// container-collect-all logs source
+2022-05-25 15:28:05 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0003b0b60 = {
+        Name: "container_collect_all",
+        Config: &LogsConfig{
+                Type: "docker",
+                Image: "",
+                Label: "",
+                Name: "",
+                Identifier: "",
+                Service: "docker",
+                Source: "docker",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc000ded9c0)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// schedule service config (docker)
+2022-05-25 15:29:53 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "docker://9ac3af92af5fea17de3e1f4a8d49c17a1066aff20e1a268d86c9f6b3b18f2681",
+        TaggerEntity: "container_id://9ac3af92af5fea17de3e1f4a8d49c17a1066aff20e1a268d86c9f6b3b18f2681",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 51161e6e15c333b8)
+
+// schedule service config (kubernetes)
+2022-05-25 15:29:53 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://606b56d3-c09c-4042-947a-591e899d833d",
+        TaggerEntity: "kubernetes_pod_uid://606b56d3-c09c-4042-947a-591e899d833d",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 322ca1c77e8d0a54)
+
+// docker-launcher begins tailing now
+2022-05-25 15:29:53 UTC | CORE | DEBUG | (pkg/logs/internal/tailers/docker/tailer.go:131 in Start) | Start tailing container: 9ac3af92af5f
+
+# Status
+
+  container_collect_all
+  ---------------------
+    - Type: docker
+      Status: OK
+      Inputs:
+        9ac3af92af5fea17de3e1f4a8d49c17a1066aff20e1a268d86c9f6b3b18f2681
+      BytesRead: 3.146221e+06
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+      Container Info:
+        Container ID: 9ac3af92af5f, Image: bash, Created: 2022-05-25T15:29:49.821451747Z, Tailing from the Docker socket

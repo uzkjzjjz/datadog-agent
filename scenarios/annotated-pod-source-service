@@ -1,0 +1,328 @@
+# Settings
+
+In GKE, using agent 7.36.0
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: false
+
+k run bash --image=bash \
+	--annotations ad.datadoghq.com/bash.logs='[{"source":"dustin", "service":"dustin"}]' \
+	--annotations ad.datadoghq.com/bash.tags='{"dustin":"testing"}' \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+// schedule service config (containerd)
+2022-05-18 17:59:22 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+        TaggerEntity: "container_id://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 6348bcd9bd351216)
+
+// add logs service
+2022-05-18 17:59:22 UTC | CORE | INFO | (pkg/logs/service/services.go:33 in AddService) | add &service.Service{Type:"containerd", Identifier:"cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f"}
+
+// schedule service config (kubernetes)
+2022-05-18 17:59:22 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte(""),
+        ADIdentifiers: []string(nil),
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "kubernetes_pod://b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0",
+        TaggerEntity: "kubernetes_pod_uid://b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: ,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest b258b53689b404c4)
+
+// (no logs service because TaggerEntity does not start with `container_id`)
+
+// kubernetes launcher reacts to logs service, parses pod annotations, creates source
+2022-05-18 17:59:22 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc0004d0230 = {
+        Name: "default/bash/bash",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash/*.log",
+                Identifier: "cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "kubernetes",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc000fa6390)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+// (tags will be fetched by file tailer (!) from tagger using Config.Identifier)
+
+// schedule resolved config
+2022-05-18 17:59:31 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest a5e15e57681cf78)
+
+// logs scheduler adds a "containerd" source, but no launcher responds to it
+2022-05-18 17:59:31 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc00097bea0 = {
+        Name: "containerd",
+        Config: &LogsConfig{
+                Type: "containerd",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc0012bb380)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  default/bash/bash
+  -----------------
+    - Type: file
+      Identifier: cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f
+      Path: /var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash/*.log
+      Status: OK
+        1 files tailed out of 1 files matching
+      Inputs:
+        /var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash/0.log
+      BytesRead: 2687
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+  containerd
+  ----------
+    - Type: containerd
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+# Stream-Logs
+
+Integration Name: default/bash/bash | Type: file | Status: info | Timestamp: 2022-05-18 18:00:22.982753872 +0000 UTC | Hostname: gke-dustin-mitchell-qa-default-pool-a1fa5582-brct.c.datadog-sandbox.internal | Service: dustin | Source: dustin | Tags: filename:0.log,dirname:/var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash,kube_container_name:bash,short_image:bash,image_id:docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5,kube_namespace:default,pod_phase:running,image_tag:latest,dustin:testing,kube_qos:BestEffort,image_name:bash,pod_name:bash,container_id:cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,display_container_name:bash_bash,container_name:bash | Message: Wed May 18 18:00:21 UTC 2022
+
+# Update Annotations
+
+k edit pod bash
+
+metadata:
+  annotations:
+    ad.datadoghq.com/bash.logs: '[{"source":"UPDATED", "service":"UPDATED"}]'
+    ad.datadoghq.com/bash.tags: '{"dustin":"UPDATED"}'
+
+# Results
+
+// unschedule the template config (AC-1774)
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/autodiscovery/config_poller.go:100 in poll) | kubernetes provider: collected 1 new configurations, removed 1
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:110 in Unschedule) | unscheduling integration.Config = {
+        Name: "",
+        Instances: nil,
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "",
+        ServiceID: "",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 9ba55f772020c4c0)
+
+// unschedule the resolved config
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:110 in Unschedule) | unscheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"dustin\",\"source\":\"dustin\"}]"),
+        ADIdentifiers: []string{"containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest a5e15e57681cf78)
+
+// remove log source for resolved config (no effect)
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/logs/config/sources.go:62 in RemoveSource) | removing &LogsSource @ 0xc00097bea0 = {
+        Name: "containerd",
+        Config: &LogsConfig{
+                Type: "containerd",
+                Service: "dustin",
+                Source: "dustin",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc0012bb380)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+// schedule new resolved config
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/logs/schedulers/ad/scheduler.go:63 in Schedule) | scheduling integration.Config = {
+        Name: "",
+        Instances: {
+        }
+        InitConfig: nil,
+        MetricConfig: nil,
+        LogsConfig: []byte("[{\"service\":\"UPDATED\",\"source\":\"UPDATED\"}]"),
+        ADIdentifiers: []string{"containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f"},
+        AdvancedADIdentifiers: []integration.AdvancedADIdentifier(nil),
+        Provider: "kubernetes",
+        ServiceID: "containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f",
+        TaggerEntity: "",
+        ClusterCheck: false,
+        NodeName: "",
+        Source: kubelet:containerd://cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,
+        IgnoreAutodiscoveryTags: false,
+        MetricsExcluded: false,
+        LogsExcluded: false,
+} (digest 9bc26aa9e1b7645c)
+
+// add a logs source for the new resolved config
+2022-05-18 18:06:11 UTC | CORE | INFO | (pkg/logs/config/sources.go:42 in AddSource) | adding &LogsSource @ 0xc00072b2d0 = {
+        Name: "containerd",
+        Config: &LogsConfig{
+                Type: "containerd",
+                Service: "UPDATED",
+                Source: "UPDATED",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ProcessingRules: []*config.ProcessingRule(nil),
+                AutoMultiLine: nil,
+                AutoMultiLineSampleSize: 0,
+                AutoMultiLineMatchThreshold: 0.000000,
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31bdbc0), lock:(*sync.Mutex)(0xc001fd1f58)},
+        BytesRead: {0},
+        hiddenFromStatus: false,
+}
+
+# Status
+
+  containerd
+  ----------
+    - Type: containerd
+      Status: Pending
+      BytesRead: 0
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+  default/bash/bash
+  -----------------
+    - Type: file
+      Identifier: cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f
+      Path: /var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash/*.log
+      Status: OK
+        1 files tailed out of 1 files matching
+      Inputs:
+        /var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash/0.log
+      BytesRead: 32993
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 0
+      24h Peak Latency (ms): 0
+
+# Stream-Logs
+
+// service/source _not_ updated; tags updated
+Integration Name: default/bash/bash | Type: file | Status: info | Timestamp: 2022-05-18 18:06:45.265217815 +0000 UTC | Hostname: gke-dustin-mitchell-qa-default-pool-a1fa5582-brct.c.datadog-sandbox.internal | Service: dustin | Source: dustin | Tags: filename:0.log,dirname:/var/log/pods/default_bash_b6618ceb-cb2d-4cad-8ce3-4969ba90c9c0/bash,kube_qos:BestEffort,image_name:bash,short_image:bash,image_tag:latest,kube_namespace:default,pod_phase:running,kube_container_name:bash,image_id:docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5,dustin:UPDATED,pod_name:bash,container_id:cfa1ad4a630c7df8beb41717051426ee14d0bda70aa7c0ecd3771c55a68efb8f,display_container_name:bash_bash,container_name:bash | Message: Wed May 18 18:06:44 UTC 2022
+
+# Analysis
+
+* AC-1772 for the mystery config

@@ -1,0 +1,89 @@
+# Settings
+
+datadog-values.yaml:
+  logs:
+    enabled: true
+    containerCollectAll: true
+  env:
+    - name: DD_LOGS_CONFIG_CCA_IN_AD
+      value: "false"
+
+and in the pod by default:
+
+    - name: DD_LOGS_CONFIG_K8S_CONTAINER_USE_FILE
+      value: "true"
+
+---
+
+k run bash --image=bash \
+	--command -- bash -c 'while true; do date; sleep 1; done'
+
+# Results
+
+2022-05-06 18:11:56 UTC | CORE | INFO | (pkg/logs/internal/launchers/kubernetes/launcher.go:98 in run) | Starting Kubernetes launcher
+
+// service config for container
+integration.Config = {
+        Name: "",
+        LogsConfig: "",
+        ADIdentifiers: []string(nil),
+        Provider: ,
+        ServiceID: containerd://c29bdc51fca1aa7ffa95dea6cea9080a8f9a4f045ed0fc9aec0b95ba4e378518,
+        Source: ,
+}
+
+2022-05-06 18:14:36 UTC | CORE | DEBUG | (pkg/logs/internal/launchers/kubernetes/launcher.go:306 in getPath) | Using the latest kubernetes logs path for container bash
+
+&LogsSource @ 0xc00022bdc0 = {
+        Name: "default/bash/bash",
+        Config: &LogsConfig{
+                Type: "file",
+                Path: "/var/log/pods/default_bash_684d69e9-5217-48e2-a475-288d6b21b742/bash/*.log",
+                Encoding: "",
+                ExcludePaths: []string(nil),
+                TailingMode: "",
+                Service: "bash",
+                Source: "bash",
+                SourceCategory: "",
+                Tags: []string(nil),
+                ...
+        },
+        Status: &LogStatus{status: isPending, err: ""},
+        inputs: map[string]bool{},
+        Messages: []string{},
+        sourceType: "kubernetes",
+        info: map[string]config.InfoProvider{},
+        parentSource: 0x0,
+        LatencyStats: &util.StatsTracker{allTimeAvg:0, allTimePeak:0, totalPoints:0, timeFrame:86400000000000, bucketFrame:3600000000000, avgPointsHead:(*util.taggedPoint)(nil), peakPointsHead:(*util.taggedPoint)(nil), aggregatedAvgPoints:[]*util.taggedPoint{}, aggregatedPeakPoints:[]*util.taggedPoint{}, timeProvider:(util.timeProvider)(0x31ea840), lock:(*sync.Mutex)(0xc000efdec0)},
+        BytesRead: 0,
+        hiddenFromStatus: false,
+}
+
+// service config for pod
+integration.Config = {
+        Name: "",
+        LogsConfig: "",
+        ADIdentifiers: []string(nil),
+        Provider: ,
+        ServiceID: kubernetes_pod://684d69e9-5217-48e2-a475-288d6b21b742,
+        Source: ,
+}
+
+# status
+
+  default/bash/bash
+  -----------------
+    - Type: file
+      Identifier: c29bdc51fca1aa7ffa95dea6cea9080a8f9a4f045ed0fc9aec0b95ba4e378518
+      Path: /var/log/pods/default_bash_684d69e9-5217-48e2-a475-288d6b21b742/bash/*.log
+      Status: OK
+        1 files tailed out of 1 files matching
+      Inputs:
+        /var/log/pods/default_bash_684d69e9-5217-48e2-a475-288d6b21b742/bash/0.log
+      BytesRead: 12680
+      Average Latency (ms): 0
+      24h Average Latency (ms): 0
+      Peak Latency (ms): 2
+      24h Peak Latency (ms): 2
+
+// kubernetes launcher doesn't use cca source
