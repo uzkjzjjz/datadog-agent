@@ -132,6 +132,8 @@ variables:
   ## comment out the line below to disable integration wheels cache
   INTEGRATION_WHEELS_CACHE_BUCKET: dd-agent-omnibus
   GENERAL_ARTIFACTS_CACHE_BUCKET_URL: https://dd-agent-omnibus.s3.amazonaws.com
+  LINUX_BASEIMAGE_REGISTRY: registry.ddbuild.io/
+  WINDOWS_BASEIMAGE_REGISTRY: registry.ddbuild.io/
   S3_DSD6_URI: s3://dsd6-staging
   RELEASE_VERSION_6: nightly
   RELEASE_VERSION_7: nightly-a7
