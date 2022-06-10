@@ -12,6 +12,7 @@ const (
 	connectionID     = "connection_id"
 	endpoint         = "endpoint"
 	eventType        = "event_type"
+	eventSourceArn   = "event_source_arn"
 	httpURL          = "http.url"
 	httpMethod       = "http.method"
 	httpProtocol     = "http.protocol"
@@ -20,16 +21,17 @@ const (
 	messageDirection = "message_direction"
 	messageID        = "message_id"
 	operationName    = "operation_name"
+	queueName        = "queuename"
+	receiptHandle    = "receipt_handle"
 	requestID        = "request_id"
 	resourceNames    = "resource_names"
+	senderID         = "sender_id"
+	sentTimestamp    = "SentTimestamp"
 	stage            = "stage"
 	subject          = "subject"
 	topicName        = "topicname"
 	topicARN         = "topic_arn"
 	metadataType     = "type"
-
-	// Below are used for parsing and setting the event sources
-	sns = "sns"
 
 	// invocationType is used to look for the invocation type
 	// in the payload headers
