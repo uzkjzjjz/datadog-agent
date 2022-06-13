@@ -68,6 +68,7 @@ func (s *StartInvocation) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		StartTime:             startTime,
 		InvokeEventRawPayload: string(reqBody),
 		InvokeEventHeaders:    lambdaInvokeContext,
+		InvokedFunctionARN:    s.daemon.ExecutionContext.GetCurrentState().ARN,
 	}
 
 	s.daemon.InvocationProcessor.OnInvokeStart(startDetails)
@@ -101,10 +102,8 @@ func (e *EndInvocation) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		EndTime:            endTime,
 		IsError:            r.Header.Get(invocationlifecycle.InvocationErrorHeader) == "true",
 		RequestID:          ecs.LastRequestID,
-		ResponseRawPayload: responseBody,
+		ResponseRawPayload: string(responseBody),
 	}
-	log.Debug(responseBody)
-	log.Debug("Header: %+v", r.Header)
 	executionContext := e.daemon.InvocationProcessor.GetExecutionInfo()
 	if executionContext.TraceID == 0 {
 		log.Debug("no context has been found yet, injecting it now via headers from the tracer")
