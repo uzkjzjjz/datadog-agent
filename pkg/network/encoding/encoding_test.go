@@ -143,12 +143,7 @@ func TestSerialization(t *testing.T) {
 				{
 					Source: util.AddressFromString("10.1.1.1"),
 					Dest:   util.AddressFromString("10.2.2.2"),
-					Monotonic: network.StatCounters{
-						SentBytes:   1,
-						RecvBytes:   100,
-						Retransmits: 201,
-					},
-					Last: network.StatCounters{
+					StatCounters: network.StatCounters{
 						SentBytes:      2,
 						RecvBytes:      101,
 						TCPEstablished: 1,
