@@ -160,18 +160,6 @@ func NewState(clientExpiry time.Duration, maxClosedConns, maxClientStats int, ma
 	}
 }
 
-func (ns *networkState) getClients() []string {
-	ns.Lock()
-	defer ns.Unlock()
-	clients := make([]string, 0, len(ns.clients))
-
-	for id := range ns.clients {
-		clients = append(clients, id)
-	}
-
-	return clients
-}
-
 // GetTelemetryDelta returns the telemetry delta for a given client.
 // As for now, this only keeps track of monotonic telemetry, as the
 // other ones are already relative to the last time they were fetched.
