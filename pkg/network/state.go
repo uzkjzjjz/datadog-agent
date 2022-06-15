@@ -502,49 +502,45 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 // This is used to update the stats when we process a closed connection that became active again
 // in this case we want the stats to reflect the new active connections in order to avoid resets
 func (ns *networkState) updateConnWithStatWithActiveConn(client *client, key string, active *ConnectionStats, closed *ConnectionStats) {
-	if st, ok := client.stats[key]; ok {
-		// Check for underflows
-		ns.handleStatsUnderflow(key, st, closed)
-
-		closed.Last.SentBytes = closed.Monotonic.SentBytes - st.SentBytes
-		closed.Last.RecvBytes = closed.Monotonic.RecvBytes - st.RecvBytes
-		closed.Last.SentPackets = closed.Monotonic.SentPackets - st.SentPackets
-		closed.Last.RecvPackets = closed.Monotonic.RecvPackets - st.RecvPackets
-
-		closed.Last.Retransmits = closed.Monotonic.Retransmits - st.Retransmits
-		closed.Last.TCPEstablished = closed.Monotonic.TCPEstablished - st.TCPEstablished
-		closed.Last.TCPClosed = closed.Monotonic.TCPClosed - st.TCPClosed
-
-		// We also update the counters to reflect only the active connection
-		// The monotonic counters will be the sum of all connections that cross our interval start + finish.
-		*st = active.Monotonic
-	} else {
-		closed.Last = closed.Monotonic
+	st, ok := client.stats[key]
+	if !ok {
+		return
 	}
+
+	// Check for underflows
+	ns.handleStatsUnderflow(key, st, closed)
+	ns.calculateDelta(&closed.StatCounters, st)
+	// We also update the counters to reflect only the active connection
+	// The monotonic counters will be the sum of all connections that cross our interval start + finish.
+	*st = active.StatCounters
 }
 
 func (ns *networkState) updateConnWithStats(client *client, key string, c *ConnectionStats) {
-	if st, ok := client.stats[key]; ok {
-		// Check for underflows
-		ns.handleStatsUnderflow(key, st, c)
-
-		c.Last.SentBytes = c.Monotonic.SentBytes - st.SentBytes
-		c.Last.RecvBytes = c.Monotonic.RecvBytes - st.RecvBytes
-		c.Last.SentPackets = c.Monotonic.SentPackets - st.SentPackets
-		c.Last.RecvPackets = c.Monotonic.RecvPackets - st.RecvPackets
-		c.Last.Retransmits = c.Monotonic.Retransmits - st.Retransmits
-		c.Last.TCPEstablished = c.Monotonic.TCPEstablished - st.TCPEstablished
-		c.Last.TCPClosed = c.Monotonic.TCPClosed - st.TCPClosed
-
-		*st = c.Monotonic
-	} else {
-		c.Last = c.Monotonic
+	st, ok := client.stats[key]
+	if !ok {
+		return
 	}
+
+	// Check for underflows
+	ns.handleStatsUnderflow(key, st, c)
+	newState := c.StatCounters
+	ns.calculateDelta(&c.StatCounters, st)
+	*st = newState
+}
+
+func (ns *networkState) calculateDelta(current, prev *StatCounters) {
+	current.SentBytes -= prev.SentBytes
+	current.RecvBytes -= prev.RecvBytes
+	current.SentPackets -= prev.SentPackets
+	current.RecvPackets -= prev.RecvPackets
+	current.Retransmits -= prev.Retransmits
+	current.TCPEstablished -= prev.TCPEstablished
+	current.TCPClosed -= prev.TCPClosed
 }
 
 // handleStatsUnderflow checks if we are going to have an underflow when computing last stats and if it's the case it resets the stats to avoid it
 func (ns *networkState) handleStatsUnderflow(key string, st *StatCounters, c *ConnectionStats) {
-	if c.Monotonic.SentBytes < st.SentBytes || c.Monotonic.RecvBytes < st.RecvBytes || c.Monotonic.Retransmits < st.Retransmits {
+	if c.SentBytes < st.SentBytes || c.RecvBytes < st.RecvBytes || c.Retransmits < st.Retransmits {
 		ns.telemetry.statsResets++
 		log.Debugf("Stats reset triggered for key:%s, stats:%+v, connection:%+v", BeautifyKey(key), *st, *c)
 		st.SentBytes = 0
@@ -726,13 +722,13 @@ func (ns *networkState) determineConnectionIntraHost(connections []ConnectionSta
 }
 
 func addConnections(a, b *ConnectionStats) {
-	a.Monotonic.SentBytes += b.Monotonic.SentBytes
-	a.Monotonic.RecvBytes += b.Monotonic.RecvBytes
-	a.Monotonic.SentPackets += b.Monotonic.SentPackets
-	a.Monotonic.RecvPackets += b.Monotonic.RecvPackets
-	a.Monotonic.Retransmits += b.Monotonic.Retransmits
-	a.Monotonic.TCPEstablished += b.Monotonic.TCPEstablished
-	a.Monotonic.TCPClosed += b.Monotonic.TCPClosed
+	a.SentBytes += b.SentBytes
+	a.RecvBytes += b.RecvBytes
+	a.SentPackets += b.SentPackets
+	a.RecvPackets += b.RecvPackets
+	a.Retransmits += b.Retransmits
+	a.TCPEstablished += b.TCPEstablished
+	a.TCPClosed += b.TCPClosed
 
 	if b.LastUpdateEpoch > a.LastUpdateEpoch {
 		a.LastUpdateEpoch = b.LastUpdateEpoch

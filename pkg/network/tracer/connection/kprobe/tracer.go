@@ -420,9 +420,9 @@ func updateTCPStats(conn *network.ConnectionStats, tcpStats *netebpf.TCPStats) {
 	if conn.Type != network.TCP {
 		return
 	}
-	conn.Monotonic.Retransmits = tcpStats.Retransmits
-	conn.Monotonic.TCPEstablished = uint32(tcpStats.State_transitions >> netebpf.Established & 1)
-	conn.Monotonic.TCPClosed = uint32(tcpStats.State_transitions >> netebpf.Close & 1)
+	conn.Retransmits = tcpStats.Retransmits
+	conn.TCPEstablished = uint32(tcpStats.State_transitions >> netebpf.Established & 1)
+	conn.TCPClosed = uint32(tcpStats.State_transitions >> netebpf.Close & 1)
 	conn.RTT = tcpStats.Rtt
 	conn.RTTVar = tcpStats.Rtt_var
 }
@@ -462,7 +462,7 @@ func populateConnStats(stats *network.ConnectionStats, t *netebpf.ConnTuple, s *
 		SPort:            t.Sport,
 		DPort:            t.Dport,
 		SPortIsEphemeral: network.IsPortInEphemeralRange(t.Sport),
-		Monotonic: network.StatCounters{
+		StatCounters: network.StatCounters{
 			SentBytes:   s.Sent_bytes,
 			RecvBytes:   s.Recv_bytes,
 			SentPackets: s.Sent_packets,

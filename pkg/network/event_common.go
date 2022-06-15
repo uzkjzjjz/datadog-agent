@@ -9,12 +9,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/dns"
 	"github.com/DataDog/datadog-agent/pkg/network/http"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
-	"github.com/dustin/go-humanize"
 )
 
 // ConnectionType will be either TCP or UDP
@@ -203,14 +201,13 @@ type StatCounters struct {
 
 // ConnectionStats stores statistics for a single connection.  Field order in the struct should be 8-byte aligned
 type ConnectionStats struct {
+	StatCounters
+
 	Source util.Address
 	Dest   util.Address
 
 	IPTranslation *IPTranslation
 	Via           *Via
-
-	Monotonic StatCounters
-	Last      StatCounters
 
 	// Last time the stats for this connection were updated
 	LastUpdateEpoch uint64
@@ -286,7 +283,7 @@ func (c ConnectionStats) ByteKey(buf []byte) ([]byte, error) {
 // IsShortLived returns true when a connection went through its whole lifecycle
 // between two connection checks
 func (c ConnectionStats) IsShortLived() bool {
-	return c.Last.TCPEstablished >= 1 && c.Last.TCPClosed >= 1
+	return c.TCPEstablished >= 1 && c.TCPClosed >= 1
 }
 
 const keyFmt = "p:%d|src:%s:%d|dst:%s:%d|f:%d|t:%d"
@@ -345,21 +342,6 @@ func ConnectionSummary(c *ConnectionStats, names map[util.Address][]dns.Hostname
 			c.IPTranslation.ReplSrcPort,
 			c.IPTranslation.ReplDstIP,
 			c.IPTranslation.ReplDstPort,
-		)
-	}
-
-	str += fmt.Sprintf("(%s) %s sent (+%s), %s received (+%s)",
-		c.Direction,
-		humanize.Bytes(c.Monotonic.SentBytes), humanize.Bytes(c.Last.SentBytes),
-		humanize.Bytes(c.Monotonic.RecvBytes), humanize.Bytes(c.Last.RecvBytes),
-	)
-
-	if c.Type == TCP {
-		str += fmt.Sprintf(
-			", %d retransmits (+%d), RTT %s (± %s)",
-			c.Monotonic.Retransmits, c.Last.Retransmits,
-			time.Duration(c.RTT)*time.Microsecond,
-			time.Duration(c.RTTVar)*time.Microsecond,
 		)
 	}
 

@@ -26,7 +26,7 @@ var (
 		Dest:   util.AddressFromString("192.168.0.103"),
 		SPort:  123,
 		DPort:  35000,
-		Monotonic: StatCounters{
+		StatCounters: StatCounters{
 			SentBytes: 123123,
 			RecvBytes: 312312,
 		},
