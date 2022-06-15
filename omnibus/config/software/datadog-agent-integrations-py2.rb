@@ -230,6 +230,7 @@ build do
     if windows?
       command "#{python} -m pip install --no-deps --require-hashes -r #{windows_safe_path(install_dir)}\\#{agent_requirements_file}", :env => win_build_env
     else
+      command "#{pip} debug --verbose && false", :env => nix_build_env
       command "#{pip} install --no-deps --require-hashes -r #{install_dir}/#{agent_requirements_file}", :env => nix_build_env
     end
 
