@@ -1,0 +1,17 @@
+New tailers:
+ - for docker, pass the source and service to the tailer, rather than updating
+   the LogSource.Config property
+ - socket tailer (all tailers?) should provide a method to determine if the
+   tailer appears in the registry
+
+QA for the container launcher should include (all with `logs_agent.cca_in_ad` set to true):
+ - docker daemon killed during logging
+ - docker daemon stopped during logging, later restarted
+ - docker_container_use_file but /var/lib/docker/containers not accessible -> fall back to socket
+ - CCA + unlabeled container -> source/service based on image name
+ - container with source+service set --> results in stream-logs
+ - container with only service set --> results in stream-logs with default from image name
+ - container with only source set --> results in stream-logs with default from image name
+ - container with `[{}]` --> default source and service from image name
+ - container with 'service:foo' standard tag --> service=foo, default source
+ - pod with annotation including `{"type":"docker"}` -- should work for docker-based k8s, should be no worse than existing behavior for non-docker-based k8s
