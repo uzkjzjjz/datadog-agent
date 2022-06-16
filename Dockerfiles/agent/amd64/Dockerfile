@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS baseimage
+FROM ubuntu:21.10 AS baseimage
 ARG CIBUILD
 # NOTE about APT mirrorlists:
 # It seems that this feature could use some improvement. If you just get mirrorlist
