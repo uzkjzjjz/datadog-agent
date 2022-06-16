@@ -698,8 +698,45 @@ def build_security_ebpf_files(ctx, build_dir, parallel_build=True):
     build_security_offset_guesser_ebpf_files(ctx, build_dir)
 
 
+def setup_clang(ctx):
+    # get clangs target version
+    res = ctx.run("printenv CLANG_VERSION")
+    target = res.stdout.strip()
+
+    # check if correct version is running
+    res = ctx.run("clang --version", warn=True)
+    if res.ok:
+        version_str = res.stdout.split("\n")[0].split(" ")[2].strip()
+        if version_str == target:
+            return
+
+    if platform.machine() != "amd64":
+        arch = arch_mapping.get(platform.machine())
+    else:
+        arch = arch_mapping.get(platform.machine())
+
+
+    # setup correct version
+    clang_url = f"https://dd-agent-omnibus.s3.amazonaws.com/llvm/clang-{target}.{arch}"
+    ctx.run(f"sudo wget -q {clang_url} -O /opt/clang-{target}")
+    ctx.run(f"sudo chmod 0755 /opt/clang-{target}")
+
+    llc_url = f"https://dd-agent-omnibus.s3.amazonaws.com/llvm/llc-{target}.{arch}"
+    ctx.run(f"sudo wget -q {llc_url} -O /opt/llc-{target}")
+    ctx.run(f"sudo chmod 0755 /opt/llc-{target}")
+
+    # make symlinks
+    ctx.run("sudo rm /usr/bin/llc", warn=True)
+    ctx.run(f"sudo ln -s /opt/llc-{target} /usr/bin/llc")
+
+    ctx.run("sudo rm /usr/bin/clang", warn=True)
+    ctx.run(f"sudo ln -s /opt/clang-{target} /usr/bin/clang")
+
+import os
 def build_object_files(ctx, parallel_build):
     """build_object_files builds only the eBPF object"""
+
+    setup_clang(ctx)
 
     # if clang is missing, subsequent calls to ctx.run("clang ...") will fail silently
     print("checking for clang executable...")
