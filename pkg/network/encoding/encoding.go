@@ -65,6 +65,11 @@ func modelConnections(conns *network.Connections) *model.Connections {
 		}
 	})
 
+	// REMOVE: truncate connections payload to find how much headroom we have for optimizations
+	if len(conns.Conns) > 1 {
+		conns.Conns = conns.Conns[:1]
+	}
+
 	agentConns := make([]*model.Connection, len(conns.Conns))
 	routeIndex := make(map[string]RouteIdx)
 	httpEncoder := newHTTPEncoder(conns)
