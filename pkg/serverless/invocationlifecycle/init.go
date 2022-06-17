@@ -119,6 +119,7 @@ func (lp *LifecycleProcessor) initFromSQSEvent(event events.SQSEvent) {
 	snsEvent.Records[0].SNS = snsEntity
 
 	lp.requestHandler.inferredSpans[1].EnrichInferredSpanWithSNSEvent(snsEvent)
+	lp.requestHandler.inferredSpans[1].Span.Duration = lp.GetInferredSpan().Span.Start - lp.requestHandler.inferredSpans[1].Span.Start
 
 }
 

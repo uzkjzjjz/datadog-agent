@@ -141,6 +141,7 @@ func (inferredSpan *InferredSpan) EnrichInferredSpanWithSQSEvent(eventPayload ev
 	splitArn := strings.Split(eventRecord.EventSourceARN, ":")
 	parsedQueueName := splitArn[len(splitArn)-1]
 	startTime := calculateStartTime(convertStringTimestamp(eventRecord.Attributes[sentTimestamp]))
+
 	inferredSpan.IsAsync = true
 	inferredSpan.Span.Name = "aws.sqs"
 	inferredSpan.Span.Service = "sqs"
