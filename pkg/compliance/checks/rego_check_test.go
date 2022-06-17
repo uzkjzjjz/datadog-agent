@@ -55,9 +55,6 @@ func (f *regoFixture) run(t *testing.T) {
 
 	cache.Cache.Delete(processCacheKey)
 	processFetcher = func() (processes, error) {
-		for pid, p := range f.processes {
-			p.Pid = pid
-		}
 		return f.processes, nil
 	}
 
@@ -115,10 +112,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				42: {
-					Name:    "proc1",
-					Cmdline: []string{"arg1", "--path=foo"},
-				},
+				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -172,10 +166,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				42: {
-					Name:    "proc1",
-					Cmdline: []string{"arg1", "--path=foo"},
-				},
+				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -220,10 +211,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				42: {
-					Name:    "proc1",
-					Cmdline: []string{"arg1", "--path=foo"},
-				},
+				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -266,10 +254,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				42: {
-					Name:    "proc1",
-					Cmdline: []string{"arg1", "--path=foo"},
-				},
+				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: nil,
 		},
