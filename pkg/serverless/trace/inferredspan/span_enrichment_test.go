@@ -225,6 +225,32 @@ func TestEnrichInferredSpanWithSQSEvent(t *testing.T) {
 	assert.True(t, inferredSpan.IsAsync)
 }
 
+func TestEnrichInferredSpanWithKinesisEvent(t *testing.T) {
+	var kinesisRequest events.KinesisEvent
+	_ = json.Unmarshal(getEventFromFile("kinesis.json"), &kinesisRequest)
+	inferredSpan := mockInferredSpan()
+	inferredSpan.EnrichInferredSpanWithKinesisEvent(kinesisRequest)
+
+	span := inferredSpan.Span
+
+	assert.Equal(t, uint64(7353030974370088224), span.TraceID)
+	assert.Equal(t, uint64(8048964810003407541), span.SpanID)
+	assert.Equal(t, "kinesis", span.Service)
+	assert.Equal(t, "aws.kinesis", span.Name)
+	assert.Equal(t, "stream/kinesisStream", span.Resource)
+	assert.Equal(t, "web", span.Type)
+	assert.Equal(t, "aws.kinesis", span.Meta[operationName])
+	assert.Equal(t, "stream/kinesisStream", span.Meta[resourceNames])
+	assert.Equal(t, "stream/kinesisStream", span.Meta["streamname"])
+	assert.Equal(t, "shardId-000000000002", span.Meta["shardid"])
+	assert.Equal(t, "arn:aws:kinesis:sa-east-1:601427279990:stream/kinesisStream", span.Meta[eventSourceArn])
+	assert.Equal(t, "shardId-000000000002:49624230154685806402418173680709770494154422022871973922", span.Meta["event_id"])
+	assert.Equal(t, "aws:kinesis:record", span.Meta[eventName])
+	assert.Equal(t, "1.0", span.Meta[eventVersion])
+	assert.Equal(t, "partitionkey", span.Meta[partitionKey])
+	assert.True(t, inferredSpan.IsAsync)
+}
+
 func TestFormatISOStartTime(t *testing.T) {
 	isotime := "2022-01-31T14:13:41.637Z"
 	startTime := formatISOStartTime(isotime)

@@ -158,6 +158,35 @@ func (inferredSpan *InferredSpan) EnrichInferredSpanWithSQSEvent(eventPayload ev
 	}
 }
 
+// EnrichInferredSpanWithKinesisEvent uses the parsed event
+// payload to enrich the current inferred span. It applies a
+// specific set of data to the span expected from a Kinesis event.
+func (inferredSpan *InferredSpan) EnrichInferredSpanWithKinesisEvent(eventPayload events.KinesisEvent) {
+	eventRecord := eventPayload.Records[0]
+	eventSourceArn := eventRecord.EventSourceArn
+	splitArn := strings.Split(eventSourceArn, ":")
+	eventID := eventRecord.EventID
+	streamName := splitArn[len(splitArn)-1]
+	shardID := strings.Split(eventID, ":")[0]
+
+	inferredSpan.IsAsync = true
+	inferredSpan.Span.Name = "aws.kinesis"
+	inferredSpan.Span.Service = "kinesis"
+	inferredSpan.Span.Resource = streamName
+	inferredSpan.Span.Type = "web"
+	inferredSpan.Span.Meta = map[string]string{
+		operationName:  "aws.kinesis",
+		resourceNames:  streamName,
+		"streamname":   streamName,
+		shardID:        shardID,
+		eventSourceArn: eventSourceArn,
+		eventID:        eventID,
+		eventName:      eventRecord.EventName,
+		eventVersion:   eventRecord.EventVersion,
+		partitionKey:   eventRecord.Kinesis.PartitionKey,
+	}
+}
+
 // CalculateStartTime converts AWS event timeEpochs to nanoseconds
 func calculateStartTime(epoch int64) int64 {
 	return epoch * 1e6
