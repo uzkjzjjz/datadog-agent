@@ -28,7 +28,7 @@ __attribute__((constructor, visibility("hidden"))) void init(void)
       continue;
     }
 
-    int rc = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOSYS), syscall, 0);
+    int rc = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), syscall, 0);
     if (rc < 0) {
       fprintf(stderr, "seccomp_rule_add failed: %s\n", strerror(-rc));
       goto out;
