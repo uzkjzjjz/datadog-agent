@@ -112,7 +112,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
+				NewCheckedFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -166,7 +166,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
+				NewCheckedFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -211,7 +211,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
+				NewCheckedFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: []*compliance.Report{
 				{
@@ -254,7 +254,7 @@ func TestRegoCheck(t *testing.T) {
 			`,
 			findings: "data.test.findings",
 			processes: processes{
-				NewCSPMFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
+				NewCheckedFakeProcess(42, "proc1", []string{"arg1", "--path=foo"}),
 			},
 			expectReports: nil,
 		},
