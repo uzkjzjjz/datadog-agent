@@ -8,6 +8,7 @@ package integration
 import (
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/twmb/murmur3"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/tmplvar"
@@ -350,6 +352,14 @@ func (c *Data) SetField(key string, value interface{}) error {
 	return nil
 }
 
+var tagReshuffles = telemetry.NewCounterWithOpts(
+	"integration_config",
+	"events",
+	[]string{"check_name"},
+	"TODO",
+	telemetry.Options{NoDoubleUnderscoreSep: true},
+)
+
 // Digest returns an hash value representing the data stored in this configuration.
 // The ClusterCheck field is intentionally left out to keep a stable digest
 // between the cluster-agent and the node-agents
@@ -376,6 +386,11 @@ func (c *Config) Digest() string {
 				tags[i] = fmt.Sprint(tag)
 			}
 			sort.Strings(tags)
+
+			if len(tagsInterface) == len(tags) && !reflect.DeepEqual(tagsInterface, tags) {
+				tagReshuffles.Inc(c.Name)
+			}
+
 			inst["tags"] = tags
 		}
 		out, err := yaml.Marshal(&inst)
