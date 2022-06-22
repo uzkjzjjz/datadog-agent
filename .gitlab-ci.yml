@@ -161,6 +161,8 @@ variables:
   DOCKER_REGISTRY_PWD_SSM_KEY: docker_hub_pwd
   DOCKER_REGISTRY_URL: docker.io
   KITCHEN_INFRASTRUCTURE_FLAKES_RETRY: 2
+  # Clang version
+  CLANG_LLVM_VER: 14.0.5
 
 #
 # Condition mixins for simplification of rules
