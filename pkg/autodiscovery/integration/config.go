@@ -355,7 +355,7 @@ func (c *Data) SetField(key string, value interface{}) error {
 var tagReshuffles = telemetry.NewCounterWithOpts(
 	"integration_config",
 	"events",
-	[]string{"check_name"},
+	[]string{"check_name", "provider"},
 	"TODO",
 	telemetry.Options{NoDoubleUnderscoreSep: true},
 )
@@ -388,7 +388,7 @@ func (c *Config) Digest() string {
 			sort.Strings(tags)
 
 			if !reflect.DeepEqual(tagsInterface, tags) {
-				tagReshuffles.Inc(c.Name)
+				tagReshuffles.Inc(c.Name, c.Provider)
 			}
 
 			inst["tags"] = tags
