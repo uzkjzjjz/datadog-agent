@@ -163,24 +163,22 @@ func (inferredSpan *InferredSpan) EnrichInferredSpanWithSQSEvent(eventPayload ev
 // specific set of data to the span expected from a Kinesis event.
 func (inferredSpan *InferredSpan) EnrichInferredSpanWithKinesisEvent(eventPayload events.KinesisEvent) {
 	eventRecord := eventPayload.Records[0]
-	eventSourceArn := eventRecord.EventSourceArn
-	splitArn := strings.Split(eventSourceArn, ":")
-	eventID := eventRecord.EventID
-	streamName := splitArn[len(splitArn)-1]
-	shardID := strings.Split(eventID, ":")[0]
+	splitArn := strings.Split(eventRecord.EventSourceArn, ":")
+	parsedStreamName := splitArn[len(splitArn)-1]
+	parsedShardID := strings.Split(eventRecord.EventID, ":")[0]
 
 	inferredSpan.IsAsync = true
 	inferredSpan.Span.Name = "aws.kinesis"
 	inferredSpan.Span.Service = "kinesis"
-	inferredSpan.Span.Resource = streamName
+	inferredSpan.Span.Resource = parsedStreamName
 	inferredSpan.Span.Type = "web"
 	inferredSpan.Span.Meta = map[string]string{
 		operationName:  "aws.kinesis",
-		resourceNames:  streamName,
-		"streamname":   streamName,
-		shardID:        shardID,
-		eventSourceArn: eventSourceArn,
-		eventID:        eventID,
+		resourceNames:  parsedStreamName,
+		streamName:     parsedStreamName,
+		shardID:        parsedShardID,
+		eventSourceArn: eventRecord.EventSourceArn,
+		eventID:        eventRecord.EventID,
 		eventName:      eventRecord.EventName,
 		eventVersion:   eventRecord.EventVersion,
 		partitionKey:   eventRecord.Kinesis.PartitionKey,
