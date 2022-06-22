@@ -387,7 +387,7 @@ func (c *Config) Digest() string {
 			}
 			sort.Strings(tags)
 
-			if len(tagsInterface) == len(tags) && !reflect.DeepEqual(tagsInterface, tags) {
+			if !reflect.DeepEqual(tagsInterface, tags) {
 				tagReshuffles.Inc(c.Name)
 			}
 
