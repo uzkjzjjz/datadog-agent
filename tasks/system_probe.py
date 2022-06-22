@@ -440,7 +440,6 @@ def object_files(ctx, parallel_build=True, kernel_release=None):
     """object_files builds the eBPF object files"""
     build_object_files(ctx, parallel_build=parallel_build, kernel_release=kernel_release)
 
-
 def get_ebpf_targets():
     files = glob.glob("pkg/ebpf/c/*.[c,h]")
     files.extend(glob.glob("pkg/network/ebpf/c/*.[c,h]"))
