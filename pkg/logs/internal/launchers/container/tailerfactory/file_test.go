@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
@@ -27,13 +28,15 @@ import (
 func fileTestSetup(t *testing.T) {
 	dockerutilPkg.EnableTestingMode()
 	tmp := t.TempDir()
-	var oldPodLogsBasePath, oldDockerLogsBasePath, oldPodmanLogsBasePath string
+	var oldPodLogsBasePath, oldDockerLogsBasePath, oldDockerLogsBasePathWindows, oldPodmanLogsBasePath string
 	oldPodLogsBasePath, podLogsBasePath = podLogsBasePath, path.Join(tmp, "pods")
 	oldDockerLogsBasePath, dockerLogsBasePath = dockerLogsBasePath, path.Join(tmp, "docker")
+	oldDockerLogsBasePathWindows, dockerLogsBasePathWindows = dockerLogsBasePath, path.Join(tmp, "docker")
 	oldPodmanLogsBasePath, podmanLogsBasePath = podmanLogsBasePath, path.Join(tmp, "containers")
 	t.Cleanup(func() {
 		podLogsBasePath = oldPodLogsBasePath
 		dockerLogsBasePath = oldDockerLogsBasePath
+		dockerLogsBasePathWindows = oldDockerLogsBasePathWindows
 		podmanLogsBasePath = oldPodmanLogsBasePath
 	})
 }
@@ -107,13 +110,16 @@ func TestMakeFileSource_docker_no_file(t *testing.T) {
 	child, err := tf.makeFileSource(source)
 	require.Nil(t, child)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), p) // error is about the path
+
+	// error is about the path - Windows returns a different error than *nix
+	require.True(t, strings.Contains(err.Error(), p) || strings.Contains(err.Error(), "The system cannot find the path specified."))
 }
 
 func TestMakeK8sSource(t *testing.T) {
 	fileTestSetup(t)
 
-	p := filepath.FromSlash(path.Join(podLogsBasePath, "podns_podname_poduuid/cname/*.log"))
+	expectedPath := filepath.FromSlash(path.Join(podLogsBasePath, "podns_podname_poduuid/cname/*.log"))
+	p := filepath.FromSlash(path.Join(podLogsBasePath, "podns_podname_poduuid/cname/abc-json.log"))
 	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o777))
 	require.NoError(t, ioutil.WriteFile(p, []byte("{}"), 0o666))
 
@@ -137,7 +143,7 @@ func TestMakeK8sSource(t *testing.T) {
 	require.Equal(t, "podns/podname/cname", child.Name)
 	require.Equal(t, "file", child.Config.Type)
 	require.Equal(t, "abc", child.Config.Identifier)
-	require.Equal(t, p, child.Config.Path)
+	require.Equal(t, expectedPath, child.Config.Path)
 	require.Equal(t, "src", child.Config.Source)
 	require.Equal(t, "svc", child.Config.Service)
 	require.Equal(t, []string{"tag!"}, child.Config.Tags)
