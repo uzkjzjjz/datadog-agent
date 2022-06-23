@@ -63,7 +63,7 @@ func makeTestPod() *workloadmeta.KubernetesPod {
 func TestMakeFileSource_docker_success(t *testing.T) {
 	fileTestSetup(t)
 
-	p := path.Join(dockerLogsBasePath, "containers/abc/abc-json.log")
+	p := path.Join(dockerLogsBasePath, filepath.FromSlash("containers/abc/abc-json.log"))
 	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o777))
 	require.NoError(t, ioutil.WriteFile(p, []byte("{}"), 0o666))
 
@@ -92,7 +92,7 @@ func TestMakeFileSource_docker_success(t *testing.T) {
 func TestMakeFileSource_docker_no_file(t *testing.T) {
 	fileTestSetup(t)
 
-	p := path.Join(dockerLogsBasePath, "containers/abc/abc-json.log")
+	p := path.Join(dockerLogsBasePath, filepath.FromSlash("containers/abc/abc-json.log"))
 
 	tf := &factory{
 		pipelineProvider: pipeline.NewMockProvider(),
@@ -113,7 +113,7 @@ func TestMakeFileSource_docker_no_file(t *testing.T) {
 func TestMakeK8sSource(t *testing.T) {
 	fileTestSetup(t)
 
-	p := path.Join(podLogsBasePath, "podns_podname_poduuid/cname/*.log")
+	p := path.Join(podLogsBasePath, filepath.FromSlash("podns_podname_poduuid/cname/*.log"))
 	require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o777))
 	require.NoError(t, ioutil.WriteFile(p, []byte("{}"), 0o666))
 
@@ -169,9 +169,9 @@ func TestFindK8sLogPath(t *testing.T) {
 	fileTestSetup(t)
 
 	tests := []struct{ name, pathExists, expectedPattern string }{
-		{"..v1.9", "poduuid/cname_1.log", "poduuid/cname_*.log"},
-		{"v1.10..v1.13", "poduuid/cname/1.log", "poduuid/cname/*.log"},
-		{"v1.14..", "podns_podname_poduuid/cname/1.log", "podns_podname_poduuid/cname/*.log"},
+		{"..v1.9", "poduuid/cname_1.log", filepath.FromSlash("poduuid/cname_*.log")},
+		{"v1.10..v1.13", "poduuid/cname/1.log", filepath.FromSlash("poduuid/cname/*.log")},
+		{"v1.14..", "podns_podname_poduuid/cname/1.log", filepath.FromSlash("podns_podname_poduuid/cname/*.log")},
 	}
 
 	for _, test := range tests {
