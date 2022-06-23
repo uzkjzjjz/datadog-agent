@@ -9,8 +9,8 @@ experimental:
   # marked as experimental but as of today, it's still working.
   notify:
     branches:
-      only:
-        - main
+      # only:
+      #   - main
 
 templates:
   job_template: &job_template
