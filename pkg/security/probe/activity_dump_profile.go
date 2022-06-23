@@ -83,8 +83,8 @@ func (ad *ActivityDump) generateBindRule(sock *SocketNode, activityNode *Process
 		if len(sock.Bind) > 0 {
 			for _, bindNode := range sock.Bind {
 				socketRules = append(socketRules, NewProfileRule(fmt.Sprintf(
-					"bind.addr.family == %s && bind.addr.ip in %s/32 && bind.addr.port == %d",
-					sock.Family, bindNode.IP, bindNode.Port),
+					"bind.addr.family == %s && bind.addr.protocol == %s && bind.addr.ip in %s/32 && bind.addr.port == %d",
+					sock.Family, bindNode.Protocol, bindNode.IP, bindNode.Port),
 					ruleIDPrefix,
 				))
 			}
