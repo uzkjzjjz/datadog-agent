@@ -9,6 +9,7 @@
 // In a nutshell, we read HTTP_BUFFER_SIZE bytes no matter what and then get rid of garbage data.
 // Please note that even though the memset could be removed with no semantic change to the code,
 // it is still necessary to make the eBPF verifier happy.
+/*
 static __always_inline void read_into_buffer(char *buffer, char *data, size_t data_size) {
     size_t read_sz = 0;
     __builtin_memset(buffer, 0, HTTP_BUFFER_SIZE);
@@ -25,8 +26,8 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
 
     return;
 }
+*/
 
-/*
 static __always_inline void read_into_buffer(char *buffer, char *data, size_t data_size) {
     __builtin_memset(buffer, 0, HTTP_BUFFER_SIZE);
     bpf_probe_read(buffer, HTTP_BUFFER_SIZE, data);
@@ -70,6 +71,5 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
     }
 #undef BLOCK_SIZE
 }
-*/
 
 #endif
