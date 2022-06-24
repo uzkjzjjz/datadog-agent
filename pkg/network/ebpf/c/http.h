@@ -42,7 +42,8 @@ static __always_inline int http_responding(http_transaction_t *http) {
 }
 
 static __always_inline void http_enqueue(http_transaction_t *http) {
-    // Retrieve the active batch number for this CPU
+    //Retrieve the active batch number for this CPU
+    u8 pos = 0;
     u32 cpu = bpf_get_smp_processor_id();
     http_batch_state_t *batch_state = bpf_map_lookup_elem(&http_batch_state, &cpu);
     if (batch_state == NULL) {
@@ -77,12 +78,15 @@ static __always_inline void http_enqueue(http_transaction_t *http) {
     //
     // What is unfortunate about this is not only that enqueuing a HTTP transaction is O(HTTP_BATCH_SIZE),
     // but also that we can't really increase the batch/page size at the moment because that blows up the eBPF *program* size
-#pragma unroll
-    for (int i = 0; i < HTTP_BATCH_SIZE; i++) {
-        if (i == batch_state->pos) {
-            __builtin_memcpy(&batch->txs[i], http, sizeof(http_transaction_t));
-        }
-    }
+   //#pragma unroll
+   // for (int i = 0; i < HTTP_BATCH_SIZE; i++) {
+   //     if (i == batch_state->pos) {
+   //         __builtin_memcpy(&batch->txs[i], http, sizeof(http_transaction_t));
+   //     }
+   // }
+
+    pos = batch_state->pos & HTTP_BATCH_SIZE;
+    __builtin_memcpy(&batch->txs[pos], http, sizeof(http_transaction_t));
 
     log_debug("http transaction enqueued: cpu: %d batch_idx: %d pos: %d\n", cpu, batch_state->idx, batch_state->pos);
     batch_state->pos++;
