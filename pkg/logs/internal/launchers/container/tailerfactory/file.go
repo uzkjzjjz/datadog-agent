@@ -31,8 +31,6 @@ import (
 )
 
 var podLogsBasePath = "/var/log/pods"
-var dockerLogsBasePath = "/var/lib/docker"
-var dockerLogsBasePathWindows = "c:\\programdata\\docker\\containers"
 var podmanLogsBasePath = "/var/lib/containers"
 
 // makeFileTailer makes a file-based tailer for the given source, or returns
@@ -141,7 +139,7 @@ func (tf *factory) makeDockerFileSource(source *sources.LogSource) (*sources.Log
 func (tf *factory) findDockerLogPath(containerID string) string {
 	switch runtime.GOOS {
 	case "windows":
-		return filepath.Join(dockerLogsBasePathWindows, containerID, fmt.Sprintf("%s-json.log", containerID))
+		return filepath.Join(dockerLogsBasePath, containerID, fmt.Sprintf("%s-json.log", containerID))
 	default: // linux, darwin
 		// this config flag provides temporary support for podman while it is
 		// still recognized by AD as a "docker" runtime.

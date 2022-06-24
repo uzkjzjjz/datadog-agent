@@ -28,15 +28,13 @@ import (
 func fileTestSetup(t *testing.T) {
 	dockerutilPkg.EnableTestingMode()
 	tmp := t.TempDir()
-	var oldPodLogsBasePath, oldDockerLogsBasePath, oldDockerLogsBasePathWindows, oldPodmanLogsBasePath string
+	var oldPodLogsBasePath, oldDockerLogsBasePath, oldPodmanLogsBasePath string
 	oldPodLogsBasePath, podLogsBasePath = podLogsBasePath, path.Join(tmp, "pods")
 	oldDockerLogsBasePath, dockerLogsBasePath = dockerLogsBasePath, path.Join(tmp, "docker")
-	oldDockerLogsBasePathWindows, dockerLogsBasePathWindows = dockerLogsBasePath, path.Join(tmp, "docker")
 	oldPodmanLogsBasePath, podmanLogsBasePath = podmanLogsBasePath, path.Join(tmp, "containers")
 	t.Cleanup(func() {
 		podLogsBasePath = oldPodLogsBasePath
 		dockerLogsBasePath = oldDockerLogsBasePath
-		dockerLogsBasePathWindows = oldDockerLogsBasePathWindows
 		podmanLogsBasePath = oldPodmanLogsBasePath
 	})
 }
