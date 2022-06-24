@@ -269,7 +269,19 @@ build do
       File.exist?(manifest_file_path) || next
 
       manifest = JSON.parse(File.read(manifest_file_path))
-      manifest['supported_os'].include?(os) || next
+      manifest_v2tags = {
+        "linux" => "Supported OS::Linux",
+        "mac_os" => "Supported OS::macOS",
+        "windows" => "Supported OS::Windows"
+      }
+      # v2 manifest OS tags are in classifier_tags
+      unless manifest['classifier_tags'].nil?
+        manifest['classifier_tags'].include?(manifest_v2tags[os]) || next
+      end
+      # v1 manifest OS tags are in supported_os
+      unless manifest['supported_os'].nil?
+        manifest['supported_os'].include?(os) || next
+      end
 
       File.file?("#{check_dir}/setup.py") || File.file?("#{check_dir}/pyproject.toml") || next
       # Check if it supports Python 3.
