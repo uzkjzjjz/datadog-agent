@@ -8,4 +8,4 @@
 
 package tailerfactory
 
-var dockerLogsBasePathWindows = "c:\\programdata\\docker\\containers"
+var dockerLogsBasePath = "c:\\programdata\\docker\\containers"
