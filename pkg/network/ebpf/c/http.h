@@ -41,6 +41,197 @@ static __always_inline int http_responding(http_transaction_t *http) {
     return (http != NULL && http->response_status_code != 0);
 }
 
+#define __it_bwd(x, op) (x -= sizeof(__u##op))
+#define __it_mob(a, b, op) (*(__u##op *)__it_bwd(a, op)) = (*(__u##op *)__it_bwd(b, op))
+
+static __always_inline void __bpf_memcpy(void *d, const void *s, __u64 len) {
+#if __clang_major__ >= 10
+    d += len;
+    s += len;
+
+    if (len > 1 && len % 2 == 1) {
+        __it_mob(d, s, 8);
+        len -= 1;
+    }
+
+    switch (len) {
+    case 96:
+        __it_mob(d, s, 64);
+    case 88:
+    jmp_88:
+        __it_mob(d, s, 64);
+    case 80:
+    jmp_80:
+        __it_mob(d, s, 64);
+    case 72:
+    jmp_72:
+        __it_mob(d, s, 64);
+    case 64:
+    jmp_64:
+        __it_mob(d, s, 64);
+    case 56:
+    jmp_56:
+        __it_mob(d, s, 64);
+    case 48:
+    jmp_48:
+        __it_mob(d, s, 64);
+    case 40:
+    jmp_40:
+        __it_mob(d, s, 64);
+    case 32:
+    jmp_32:
+        __it_mob(d, s, 64);
+    case 24:
+    jmp_24:
+        __it_mob(d, s, 64);
+    case 16:
+    jmp_16:
+        __it_mob(d, s, 64);
+    case 8:
+    jmp_8:
+        __it_mob(d, s, 64);
+        break;
+
+    case 94:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_88;
+    case 86:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_80;
+    case 78:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_72;
+    case 70:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_64;
+    case 62:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_56;
+    case 54:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_48;
+    case 46:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_40;
+    case 38:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_32;
+    case 30:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_24;
+    case 22:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_16;
+    case 14:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        goto jmp_8;
+    case 6:
+        __it_mob(d, s, 16);
+        __it_mob(d, s, 32);
+        break;
+
+    case 92:
+        __it_mob(d, s, 32);
+        goto jmp_88;
+    case 84:
+        __it_mob(d, s, 32);
+        goto jmp_80;
+    case 76:
+        __it_mob(d, s, 32);
+        goto jmp_72;
+    case 68:
+        __it_mob(d, s, 32);
+        goto jmp_64;
+    case 60:
+        __it_mob(d, s, 32);
+        goto jmp_56;
+    case 52:
+        __it_mob(d, s, 32);
+        goto jmp_48;
+    case 44:
+        __it_mob(d, s, 32);
+        goto jmp_40;
+    case 36:
+        __it_mob(d, s, 32);
+        goto jmp_32;
+    case 28:
+        __it_mob(d, s, 32);
+        goto jmp_24;
+    case 20:
+        __it_mob(d, s, 32);
+        goto jmp_16;
+    case 12:
+        __it_mob(d, s, 32);
+        goto jmp_8;
+    case 4:
+        __it_mob(d, s, 32);
+        break;
+
+    case 90:
+        __it_mob(d, s, 16);
+        goto jmp_88;
+    case 82:
+        __it_mob(d, s, 16);
+        goto jmp_80;
+    case 74:
+        __it_mob(d, s, 16);
+        goto jmp_72;
+    case 66:
+        __it_mob(d, s, 16);
+        goto jmp_64;
+    case 58:
+        __it_mob(d, s, 16);
+        goto jmp_56;
+    case 50:
+        __it_mob(d, s, 16);
+        goto jmp_48;
+    case 42:
+        __it_mob(d, s, 16);
+        goto jmp_40;
+    case 34:
+        __it_mob(d, s, 16);
+        goto jmp_32;
+    case 26:
+        __it_mob(d, s, 16);
+        goto jmp_24;
+    case 18:
+        __it_mob(d, s, 16);
+        goto jmp_16;
+    case 10:
+        __it_mob(d, s, 16);
+        goto jmp_8;
+    case 2:
+        __it_mob(d, s, 16);
+        break;
+
+    case 1:
+        __it_mob(d, s, 8);
+        break;
+
+    default:
+        /* __builtin_memcpy() is crappy slow since it cannot
+																																																																																																												 * 		 * make any assumptions about alignment & underlying
+																																																																																																												 * 		 		 * efficient unaligned access on the target we're
+																																																																																																												 * 		 		 		 * running.
+																																																																																																												 * 		 		 		 		 */
+	return;
+    }
+#else
+    __bpf_memcpy_builtin(d, s, len);
+#endif
+}
+
 static __always_inline void http_enqueue(http_transaction_t *http) {
     //Retrieve the active batch number for this CPU
     u8 pos = 0;
@@ -78,15 +269,15 @@ static __always_inline void http_enqueue(http_transaction_t *http) {
     //
     // What is unfortunate about this is not only that enqueuing a HTTP transaction is O(HTTP_BATCH_SIZE),
     // but also that we can't really increase the batch/page size at the moment because that blows up the eBPF *program* size
-   //#pragma unroll
-   // for (int i = 0; i < HTTP_BATCH_SIZE; i++) {
-   //     if (i == batch_state->pos) {
-   //         __builtin_memcpy(&batch->txs[i], http, sizeof(http_transaction_t));
-   //     }
-   // }
+    //#pragma unroll
+    // for (int i = 0; i < HTTP_BATCH_SIZE; i++) {
+    //     if (i == batch_state->pos) {
+    //         __builtin_memcpy(&batch->txs[i], http, sizeof(http_transaction_t));
+    //     }
+    // }
 
     pos = batch_state->pos & HTTP_BATCH_SIZE;
-    __builtin_memcpy(&batch->txs[pos], http, sizeof(http_transaction_t));
+    __bpf_memcpy(&batch->txs[pos], http, sizeof(http_transaction_t));
 
     log_debug("http transaction enqueued: cpu: %d batch_idx: %d pos: %d\n", cpu, batch_state->idx, batch_state->pos);
     batch_state->pos++;
@@ -113,39 +304,38 @@ static __always_inline void http_begin_request(http_transaction_t *http, http_me
 
 static __always_inline void http_begin_response(http_transaction_t *http, const char *buffer) {
     u16 status_code = 0;
-    status_code += (buffer[HTTP_STATUS_OFFSET+0]-'0') * 100;
-    status_code += (buffer[HTTP_STATUS_OFFSET+1]-'0') * 10;
-    status_code += (buffer[HTTP_STATUS_OFFSET+2]-'0') * 1;
+    status_code += (buffer[HTTP_STATUS_OFFSET + 0] - '0') * 100;
+    status_code += (buffer[HTTP_STATUS_OFFSET + 1] - '0') * 10;
+    status_code += (buffer[HTTP_STATUS_OFFSET + 2] - '0') * 1;
     http->response_status_code = status_code;
 }
 
 static __always_inline void http_parse_data(char const *p, http_packet_t *packet_type, http_method_t *method) {
     if ((p[0] == 'H') && (p[1] == 'T') && (p[2] == 'T') && (p[3] == 'P')) {
         *packet_type = HTTP_RESPONSE;
-    } else if ((p[0] == 'G') && (p[1] == 'E') && (p[2] == 'T') && (p[3]  == ' ') && (p[4] == '/')) {
+    } else if ((p[0] == 'G') && (p[1] == 'E') && (p[2] == 'T') && (p[3] == ' ') && (p[4] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_GET;
-    } else if ((p[0] == 'P') && (p[1] == 'O') && (p[2] == 'S') && (p[3] == 'T') && (p[4]  == ' ') && (p[5] == '/')) {
+    } else if ((p[0] == 'P') && (p[1] == 'O') && (p[2] == 'S') && (p[3] == 'T') && (p[4] == ' ') && (p[5] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_POST;
-    } else if ((p[0] == 'P') && (p[1] == 'U') && (p[2] == 'T') && (p[3]  == ' ') && (p[4] == '/')) {
+    } else if ((p[0] == 'P') && (p[1] == 'U') && (p[2] == 'T') && (p[3] == ' ') && (p[4] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_PUT;
-    } else if ((p[0] == 'D') && (p[1] == 'E') && (p[2] == 'L') && (p[3] == 'E') && (p[4] == 'T') && (p[5] == 'E') && (p[6]  == ' ') && (p[7] == '/')) {
+    } else if ((p[0] == 'D') && (p[1] == 'E') && (p[2] == 'L') && (p[3] == 'E') && (p[4] == 'T') && (p[5] == 'E') && (p[6] == ' ') && (p[7] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_DELETE;
-    } else if ((p[0] == 'H') && (p[1] == 'E') && (p[2] == 'A') && (p[3] == 'D') && (p[4]  == ' ') && (p[5] == '/')) {
+    } else if ((p[0] == 'H') && (p[1] == 'E') && (p[2] == 'A') && (p[3] == 'D') && (p[4] == ' ') && (p[5] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_HEAD;
-    } else if ((p[0] == 'O') && (p[1] == 'P') && (p[2] == 'T') && (p[3] == 'I') && (p[4] == 'O') && (p[5] == 'N') && (p[6] == 'S') && (p[7]  == ' ') && ((p[8] == '/') || (p[8] == '*'))) {
+    } else if ((p[0] == 'O') && (p[1] == 'P') && (p[2] == 'T') && (p[3] == 'I') && (p[4] == 'O') && (p[5] == 'N') && (p[6] == 'S') && (p[7] == ' ') && ((p[8] == '/') || (p[8] == '*'))) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_OPTIONS;
-    } else if ((p[0] == 'P') && (p[1] == 'A') && (p[2] == 'T') && (p[3] == 'C') && (p[4] == 'H') && (p[5]  == ' ') && (p[6] == '/')) {
+    } else if ((p[0] == 'P') && (p[1] == 'A') && (p[2] == 'T') && (p[3] == 'C') && (p[4] == 'H') && (p[5] == ' ') && (p[6] == '/')) {
         *packet_type = HTTP_REQUEST;
         *method = HTTP_PATCH;
     }
 }
-
 
 static __always_inline http_transaction_t *http_fetch_state(http_transaction_t *http, skb_info_t *skb_info, http_packet_t packet_type) {
     if (packet_type == HTTP_PACKET_UNKNOWN) {
@@ -171,10 +361,10 @@ static __always_inline http_transaction_t *http_fetch_state(http_transaction_t *
     return http_ebpf;
 }
 
-static __always_inline http_transaction_t* http_should_flush_previous_state(http_transaction_t *http, http_packet_t packet_type) {
+static __always_inline http_transaction_t *http_should_flush_previous_state(http_transaction_t *http, http_packet_t packet_type) {
     // this can happen in the context of keep-alives
     bool must_flush = (packet_type == HTTP_REQUEST && http->request_started) ||
-        (packet_type == HTTP_RESPONSE && http->response_status_code);
+                      (packet_type == HTTP_RESPONSE && http->response_status_code);
 
     if (!must_flush) {
         return NULL;
@@ -191,7 +381,7 @@ static __always_inline http_transaction_t* http_should_flush_previous_state(http
 }
 
 static __always_inline bool http_closed(http_transaction_t *http, skb_info_t *skb_info, u16 pre_norm_src_port) {
-    return (skb_info && skb_info->tcp_flags&TCPHDR_FIN &&
+    return (skb_info && skb_info->tcp_flags & TCPHDR_FIN &&
             http->owned_by_src_port == pre_norm_src_port);
 }
 
