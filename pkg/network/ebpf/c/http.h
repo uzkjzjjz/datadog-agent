@@ -230,7 +230,6 @@ static __always_inline void __bpf_memcpy(void *d, const void *s, __u64 len) {
 #endif
 }
 
-SEC("debug/http_enqueue")
 static __always_inline void http_enqueue(http_transaction_t *http) {
     //Retrieve the active batch number for this CPU
     u8 pos = 0;
