@@ -2,6 +2,9 @@
 #define __HTTP_BUFFER_H
 
 #include "http-types.h"
+#define LOAD_CONSTANT(param, var) asm("%0 = " param " ll" \
+                                      : "=r"(var))
+
 
 // read_into_buffer copies data from an arbitrary memory address into a (statically sized) HTTP buffer.
 // Ideally we would only copy min(data_size, HTTP_BUFFER_SIZE) bytes, but the code below is the only way
@@ -14,6 +17,9 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
     size_t read_sz = 0;
     __builtin_memset(buffer, 0, HTTP_BUFFER_SIZE);
 
+    int x;
+    LOAD_CONSTANT("read_into_buffer", x);
+
     if (data_size < HTTP_BUFFER_SIZE) {
     }
     if (data_size >= HTTP_BUFFER_SIZE) {
@@ -22,6 +28,7 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
 	    read_sz = data_size % HTTP_BUFFER_SIZE;
     }
     
+
     bpf_probe_read(buffer, read_sz, data);
 
     return;
@@ -34,6 +41,7 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
     if (data_size >= HTTP_BUFFER_SIZE) {
         return;
     }
+/*
 
 #define BLOCK_SIZE (8)
 
@@ -70,6 +78,7 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
         buffer[7] = 0;
     }
 #undef BLOCK_SIZE
+*/
 }
 
 #endif
