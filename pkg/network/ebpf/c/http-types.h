@@ -85,7 +85,7 @@ typedef struct {
 typedef struct {
     __u64 idx;
     __u8 pos;
-    http_transaction_t txs[HTTP_BATCH_SIZE+1];
+    http_transaction_t txs[HTTP_BATCH_SIZE];
 } http_batch_t;
 
 // http_batch_notification_t is flushed to userspace every time we complete a
