@@ -4,7 +4,7 @@
 #include "tracer.h"
 
 // This determines the size of the payload fragment that is captured for each HTTP request
-#define HTTP_BUFFER_SIZE (8 * 20)
+#define HTTP_BUFFER_SIZE (8 * 32)
 // This controls the number of HTTP transactions read from userspace at a time
 #define HTTP_BATCH_SIZE 15
 // The greater this number is the less likely are colisions/data-races between the flushes
@@ -83,9 +83,9 @@ typedef struct {
 } http_batch_state_t;
 
 typedef struct {
+    http_transaction_t txs[HTTP_BATCH_SIZE];
     __u64 idx;
     __u8 pos;
-    http_transaction_t txs[HTTP_BATCH_SIZE];
 } http_batch_t;
 
 // http_batch_notification_t is flushed to userspace every time we complete a
