@@ -8,7 +8,9 @@ package {{.Name}}
 
 import (
 	"net"
+	{{if $Mock}}
 	"reflect"
+	{{end}}
 	"unsafe"
 
 	{{if ne $.SourcePkg $.TargetPkg}}"{{.SourcePkg}}"{{end}}
@@ -24,28 +26,7 @@ var (
 	_ *unsafe.Pointer
 )
 
-func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
-	switch field {
-	{{range $Name, $Field := .Iterators}}
-	case "{{$Name}}":
-		return &{{$Field.ReturnType}}{}, nil
-	{{end}}
-	}
-
-	return nil, &eval.ErrIteratorNotSupported{Field: field}
-}
-
-func (m *Model) GetEventTypes() []eval.EventType {
-	return []eval.EventType{
-		{{range $Name, $Exists := .EventTypes}}
-			{{- if ne $Name "*"}}
-			eval.EventType("{{$Name}}"),
-			{{end -}}
-		{{end}}
-	}
-}
-
-func (m *Model) GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, error) {
+func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, error) {
 	switch field {
 	{{range $Name, $Field := .Fields}}
 	case "{{$Name}}":
@@ -159,6 +140,28 @@ func (m *Model) GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Eval
 	}
 
 	return nil, &eval.ErrFieldNotFound{Field: field}
+}
+
+{{if $Mock}}
+func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
+	switch field {
+	{{range $Name, $Field := .Iterators}}
+	case "{{$Name}}":
+		return &{{$Field.ReturnType}}{}, nil
+	{{end}}
+	}
+
+	return nil, &eval.ErrIteratorNotSupported{Field: field}
+}
+
+func (m *Model) GetEventTypes() []eval.EventType {
+	return []eval.EventType{
+		{{range $Name, $Exists := .EventTypes}}
+			{{- if ne $Name "*"}}
+			eval.EventType("{{$Name}}"),
+			{{end -}}
+		{{end}}
+	}
 }
 
 func (e *Event) GetFields() []eval.Field {
@@ -336,3 +339,4 @@ func (e *Event) SetFieldValue(field eval.Field, value interface{}) error {
 
 		return &eval.ErrFieldNotFound{Field: field}
 }
+{{end}}

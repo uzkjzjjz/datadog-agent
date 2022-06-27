@@ -13,49 +13,7 @@ var (
 	_ *unsafe.Pointer
 )
 
-func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
-	switch field {
-	case "process.ancestors":
-		return &ProcessAncestorsIterator{}, nil
-	case "ptrace.tracee.ancestors":
-		return &ProcessAncestorsIterator{}, nil
-	case "signal.target.ancestors":
-		return &ProcessAncestorsIterator{}, nil
-	}
-	return nil, &eval.ErrIteratorNotSupported{Field: field}
-}
-func (m *Model) GetEventTypes() []eval.EventType {
-	return []eval.EventType{
-		eval.EventType("bind"),
-		eval.EventType("bpf"),
-		eval.EventType("capset"),
-		eval.EventType("chmod"),
-		eval.EventType("chown"),
-		eval.EventType("dns"),
-		eval.EventType("exec"),
-		eval.EventType("exit"),
-		eval.EventType("link"),
-		eval.EventType("load_module"),
-		eval.EventType("mkdir"),
-		eval.EventType("mmap"),
-		eval.EventType("mprotect"),
-		eval.EventType("open"),
-		eval.EventType("ptrace"),
-		eval.EventType("removexattr"),
-		eval.EventType("rename"),
-		eval.EventType("rmdir"),
-		eval.EventType("selinux"),
-		eval.EventType("setgid"),
-		eval.EventType("setuid"),
-		eval.EventType("setxattr"),
-		eval.EventType("signal"),
-		eval.EventType("splice"),
-		eval.EventType("unlink"),
-		eval.EventType("unload_module"),
-		eval.EventType("utimes"),
-	}
-}
-func (m *Model) GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, error) {
+func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, error) {
 	switch field {
 	case "async":
 		return &eval.BoolEvaluator{
@@ -6712,6 +6670,48 @@ func (m *Model) GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Eval
 		}, nil
 	}
 	return nil, &eval.ErrFieldNotFound{Field: field}
+}
+func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
+	switch field {
+	case "process.ancestors":
+		return &ProcessAncestorsIterator{}, nil
+	case "ptrace.tracee.ancestors":
+		return &ProcessAncestorsIterator{}, nil
+	case "signal.target.ancestors":
+		return &ProcessAncestorsIterator{}, nil
+	}
+	return nil, &eval.ErrIteratorNotSupported{Field: field}
+}
+func (m *Model) GetEventTypes() []eval.EventType {
+	return []eval.EventType{
+		eval.EventType("bind"),
+		eval.EventType("bpf"),
+		eval.EventType("capset"),
+		eval.EventType("chmod"),
+		eval.EventType("chown"),
+		eval.EventType("dns"),
+		eval.EventType("exec"),
+		eval.EventType("exit"),
+		eval.EventType("link"),
+		eval.EventType("load_module"),
+		eval.EventType("mkdir"),
+		eval.EventType("mmap"),
+		eval.EventType("mprotect"),
+		eval.EventType("open"),
+		eval.EventType("ptrace"),
+		eval.EventType("removexattr"),
+		eval.EventType("rename"),
+		eval.EventType("rmdir"),
+		eval.EventType("selinux"),
+		eval.EventType("setgid"),
+		eval.EventType("setuid"),
+		eval.EventType("setxattr"),
+		eval.EventType("signal"),
+		eval.EventType("splice"),
+		eval.EventType("unlink"),
+		eval.EventType("unload_module"),
+		eval.EventType("utimes"),
+	}
 }
 func (e *Event) GetFields() []eval.Field {
 	return []eval.Field{

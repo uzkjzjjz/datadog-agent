@@ -33,7 +33,7 @@ type MacroEvaluator struct {
 }
 
 // NewMacro parses an expression and returns a new macro
-func NewMacro(id, expression string, model Model, replCtx ReplacementContext) (*Macro, error) {
+func NewMacro(id, expression string, model Model, opts Opts, replCtx ReplacementContext) (*Macro, error) {
 	macro := &Macro{
 		ID:    id,
 		Store: replCtx.MacroStore,
@@ -43,7 +43,7 @@ func NewMacro(id, expression string, model Model, replCtx ReplacementContext) (*
 		return nil, fmt.Errorf("syntax error: %w", err)
 	}
 
-	if err := macro.GenEvaluator(expression, model, replCtx); err != nil {
+	if err := macro.GenEvaluator(expression, model, opts, replCtx); err != nil {
 		return nil, fmt.Errorf("compilation error: %w", err)
 	}
 
@@ -93,7 +93,7 @@ func (m *Macro) Parse(expression string) error {
 	return nil
 }
 
-func macroToEvaluator(macro *ast.Macro, model Model, replCtx ReplacementContext, field Field) (*MacroEvaluator, error) {
+func macroToEvaluator(macro *ast.Macro, model Model, opts Opts, replCtx ReplacementContext, field Field) (*MacroEvaluator, error) {
 	macros := make(map[MacroID]*MacroEvaluator)
 	for id, macro := range replCtx.Macros {
 		macros[id] = macro.evaluator
@@ -105,11 +105,11 @@ func macroToEvaluator(macro *ast.Macro, model Model, replCtx ReplacementContext,
 
 	switch {
 	case macro.Expression != nil:
-		eval, _, err = nodeToEvaluator(macro.Expression, state)
+		eval, _, err = nodeToEvaluator(macro.Expression, opts, state)
 	case macro.Array != nil:
-		eval, _, err = nodeToEvaluator(macro.Array, state)
+		eval, _, err = nodeToEvaluator(macro.Array, opts, state)
 	case macro.Primary != nil:
-		eval, _, err = nodeToEvaluator(macro.Primary, state)
+		eval, _, err = nodeToEvaluator(macro.Primary, opts, state)
 	}
 
 	if err != nil {
@@ -129,10 +129,10 @@ func macroToEvaluator(macro *ast.Macro, model Model, replCtx ReplacementContext,
 }
 
 // GenEvaluator - Compiles and generates the evalutor
-func (m *Macro) GenEvaluator(expression string, model Model, replCtx ReplacementContext) error {
+func (m *Macro) GenEvaluator(expression string, model Model, opts Opts, replCtx ReplacementContext) error {
 	m.Store = replCtx.MacroStore
 
-	evaluator, err := macroToEvaluator(m.ast, model, replCtx, "")
+	evaluator, err := macroToEvaluator(m.ast, model, opts, replCtx, "")
 	if err != nil {
 		if err, ok := err.(*ErrAstToEval); ok {
 			return errors.Wrap(&ErrRuleParse{pos: err.Pos, expr: expression}, "macro syntax error")

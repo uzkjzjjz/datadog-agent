@@ -30,6 +30,9 @@ const (
 	IteratorWeight       = 2000
 )
 
+// EvaluatorGetter is used during the rule expression compilation to get specific evaluator
+type EvaluatorGetter func(field Field, regID RegisterID) (Evaluator, error)
+
 // BoolEvalFnc describe a eval function return a boolean
 type BoolEvalFnc = func(ctx *Context) bool
 
@@ -70,7 +73,7 @@ type ReplacementContext struct {
 	*MacroStore
 }
 
-func identToEvaluator(obj *ident, state *State) (interface{}, lexer.Position, error) {
+func identToEvaluator(obj *ident, opts Opts, state *State) (interface{}, lexer.Position, error) {
 	if accessor, ok := state.replCtx.Opts.Constants[*obj.Ident]; ok {
 		return accessor, obj.Pos, nil
 	}
@@ -148,7 +151,7 @@ func identToEvaluator(obj *ident, state *State) (interface{}, lexer.Position, er
 		}
 	}
 
-	accessor, err := state.model.GetEvaluator(field, regID)
+	accessor, err := opts.EvaluatorGetter(field, regID)
 	if err != nil {
 		return nil, obj.Pos, err
 	}
@@ -158,7 +161,7 @@ func identToEvaluator(obj *ident, state *State) (interface{}, lexer.Position, er
 	return accessor, obj.Pos, nil
 }
 
-func arrayToEvaluator(array *ast.Array, state *State) (interface{}, lexer.Position, error) {
+func arrayToEvaluator(array *ast.Array, opts Opts, state *State) (interface{}, lexer.Position, error) {
 	if len(array.Numbers) != 0 {
 		var evaluator IntArrayEvaluator
 		evaluator.AppendValues(array.Numbers...)
@@ -175,7 +178,7 @@ func arrayToEvaluator(array *ast.Array, state *State) (interface{}, lexer.Positi
 		}
 
 		// could be an iterator
-		return identToEvaluator(&ident{Pos: array.Pos, Ident: array.Ident}, state)
+		return identToEvaluator(&ident{Pos: array.Pos, Ident: array.Ident}, opts, state)
 	} else if array.Variable != nil {
 		varName, ok := isVariableName(*array.Variable)
 		if !ok {
@@ -385,7 +388,7 @@ func StringArrayMatchesWrapper(a *StringArrayEvaluator, b *StringValuesEvaluator
 	return evaluator, nil
 }
 
-func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position, error) {
+func nodeToEvaluator(obj interface{}, opts Opts, state *State) (interface{}, lexer.Position, error) {
 	var err error
 	var boolEvaluator *BoolEvaluator
 	var pos lexer.Position
@@ -393,9 +396,9 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 
 	switch obj := obj.(type) {
 	case *ast.BooleanExpression:
-		return nodeToEvaluator(obj.Expression, state)
+		return nodeToEvaluator(obj.Expression, opts, state)
 	case *ast.Expression:
-		cmp, pos, err = nodeToEvaluator(obj.Comparison, state)
+		cmp, pos, err = nodeToEvaluator(obj.Comparison, opts, state)
 		if err != nil {
 			return nil, pos, err
 		}
@@ -406,7 +409,7 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 				return nil, obj.Pos, NewTypeError(obj.Pos, reflect.Bool)
 			}
 
-			next, pos, err = nodeToEvaluator(obj.Next, state)
+			next, pos, err = nodeToEvaluator(obj.Next, opts, state)
 			if err != nil {
 				return nil, pos, err
 			}
@@ -434,7 +437,7 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 		}
 		return cmp, obj.Pos, nil
 	case *ast.BitOperation:
-		unary, pos, err = nodeToEvaluator(obj.Unary, state)
+		unary, pos, err = nodeToEvaluator(obj.Unary, opts, state)
 		if err != nil {
 			return nil, pos, err
 		}
@@ -445,7 +448,7 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 				return nil, obj.Pos, NewTypeError(obj.Pos, reflect.Int)
 			}
 
-			next, pos, err = nodeToEvaluator(obj.Next, state)
+			next, pos, err = nodeToEvaluator(obj.Next, opts, state)
 			if err != nil {
 				return nil, pos, err
 			}
@@ -480,13 +483,13 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 		return unary, obj.Pos, nil
 
 	case *ast.Comparison:
-		unary, pos, err = nodeToEvaluator(obj.BitOperation, state)
+		unary, pos, err = nodeToEvaluator(obj.BitOperation, opts, state)
 		if err != nil {
 			return nil, pos, err
 		}
 
 		if obj.ArrayComparison != nil {
-			next, pos, err = nodeToEvaluator(obj.ArrayComparison, state)
+			next, pos, err = nodeToEvaluator(obj.ArrayComparison, opts, state)
 			if err != nil {
 				return nil, pos, err
 			}
@@ -709,7 +712,7 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 				return nil, pos, NewTypeError(pos, reflect.Array)
 			}
 		} else if obj.ScalarComparison != nil {
-			next, pos, err = nodeToEvaluator(obj.ScalarComparison, state)
+			next, pos, err = nodeToEvaluator(obj.ScalarComparison, opts, state)
 			if err != nil {
 				return nil, pos, err
 			}
@@ -1051,14 +1054,14 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 		}
 
 	case *ast.ArrayComparison:
-		return nodeToEvaluator(obj.Array, state)
+		return nodeToEvaluator(obj.Array, opts, state)
 
 	case *ast.ScalarComparison:
-		return nodeToEvaluator(obj.Next, state)
+		return nodeToEvaluator(obj.Next, opts, state)
 
 	case *ast.Unary:
 		if obj.Op != nil {
-			unary, pos, err = nodeToEvaluator(obj.Unary, state)
+			unary, pos, err = nodeToEvaluator(obj.Unary, opts, state)
 			if err != nil {
 				return nil, pos, err
 			}
@@ -1089,11 +1092,11 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 			return nil, pos, NewOpUnknownError(obj.Pos, *obj.Op)
 		}
 
-		return nodeToEvaluator(obj.Primary, state)
+		return nodeToEvaluator(obj.Primary, opts, state)
 	case *ast.Primary:
 		switch {
 		case obj.Ident != nil:
-			return identToEvaluator(&ident{Pos: obj.Pos, Ident: obj.Ident}, state)
+			return identToEvaluator(&ident{Pos: obj.Pos, Ident: obj.Ident}, opts, state)
 		case obj.Number != nil:
 			return &IntEvaluator{
 				Value: *obj.Number,
@@ -1157,12 +1160,12 @@ func nodeToEvaluator(obj interface{}, state *State) (interface{}, lexer.Position
 			}
 			return evaluator, obj.Pos, nil
 		case obj.SubExpression != nil:
-			return nodeToEvaluator(obj.SubExpression, state)
+			return nodeToEvaluator(obj.SubExpression, opts, state)
 		default:
 			return nil, obj.Pos, NewError(obj.Pos, "unknown primary '%s'", reflect.TypeOf(obj))
 		}
 	case *ast.Array:
-		return arrayToEvaluator(obj, state)
+		return arrayToEvaluator(obj, opts, state)
 	}
 
 	return nil, lexer.Position{}, NewError(lexer.Position{}, "unknown entity '%s'", reflect.TypeOf(obj))

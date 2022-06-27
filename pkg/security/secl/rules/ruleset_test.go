@@ -36,7 +36,7 @@ func (f *testHandler) EventDiscarderFound(rs *RuleSet, event eval.Event, field s
 	if !ok {
 		discarders = []interface{}{}
 	}
-	evaluator, _ := f.model.GetEvaluator(field, "")
+	evaluator, _ := getEvaluatorTest(field, "")
 
 	ctx := eval.NewContext(event.GetPointer())
 
@@ -77,7 +77,8 @@ func newRuleSet() *RuleSet {
 
 	var evalOpts eval.Opts
 	evalOpts.
-		WithConstants(testConstants)
+		WithConstants(testConstants).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.
@@ -550,6 +551,8 @@ func TestGetRuleEventType(t *testing.T) {
 		ID:         "aaa",
 		Expression: `open.filename == "test"`,
 	}
+	rule.Opts.WithEvaluatorGetter(getEvaluatorTest)
+
 	if err := rule.GenEvaluator(&testModel{}, emptyReplCtx()); err != nil {
 		t.Fatal(err)
 	}

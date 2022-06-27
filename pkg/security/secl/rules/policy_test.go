@@ -31,7 +31,9 @@ func savePolicy(filename string, testPolicy *PolicyDef) error {
 
 func TestMacroMerge(t *testing.T) {
 	var evalOpts eval.Opts
-	evalOpts.WithConstants(testConstants)
+	evalOpts.
+		WithConstants(testConstants).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.
@@ -109,7 +111,9 @@ func TestMacroMerge(t *testing.T) {
 
 func TestRuleMerge(t *testing.T) {
 	var evalOpts eval.Opts
-	evalOpts.WithConstants(testConstants)
+	evalOpts.
+		WithConstants(testConstants).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.
@@ -221,7 +225,8 @@ func TestActionSetVariable(t *testing.T) {
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithVariables(make(map[string]eval.VariableValue))
+		WithVariables(make(map[string]eval.VariableValue)).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.
@@ -375,7 +380,8 @@ func TestActionSetVariableConflict(t *testing.T) {
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithVariables(make(map[string]eval.VariableValue))
+		WithVariables(make(map[string]eval.VariableValue)).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.
@@ -432,7 +438,8 @@ func loadPolicy(t *testing.T, testPolicy *PolicyDef, agentVersion *semver.Versio
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithVariables(make(map[string]eval.VariableValue))
+		WithVariables(make(map[string]eval.VariableValue)).
+		WithEvaluatorGetter(getEvaluatorTest)
 
 	var opts Opts
 	opts.

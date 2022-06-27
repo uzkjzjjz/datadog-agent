@@ -24,6 +24,7 @@ type Rule struct {
 	Tags           []string
 	ReplacementCtx ReplacementContext
 	Model          Model
+	Opts           Opts
 
 	evaluator *RuleEvaluator
 	ast       *ast.Rule
@@ -132,14 +133,14 @@ func (r *Rule) Parse() error {
 	return nil
 }
 
-func ruleToEvaluator(rule *ast.Rule, model Model, replCtx ReplacementContext) (*RuleEvaluator, error) {
+func ruleToEvaluator(rule *ast.Rule, model Model, opts Opts, replCtx ReplacementContext) (*RuleEvaluator, error) {
 	macros := make(map[MacroID]*MacroEvaluator)
 	for id, macro := range replCtx.Macros {
 		macros[id] = macro.evaluator
 	}
 	state := NewState(model, "", macros, replCtx)
 
-	eval, _, err := nodeToEvaluator(rule.BooleanExpression, state)
+	eval, _, err := nodeToEvaluator(rule.BooleanExpression, opts, state)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +171,10 @@ func ruleToEvaluator(rule *ast.Rule, model Model, replCtx ReplacementContext) (*
 
 // GenEvaluator - Compile and generates the RuleEvaluator
 func (r *Rule) GenEvaluator(model Model, replCtx ReplacementContext) error {
+	if r.Opts.EvaluatorGetter == nil {
+		return errors.New("an EvaluatorGetter is required")
+	}
+
 	r.Model = model
 	r.ReplacementCtx = replCtx
 
@@ -179,7 +184,7 @@ func (r *Rule) GenEvaluator(model Model, replCtx ReplacementContext) error {
 		}
 	}
 
-	evaluator, err := ruleToEvaluator(r.ast, model, replCtx)
+	evaluator, err := ruleToEvaluator(r.ast, model, r.Opts, replCtx)
 	if err != nil {
 		if err, ok := err.(*ErrAstToEval); ok {
 			return errors.Wrapf(&ErrRuleParse{pos: err.Pos, expr: r.Expression}, "rule syntax error: %s", err)
@@ -200,7 +205,7 @@ func (r *Rule) genMacroPartials() (map[Field]map[MacroID]*MacroEvaluator, error)
 			if macro.ast != nil {
 				// NOTE(safchain) this is not working with nested macro. It will be removed once partial
 				// will be generated another way
-				evaluator, err = macroToEvaluator(macro.ast, r.Model, r.ReplacementCtx, field)
+				evaluator, err = macroToEvaluator(macro.ast, r.Model, r.Opts, r.ReplacementCtx, field)
 				if err != nil {
 					if err, ok := err.(*ErrAstToEval); ok {
 						return nil, fmt.Errorf("macro syntax error: %w", &ErrRuleParse{pos: err.Pos})
@@ -225,6 +230,10 @@ func (r *Rule) genMacroPartials() (map[Field]map[MacroID]*MacroEvaluator, error)
 
 // GenPartials - Compiles and generates partial Evaluators
 func (r *Rule) GenPartials() error {
+	if r.Opts.EvaluatorGetter == nil {
+		return errors.New("an EvaluatorGetter is required")
+	}
+
 	macroPartials, err := r.genMacroPartials()
 	if err != nil {
 		return err
@@ -232,7 +241,7 @@ func (r *Rule) GenPartials() error {
 
 	for _, field := range r.GetFields() {
 		state := NewState(r.Model, field, macroPartials[field], r.ReplacementCtx)
-		pEval, _, err := nodeToEvaluator(r.ast.BooleanExpression, state)
+		pEval, _, err := nodeToEvaluator(r.ast.BooleanExpression, r.Opts, state)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't generate partial for field %s and rule %s", field, r.ID)
 		}

@@ -27,9 +27,10 @@ func (s *MacroStore) AddMacro(macro *Macro) *MacroStore {
 
 // Opts are the options to be passed to the evaluator
 type Opts struct {
-	LegacyFields map[Field]Field
-	Constants    map[string]interface{}
-	Variables    map[string]VariableValue
+	EvaluatorGetter EvaluatorGetter
+	LegacyFields    map[Field]Field
+	Constants       map[string]interface{}
+	Variables       map[string]VariableValue
 }
 
 // WithConstants set constants
@@ -52,5 +53,11 @@ func (o *Opts) WithVariables(variables map[string]VariableValue) *Opts {
 // WithLegacyFields set legacy fields
 func (o *Opts) WithLegacyFields(fields map[Field]Field) *Opts {
 	o.LegacyFields = fields
+	return o
+}
+
+// WithEvaluatorGetter set evaluator getter
+func (o *Opts) WithEvaluatorGetter(getter EvaluatorGetter) *Opts {
+	o.EvaluatorGetter = getter
 	return o
 }

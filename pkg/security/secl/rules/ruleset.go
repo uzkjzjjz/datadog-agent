@@ -235,7 +235,7 @@ func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 	case macroDef.Expression != "" && len(macroDef.Values) > 0:
 		return nil, &ErrMacroLoad{Definition: macroDef, Err: errors.New("only one of 'expression' and 'values' can be defined")}
 	case macroDef.Expression != "":
-		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, rs.replCtx()); err != nil {
+		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, *rs.evalOpts, rs.replCtx()); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	default:
@@ -259,7 +259,7 @@ func (rs *RuleSet) AddRules(rules []*RuleDefinition) *multierror.Error {
 		}
 	}
 
-	if err := rs.generatePartials(); err != nil {
+	if err := rs.generatePartials(*rs.evalOpts); err != nil {
 		result = multierror.Append(result, errors.Wrapf(err, "couldn't generate partials for rule"))
 	}
 
@@ -311,6 +311,7 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 			ID:         ruleDef.ID,
 			Expression: ruleDef.Expression,
 			Tags:       tags,
+			Opts:       *rs.evalOpts,
 		},
 		Definition: ruleDef,
 	}
@@ -356,7 +357,7 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 	for _, action := range rule.Definition.Actions {
 		if action.Set != nil && action.Set.Field != "" {
 			if _, found := rs.fieldEvaluators[action.Set.Field]; !found {
-				evaluator, err := rs.model.GetEvaluator(action.Set.Field, "")
+				evaluator, err := rs.evalOpts.EvaluatorGetter(action.Set.Field, "")
 				if err != nil {
 					return nil, err
 				}
@@ -598,7 +599,7 @@ NewFields:
 // generatePartials generates the partials of the ruleset. A partial is a boolean evalution function that only depends
 // on one field. The goal of partial is to determine if a rule depends on a specific field, so that we can decide if
 // we should create an in-kernel filter for that field.
-func (rs *RuleSet) generatePartials() error {
+func (rs *RuleSet) generatePartials(opts eval.Opts) error {
 	// Compute the partials of each rule
 	for _, bucket := range rs.eventRuleBuckets {
 		for _, rule := range bucket.GetRules() {

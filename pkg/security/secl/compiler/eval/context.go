@@ -15,8 +15,6 @@ import (
 type Context struct {
 	Object unsafe.Pointer
 
-	Registers Registers
-
 	// cache available across all the evaluations
 	Cache map[string]unsafe.Pointer
 
@@ -39,7 +37,6 @@ func (c *Context) SetObject(obj unsafe.Pointer) {
 // Reset the context
 func (c *Context) Reset() {
 	c.Object = nil
-	c.Registers = nil
 	c.now = time.Time{}
 
 	// as the cache should be low in entry, prefer to delete than re-alloc

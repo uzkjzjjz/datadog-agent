@@ -44,6 +44,7 @@ func parseRule(expr string, model Model, replCtx ReplacementContext) (*Rule, err
 		ID:         "id1",
 		Expression: expr,
 	}
+	rule.Opts.WithEvaluatorGetter(getEvaluatorTest)
 
 	if err := rule.Parse(); err != nil {
 		return nil, fmt.Errorf("parsing error: %v", err)
@@ -87,7 +88,7 @@ func TestStringError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
+	_, err = ruleToEvaluator(rule.GetAst(), model, rule.Opts, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 73 {
 		t.Fatal("should report a string type error")
 	}
@@ -102,7 +103,7 @@ func TestIntError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
+	_, err = ruleToEvaluator(rule.GetAst(), model, rule.Opts, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 51 {
 		t.Fatal("should report a string type error")
 	}
@@ -117,7 +118,7 @@ func TestBoolError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
+	_, err = ruleToEvaluator(rule.GetAst(), model, rule.Opts, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 38 {
 		t.Fatal("should report a bool type error")
 	}
@@ -584,10 +585,14 @@ func TestMacroList(t *testing.T) {
 	model := &testModel{}
 	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
+	var opts Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
 	macro, err := NewMacro(
 		"list",
 		`[ "/etc/shadow", "/etc/password" ]`,
 		model,
+		opts,
 		replCtx,
 	)
 	if err != nil {
@@ -612,10 +617,14 @@ func TestMacroExpression(t *testing.T) {
 	model := &testModel{}
 	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
+	var opts Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
 	macro, err := NewMacro(
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
+		opts,
 		replCtx,
 	)
 	if err != nil {
@@ -649,10 +658,14 @@ func TestMacroPartial(t *testing.T) {
 	model := &testModel{}
 	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
+	var opts Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
 	macro, err := NewMacro(
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
+		opts,
 		replCtx,
 	)
 	if err != nil {
@@ -712,10 +725,14 @@ func TestNestedMacros(t *testing.T) {
 	model := &testModel{}
 	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
+	var opts Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
 	macro1, err := NewMacro(
 		"sensitive_files",
 		`[ "/etc/shadow", "/etc/passwd" ]`,
 		model,
+		opts,
 		replCtx,
 	)
 	if err != nil {
@@ -727,6 +744,7 @@ func TestNestedMacros(t *testing.T) {
 		"is_sensitive_opened",
 		`open.filename in sensitive_files`,
 		model,
+		opts,
 		replCtx,
 	)
 	if err != nil {

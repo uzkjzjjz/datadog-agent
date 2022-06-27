@@ -172,7 +172,7 @@ func (m *testModel) GetIterator(field Field) (Iterator, error) {
 	return nil, &ErrIteratorNotSupported{Field: field}
 }
 
-func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, error) {
+func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	switch field {
 
 	case "network.ip":
