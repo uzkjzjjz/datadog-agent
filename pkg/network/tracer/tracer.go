@@ -325,6 +325,7 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 	t.bufferLock.Lock()
 	defer t.bufferLock.Unlock()
 	log.Tracef("GetActiveConnections clientID=%s", clientID)
+	log.Info("Force pipeline")
 
 	t.ebpfTracer.FlushPending()
 	latestTime, err := t.getConnections(t.activeBuffer)
