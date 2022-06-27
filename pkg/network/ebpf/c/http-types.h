@@ -45,7 +45,7 @@ typedef struct {
 } http_batch_key_t;
 
 // HTTP transaction information associated to a certain socket (tuple_t)
-typedef struct {
+typedef struct __attribute__ ((aligned (16))) {
     conn_tuple_t tup;
     __u64 request_started;
     __u8  request_method;
