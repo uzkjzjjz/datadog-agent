@@ -83,7 +83,7 @@ typedef struct {
 } http_batch_state_t;
 
 typedef struct {
-    http_transaction_t txs[HTTP_BATCH_SIZE];
+    http_transaction_t txs[HTTP_BATCH_SIZE+1];
     __u64 idx;
     __u8 pos;
 } http_batch_t;
