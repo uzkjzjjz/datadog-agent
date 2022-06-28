@@ -31,6 +31,7 @@ type Opts struct {
 	LegacyFields    map[Field]Field
 	Constants       map[string]interface{}
 	Variables       map[string]VariableValue
+	MacroStore      *MacroStore
 }
 
 // WithConstants set constants
@@ -59,5 +60,11 @@ func (o *Opts) WithLegacyFields(fields map[Field]Field) *Opts {
 // WithEvaluatorGetter set evaluator getter
 func (o *Opts) WithEvaluatorGetter(getter EvaluatorGetter) *Opts {
 	o.EvaluatorGetter = getter
+	return o
+}
+
+// WithMacroStore set the macroStore
+func (o *Opts) WithMacroStore(store *MacroStore) *Opts {
+	o.MacroStore = store
 	return o
 }

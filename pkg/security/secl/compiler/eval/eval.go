@@ -67,14 +67,8 @@ type ident struct {
 	Ident *string
 }
 
-// ReplacementContext represents the group of Options and Macro Store used during SECL evaluation
-type ReplacementContext struct {
-	*Opts
-	*MacroStore
-}
-
 func identToEvaluator(obj *ident, opts *Opts, state *State) (interface{}, lexer.Position, error) {
-	if accessor, ok := state.replCtx.Opts.Constants[*obj.Ident]; ok {
+	if accessor, ok := opts.Constants[*obj.Ident]; ok {
 		return accessor, obj.Pos, nil
 	}
 
@@ -90,11 +84,11 @@ func identToEvaluator(obj *ident, opts *Opts, state *State) (interface{}, lexer.
 	}
 
 	// transform extracted field to support legacy SECL fields
-	if state.replCtx.Opts.LegacyFields != nil {
-		if newField, ok := state.replCtx.Opts.LegacyFields[field]; ok {
+	if opts.LegacyFields != nil {
+		if newField, ok := opts.LegacyFields[field]; ok {
 			field = newField
 		}
-		if newField, ok := state.replCtx.Opts.LegacyFields[field]; ok {
+		if newField, ok := opts.LegacyFields[field]; ok {
 			itField = newField
 		}
 	}
@@ -184,7 +178,7 @@ func arrayToEvaluator(array *ast.Array, opts *Opts, state *State) (interface{}, 
 		if !ok {
 			return nil, array.Pos, NewError(array.Pos, "invalid variable name '%s'", *array.Variable)
 		}
-		return evaluatorFromVariable(varName, array.Pos, state.replCtx)
+		return evaluatorFromVariable(varName, array.Pos, opts)
 	} else if array.CIDR != nil {
 		var values CIDRValues
 		if err := values.AppendCIDR(*array.CIDR); err != nil {
@@ -227,8 +221,8 @@ func isVariableName(str string) (string, bool) {
 	return "", false
 }
 
-func evaluatorFromVariable(varname string, pos lexer.Position, replCtx ReplacementContext) (interface{}, lexer.Position, error) {
-	value, exists := replCtx.Opts.Variables[varname]
+func evaluatorFromVariable(varname string, pos lexer.Position, opts *Opts) (interface{}, lexer.Position, error) {
+	value, exists := opts.Variables[varname]
 	if !exists {
 		return nil, pos, NewError(pos, "variable '%s' doesn't exist", varname)
 	}
@@ -236,12 +230,12 @@ func evaluatorFromVariable(varname string, pos lexer.Position, replCtx Replaceme
 	return value.GetEvaluator(), pos, nil
 }
 
-func stringEvaluatorFromVariable(str string, pos lexer.Position, replCtx ReplacementContext) (interface{}, lexer.Position, error) {
+func stringEvaluatorFromVariable(str string, pos lexer.Position, opts *Opts) (interface{}, lexer.Position, error) {
 	var evaluators []*StringEvaluator
 
 	doLoc := func(sub string) error {
 		if varname, ok := isVariableName(sub); ok {
-			value, exists := replCtx.Opts.Variables[varname]
+			value, exists := opts.Variables[varname]
 			if !exists {
 				return NewError(pos, "variable '%s' doesn't exist", varname)
 			}
@@ -1107,7 +1101,7 @@ func nodeToEvaluator(obj interface{}, opts *Opts, state *State) (interface{}, le
 				return nil, obj.Pos, NewError(obj.Pos, "internal variable error '%s'", varname)
 			}
 
-			return evaluatorFromVariable(varname, obj.Pos, state.replCtx)
+			return evaluatorFromVariable(varname, obj.Pos, opts)
 		case obj.Duration != nil:
 			return &IntEvaluator{
 				Value:      *obj.Duration,
@@ -1118,7 +1112,7 @@ func nodeToEvaluator(obj interface{}, opts *Opts, state *State) (interface{}, le
 
 			// contains variables
 			if len(variableRegex.FindAllIndex([]byte(str), -1)) > 0 {
-				return stringEvaluatorFromVariable(str, obj.Pos, state.replCtx)
+				return stringEvaluatorFromVariable(str, obj.Pos, opts)
 			}
 
 			return &StringEvaluator{

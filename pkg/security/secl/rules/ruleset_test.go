@@ -78,7 +78,8 @@ func newRuleSet() *RuleSet {
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
@@ -86,13 +87,6 @@ func newRuleSet() *RuleSet {
 		WithEventTypeEnabled(enabled)
 
 	return NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
-}
-
-func emptyReplCtx() eval.ReplacementContext {
-	return eval.ReplacementContext{
-		Opts:       &eval.Opts{},
-		MacroStore: &eval.MacroStore{},
-	}
 }
 
 func TestRuleBuckets(t *testing.T) {
@@ -548,11 +542,13 @@ func TestRuleSetApprovers13(t *testing.T) {
 
 func TestGetRuleEventType(t *testing.T) {
 	var opts eval.Opts
-	opts.WithEvaluatorGetter(getEvaluatorTest)
+	opts.
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	rule := eval.NewRule("aaa", `open.filename == "test"`, &opts)
 
-	if err := rule.GenEvaluator(&testModel{}, emptyReplCtx()); err != nil {
+	if err := rule.GenEvaluator(&testModel{}); err != nil {
 		t.Fatal(err)
 	}
 

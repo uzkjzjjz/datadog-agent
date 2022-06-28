@@ -177,13 +177,6 @@ type RuleSet struct {
 	pool   *eval.ContextPool
 }
 
-func (rs *RuleSet) replCtx() eval.ReplacementContext {
-	return eval.ReplacementContext{
-		Opts:       rs.evalOpts,
-		MacroStore: rs.macroStore,
-	}
-}
-
 // ListRuleIDs returns the list of RuleIDs from the ruleset
 func (rs *RuleSet) ListRuleIDs() []RuleID {
 	var ids []string
@@ -235,11 +228,11 @@ func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 	case macroDef.Expression != "" && len(macroDef.Values) > 0:
 		return nil, &ErrMacroLoad{Definition: macroDef, Err: errors.New("only one of 'expression' and 'values' can be defined")}
 	case macroDef.Expression != "":
-		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, rs.evalOpts, rs.replCtx()); err != nil {
+		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, rs.evalOpts); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	default:
-		if macro.Macro, err = eval.NewStringValuesMacro(macroDef.ID, macroDef.Values, rs.macroStore); err != nil {
+		if macro.Macro, err = eval.NewStringValuesMacro(macroDef.ID, macroDef.Values, rs.evalOpts); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	}
@@ -319,7 +312,7 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 		return nil, &ErrRuleLoad{Definition: ruleDef, Err: errors.Wrap(err, "syntax error")}
 	}
 
-	if err := rule.GenEvaluator(rs.model, rs.replCtx()); err != nil {
+	if err := rule.GenEvaluator(rs.model); err != nil {
 		return nil, &ErrRuleLoad{Definition: ruleDef, Err: err}
 	}
 

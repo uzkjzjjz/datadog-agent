@@ -33,7 +33,8 @@ func TestMacroMerge(t *testing.T) {
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
@@ -113,7 +114,8 @@ func TestRuleMerge(t *testing.T) {
 	var evalOpts eval.Opts
 	evalOpts.
 		WithConstants(testConstants).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
@@ -226,7 +228,8 @@ func TestActionSetVariable(t *testing.T) {
 	evalOpts.
 		WithConstants(testConstants).
 		WithVariables(make(map[string]eval.VariableValue)).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
@@ -381,7 +384,8 @@ func TestActionSetVariableConflict(t *testing.T) {
 	evalOpts.
 		WithConstants(testConstants).
 		WithVariables(make(map[string]eval.VariableValue)).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
@@ -439,7 +443,8 @@ func loadPolicy(t *testing.T, testPolicy *PolicyDef, agentVersion *semver.Versio
 	evalOpts.
 		WithConstants(testConstants).
 		WithVariables(make(map[string]eval.VariableValue)).
-		WithEvaluatorGetter(getEvaluatorTest)
+		WithEvaluatorGetter(getEvaluatorTest).
+		WithMacroStore(&eval.MacroStore{})
 
 	var opts Opts
 	opts.
