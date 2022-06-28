@@ -235,7 +235,7 @@ func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 	case macroDef.Expression != "" && len(macroDef.Values) > 0:
 		return nil, &ErrMacroLoad{Definition: macroDef, Err: errors.New("only one of 'expression' and 'values' can be defined")}
 	case macroDef.Expression != "":
-		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, *rs.evalOpts, rs.replCtx()); err != nil {
+		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, rs.evalOpts, rs.replCtx()); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	default:
@@ -307,12 +307,11 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 	}
 
 	rule := &Rule{
-		Rule: &eval.Rule{
-			ID:         ruleDef.ID,
-			Expression: ruleDef.Expression,
-			Tags:       tags,
-			Opts:       *rs.evalOpts,
-		},
+		Rule: eval.NewRule(ruleDef.ID,
+			ruleDef.Expression,
+			rs.evalOpts,
+			tags...,
+		),
 		Definition: ruleDef,
 	}
 

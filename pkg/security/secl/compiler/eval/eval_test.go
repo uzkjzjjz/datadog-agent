@@ -40,11 +40,10 @@ func newReplCtxWithParams(constants map[string]interface{}, legacyFields map[Fie
 }
 
 func parseRule(expr string, model Model, replCtx ReplacementContext) (*Rule, error) {
-	rule := &Rule{
-		ID:         "id1",
-		Expression: expr,
-	}
-	rule.Opts.WithEvaluatorGetter(getEvaluatorTest)
+	var opts Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
+	rule := NewRule("id1", expr, &opts)
 
 	if err := rule.Parse(); err != nil {
 		return nil, fmt.Errorf("parsing error: %v", err)
@@ -592,7 +591,7 @@ func TestMacroList(t *testing.T) {
 		"list",
 		`[ "/etc/shadow", "/etc/password" ]`,
 		model,
-		opts,
+		&opts,
 		replCtx,
 	)
 	if err != nil {
@@ -624,7 +623,7 @@ func TestMacroExpression(t *testing.T) {
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		&opts,
 		replCtx,
 	)
 	if err != nil {
@@ -665,7 +664,7 @@ func TestMacroPartial(t *testing.T) {
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		&opts,
 		replCtx,
 	)
 	if err != nil {
@@ -732,7 +731,7 @@ func TestNestedMacros(t *testing.T) {
 		"sensitive_files",
 		`[ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		&opts,
 		replCtx,
 	)
 	if err != nil {
@@ -744,7 +743,7 @@ func TestNestedMacros(t *testing.T) {
 		"is_sensitive_opened",
 		`open.filename in sensitive_files`,
 		model,
-		opts,
+		&opts,
 		replCtx,
 	)
 	if err != nil {

@@ -24,7 +24,7 @@ type Rule struct {
 	Tags           []string
 	ReplacementCtx ReplacementContext
 	Model          Model
-	Opts           Opts
+	Opts           *Opts
 
 	evaluator *RuleEvaluator
 	ast       *ast.Rule
@@ -37,6 +37,16 @@ type RuleEvaluator struct {
 	FieldValues map[Field][]FieldValue
 
 	partialEvals map[Field]BoolEvalFnc
+}
+
+// Rule returns a new rule
+func NewRule(id string, expression string, opts *Opts, tags ...string) *Rule {
+	return &Rule{
+		ID:         id,
+		Expression: expression,
+		Opts:       opts,
+		Tags:       tags,
+	}
 }
 
 // PartialEval partially evaluation of the Rule with the given Field.
@@ -133,7 +143,7 @@ func (r *Rule) Parse() error {
 	return nil
 }
 
-func ruleToEvaluator(rule *ast.Rule, model Model, opts Opts, replCtx ReplacementContext) (*RuleEvaluator, error) {
+func ruleToEvaluator(rule *ast.Rule, model Model, opts *Opts, replCtx ReplacementContext) (*RuleEvaluator, error) {
 	macros := make(map[MacroID]*MacroEvaluator)
 	for id, macro := range replCtx.Macros {
 		macros[id] = macro.evaluator

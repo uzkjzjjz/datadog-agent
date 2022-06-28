@@ -547,11 +547,10 @@ func TestRuleSetApprovers13(t *testing.T) {
 }
 
 func TestGetRuleEventType(t *testing.T) {
-	rule := &eval.Rule{
-		ID:         "aaa",
-		Expression: `open.filename == "test"`,
-	}
-	rule.Opts.WithEvaluatorGetter(getEvaluatorTest)
+	var opts eval.Opts
+	opts.WithEvaluatorGetter(getEvaluatorTest)
+
+	rule := eval.NewRule("aaa", `open.filename == "test"`, &opts)
 
 	if err := rule.GenEvaluator(&testModel{}, emptyReplCtx()); err != nil {
 		t.Fatal(err)

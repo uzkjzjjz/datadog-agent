@@ -73,7 +73,7 @@ type ReplacementContext struct {
 	*MacroStore
 }
 
-func identToEvaluator(obj *ident, opts Opts, state *State) (interface{}, lexer.Position, error) {
+func identToEvaluator(obj *ident, opts *Opts, state *State) (interface{}, lexer.Position, error) {
 	if accessor, ok := state.replCtx.Opts.Constants[*obj.Ident]; ok {
 		return accessor, obj.Pos, nil
 	}
@@ -161,7 +161,7 @@ func identToEvaluator(obj *ident, opts Opts, state *State) (interface{}, lexer.P
 	return accessor, obj.Pos, nil
 }
 
-func arrayToEvaluator(array *ast.Array, opts Opts, state *State) (interface{}, lexer.Position, error) {
+func arrayToEvaluator(array *ast.Array, opts *Opts, state *State) (interface{}, lexer.Position, error) {
 	if len(array.Numbers) != 0 {
 		var evaluator IntArrayEvaluator
 		evaluator.AppendValues(array.Numbers...)
@@ -388,7 +388,7 @@ func StringArrayMatchesWrapper(a *StringArrayEvaluator, b *StringValuesEvaluator
 	return evaluator, nil
 }
 
-func nodeToEvaluator(obj interface{}, opts Opts, state *State) (interface{}, lexer.Position, error) {
+func nodeToEvaluator(obj interface{}, opts *Opts, state *State) (interface{}, lexer.Position, error) {
 	var err error
 	var boolEvaluator *BoolEvaluator
 	var pos lexer.Position
