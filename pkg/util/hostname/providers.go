@@ -32,8 +32,8 @@ func GetProvider(providerName string) Provider {
 	return nil
 }
 
-// GetHostname returns the hostname for a specific Provider if it was register
-func GetHostname(ctx context.Context, providerName string, options map[string]interface{}) (string, error) {
+// GetHostnameFromProvider returns the hostname for a specific Provider if it was registered.
+func GetHostnameFromProvider(ctx context.Context, providerName string, options map[string]interface{}) (string, error) {
 	if provider, found := providerCatalog[providerName]; found {
 		log.Debugf("GetHostname trying provider '%s' ...", providerName)
 		name, err := provider(ctx, options)

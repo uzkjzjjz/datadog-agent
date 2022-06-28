@@ -16,14 +16,14 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/metadata/externalhost"
 	"github.com/DataDog/datadog-agent/pkg/metadata/host"
 	"github.com/DataDog/datadog-agent/pkg/status"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // GetPayload builds a payload of all the agentchecks metadata
 func GetPayload(ctx context.Context) *Payload {
 	agentChecksPayload := ACPayload{}
-	hostnameData, _ := util.GetHostnameData(ctx)
+	hostnameData, _ := hostname.GetHostnameData(ctx)
 	hostname := hostnameData.Hostname
 	checkStats := expvars.GetCheckStats()
 	jmxStartupError := status.GetJMXStartupError()

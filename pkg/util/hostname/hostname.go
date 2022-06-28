@@ -6,7 +6,7 @@
 //go:build !serverless
 // +build !serverless
 
-package util
+package hostname
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	"runtime"
 
 	"github.com/DataDog/datadog-agent/pkg/metadata/inventories"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/ec2"
 	"github.com/DataDog/datadog-agent/pkg/util/ecs"
 	"github.com/DataDog/datadog-agent/pkg/util/fargate"
-	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/hostname/validate"
 )
 
@@ -83,7 +83,7 @@ func isOSHostnameUsable(ctx context.Context) (osHostnameUsable bool) {
 	}
 
 	// Check UTS namespace from docker
-	utsMode, err := GetAgentUTSMode(ctx)
+	utsMode, err := util.GetAgentUTSMode(ctx)
 	if err == nil && (utsMode != containers.HostUTSMode && utsMode != containers.UnknownUTSMode) {
 		log.Debug("Agent is running in a docker container without host UTS mode: OS-provided hostnames cannot be used for hostname resolution.")
 		return false
@@ -183,7 +183,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 	configHostnameFilepath := config.Datadog.GetString("hostname_file")
 	if configHostnameFilepath != "" {
 		log.Debug("GetHostname trying `hostname_file` config option...")
-		if fileHostnameProvider := hostname.GetProvider("file"); fileHostnameProvider != nil {
+		if fileHostnameProvider := GetProvider("file"); fileHostnameProvider != nil {
 			if hostname, err := fileHostnameProvider(
 				ctx,
 				map[string]interface{}{
@@ -210,7 +210,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 
 	// GCE metadata
 	log.Debug("GetHostname trying GCE metadata...")
-	if getGCEHostname := hostname.GetProvider("gce"); getGCEHostname != nil {
+	if getGCEHostname := GetProvider("gce"); getGCEHostname != nil {
 		gceName, err := getGCEHostname(ctx, nil)
 		if err == nil {
 			hostnameData := saveHostnameData(cacheHostnameKey, gceName, "gce")
@@ -274,7 +274,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 	// We use the instance id if we're on an ECS cluster or we're on EC2 and the hostname is one of the default ones
 	// or ec2_prioritize_instance_id_as_hostname is set to true
 	prioritizeEC2Hostname := config.Datadog.GetBool("ec2_prioritize_instance_id_as_hostname")
-	if getEC2Hostname := hostname.GetProvider("ec2"); getEC2Hostname != nil {
+	if getEC2Hostname := GetProvider("ec2"); getEC2Hostname != nil {
 		log.Debug("GetHostname trying EC2 metadata...")
 
 		if ecs.IsECSInstance() || ec2.IsDefaultHostname(hostName) || prioritizeEC2Hostname {
@@ -320,7 +320,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 		hostnameErrors.Set("forced EC2 hostname", expErr)
 	}
 
-	if getAzureHostname := hostname.GetProvider("azure"); getAzureHostname != nil {
+	if getAzureHostname := GetProvider("azure"); getAzureHostname != nil {
 		log.Debug("GetHostname trying Azure metadata...")
 
 		azureHostname, err := getAzureHostname(ctx, nil)
@@ -375,7 +375,7 @@ func isHostnameCanonicalForIntake(ctx context.Context, hostname string) bool {
 
 // getValidEC2Hostname gets a valid EC2 hostname
 // Returns (hostname, error)
-func getValidEC2Hostname(ctx context.Context, ec2Provider hostname.Provider) (string, error) {
+func getValidEC2Hostname(ctx context.Context, ec2Provider Provider) (string, error) {
 	instanceID, err := ec2Provider(ctx, nil)
 	if err == nil {
 		err = validate.ValidHostname(instanceID)

@@ -13,7 +13,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/message"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 )
 
 // MessageReceiver interface to handle messages for diagnostics
@@ -143,7 +143,7 @@ func shouldHandleMessage(m *message.Message, filters *Filters) bool {
 }
 
 func formatMessage(m *message.Message, redactedMsg []byte) string {
-	hostname, err := util.GetHostname(context.TODO())
+	hostname, err := hostname.GetHostname(context.TODO())
 	if err != nil {
 		hostname = "unknown"
 	}

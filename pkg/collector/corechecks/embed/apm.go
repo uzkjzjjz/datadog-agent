@@ -21,9 +21,9 @@ import (
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	telemetry_utils "github.com/DataDog/datadog-agent/pkg/telemetry/utils"
-	"github.com/DataDog/datadog-agent/pkg/util"
 	"go.uber.org/atomic"
 
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -81,7 +81,7 @@ func (c *APMCheck) run() error {
 
 	cmd := exec.Command(c.binPath, c.commandOpts...)
 
-	hostname, _ := util.GetHostname(context.TODO())
+	hostname, _ := hostname.GetHostname(context.TODO())
 
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("DD_API_KEY=%s", config.SanitizeAPIKey(config.Datadog.GetString("api_key"))))

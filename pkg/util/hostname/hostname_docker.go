@@ -9,20 +9,19 @@
 // I don't think windows and darwin can actually be docker hosts
 // but keeping it this way for build consistency (for now)
 
-package util
+package hostname
 
 import (
 	"context"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 func getContainerHostname(ctx context.Context) string {
 	if config.IsFeaturePresent(config.Kubernetes) {
 		// Cluster-agent logic: Kube apiserver
-		name, err := hostname.GetHostname(ctx, "kube_apiserver", nil)
+		name, err := GetHostnameFromProvider(ctx, "kube_apiserver", nil)
 		if err == nil {
 			return name
 		}
@@ -31,7 +30,7 @@ func getContainerHostname(ctx context.Context) string {
 
 	// Node-agent logic: docker or kubelet
 	if config.IsFeaturePresent(config.Docker) {
-		name, err := hostname.GetHostname(ctx, "docker", nil)
+		name, err := GetHostnameFromProvider(ctx, "docker", nil)
 		if err == nil {
 			return name
 		}
@@ -39,7 +38,7 @@ func getContainerHostname(ctx context.Context) string {
 	}
 
 	if config.IsFeaturePresent(config.Kubernetes) {
-		name, err := hostname.GetHostname(ctx, "kubelet", nil)
+		name, err := GetHostnameFromProvider(ctx, "kubelet", nil)
 		if err == nil {
 			return name
 		}

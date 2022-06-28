@@ -6,7 +6,7 @@
 //go:build kubelet
 // +build kubelet
 
-package util
+package hostname
 
 import (
 	"context"

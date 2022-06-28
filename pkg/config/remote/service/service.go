@@ -23,8 +23,8 @@ import (
 	rdata "github.com/DataDog/datadog-agent/pkg/config/remote/data"
 	"github.com/DataDog/datadog-agent/pkg/config/remote/uptane"
 	"github.com/DataDog/datadog-agent/pkg/proto/pbgo"
-	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/backoff"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"go.etcd.io/bbolt"
 )
@@ -125,7 +125,7 @@ func NewService() (*Service, error) {
 		apiKey = config.Datadog.GetString("remote_configuration.api_key")
 	}
 	apiKey = config.SanitizeAPIKey(apiKey)
-	hostname, err := util.GetHostname(context.Background())
+	hostname, err := hostname.GetHostname(context.Background())
 	if err != nil {
 		return nil, err
 	}

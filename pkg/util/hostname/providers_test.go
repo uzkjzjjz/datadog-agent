@@ -42,13 +42,13 @@ func TestGetHostname(t *testing.T) {
 	RegisterHostnameProvider("dummy", dummyProvider)
 	defer delete(providerCatalog, "dummy")
 
-	name, err := GetHostname(context.Background(), "dummy", nil)
+	name, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "dummy-hostname", name)
 }
 
 func TestGetHostnameUnknown(t *testing.T) {
-	_, err := GetHostname(context.Background(), "dummy", nil)
+	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }
 
@@ -56,7 +56,7 @@ func TestGetHostnameError(t *testing.T) {
 	RegisterHostnameProvider("dummy", dummyErrorProvider)
 	defer delete(providerCatalog, "dummy")
 
-	_, err := GetHostname(context.Background(), "dummy", nil)
+	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }
 
@@ -64,6 +64,6 @@ func TestGetHostnameInvalid(t *testing.T) {
 	RegisterHostnameProvider("dummy", dummyInvalidProvider)
 	defer delete(providerCatalog, "dummy")
 
-	_, err := GetHostname(context.Background(), "dummy", nil)
+	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }

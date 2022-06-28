@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 )
 
 func TestHostAliasDisable(t *testing.T) {
@@ -30,7 +30,7 @@ func TestHostAliasDisable(t *testing.T) {
 
 func TestHostAlias(t *testing.T) {
 	ctx := context.Background()
-	defer func() { getFqdn = util.Fqdn }()
+	defer func() { getFqdn = hostname.Fqdn }()
 	mockConfig := config.Mock(t)
 
 	mockConfig.Set("cloud_foundry", true)
@@ -79,6 +79,6 @@ func TestHostAliasDefault(t *testing.T) {
 	aliases, err := GetHostAliases(ctx)
 	assert.Nil(t, err)
 
-	hostname, _ := os.Hostname()
-	assert.Equal(t, []string{util.Fqdn(hostname)}, aliases)
+	host, _ := os.Hostname()
+	assert.Equal(t, []string{hostname.Fqdn(host)}, aliases)
 }

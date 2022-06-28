@@ -25,9 +25,9 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/probe/dump"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/utils"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 
-	// util.GetHostname(...) will panic without this import
+	// hostname.GetHostname(...) will panic without this import
 	_ "github.com/DataDog/datadog-agent/pkg/util/containers/providers/cgroup"
 )
 
@@ -200,7 +200,7 @@ func (adm *ActivityDumpManager) prepareContextTags() {
 	var err error
 
 	// add hostname tag
-	adm.hostname, err = util.GetHostname(context.TODO())
+	adm.hostname, err = hostname.GetHostname(context.TODO())
 	if err != nil {
 		adm.hostname = "unknown"
 	}

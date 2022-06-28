@@ -6,7 +6,7 @@
 //go:build !serverless
 // +build !serverless
 
-package util
+package hostname
 
 import (
 	"context"
@@ -20,7 +20,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/cache"
-	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 )
 
 func TestGetHostnameFromHostnameConfig(t *testing.T) {
@@ -110,13 +109,13 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 	config.Datadog.Set("ec2_prioritize_instance_id_as_hostname", true)
 	defer config.Datadog.Set("ec2_prioritize_instance_id_as_hostname", false)
 
-	oldProvider := hostname.GetProvider("ec2")
+	oldProvider := GetProvider("ec2")
 	if oldProvider != nil {
-		defer hostname.RegisterHostnameProvider("ec2", oldProvider)
+		defer RegisterHostnameProvider("ec2", oldProvider)
 	}
 
 	// Failure if EC2 provider returns an error
-	hostname.RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
+	RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("some error")
 	})
 
@@ -130,7 +129,7 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 	assert.Equal(t, h, data.Hostname) // check that we fallback on OS
 
 	// Failure if EC2 provider returns an error
-	hostname.RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
+	RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
 		return "someHostname", nil
 	})
 

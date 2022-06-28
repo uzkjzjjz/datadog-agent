@@ -3,11 +3,13 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-//go:build !kubelet
-// +build !kubelet
+//go:build freebsd || netbsd || openbsd || solaris || dragonfly || aix
+// +build freebsd netbsd openbsd solaris dragonfly aix
 
-package util
+package hostname
 
-func isAgentKubeHostNetwork() (bool, error) {
-	return true, nil
+import "context"
+
+func getContainerHostname(ctx context.Context) string {
+	return ""
 }

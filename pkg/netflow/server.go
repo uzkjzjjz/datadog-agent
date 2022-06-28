@@ -7,11 +7,11 @@ package netflow
 
 import (
 	"context"
-	coreutil "github.com/DataDog/datadog-agent/pkg/util"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	coreconfig "github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"github.com/DataDog/datadog-agent/pkg/netflow/config"
@@ -37,7 +37,7 @@ func NewNetflowServer(sender aggregator.Sender) (*Server, error) {
 		return nil, err
 	}
 
-	hostname, err := coreutil.GetHostname(context.TODO())
+	hostname, err := hostname.GetHostname(context.TODO())
 	if err != nil {
 		log.Warnf("Error getting the hostname: %v", err)
 		hostname = ""

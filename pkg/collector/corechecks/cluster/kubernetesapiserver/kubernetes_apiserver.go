@@ -27,7 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -352,7 +352,7 @@ func (k *KubeASCheck) processEvents(sender aggregator.Sender, events []*v1.Event
 	}
 
 	ctx := context.TODO()
-	hostname, _ := util.GetHostname(ctx)
+	hostname, _ := hostname.GetHostname(ctx)
 	clusterName := clustername.GetClusterName(ctx, hostname)
 
 	for id, bundle := range bundlesByObject {

@@ -18,7 +18,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 	orchcfg "github.com/DataDog/datadog-agent/pkg/orchestrator/config"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver/common"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver/leaderelection"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
@@ -141,7 +141,7 @@ func setCacheInformationDCAMode(status map[string]interface{}) {
 func setClusterName(ctx context.Context, status map[string]interface{}) {
 	errorMsg := "No cluster name was detected. This means resource collection will not work."
 
-	hostname, err := util.GetHostname(ctx)
+	hostname, err := hostname.GetHostname(ctx)
 	if err != nil {
 		status["ClusterNameError"] = fmt.Sprintf("Error detecting cluster name: %s.\n%s", err.Error(), errorMsg)
 	} else {
