@@ -21,7 +21,7 @@ import (
 func getContainerHostname(ctx context.Context) string {
 	if config.IsFeaturePresent(config.Kubernetes) {
 		// Cluster-agent logic: Kube apiserver
-		name, err := GetHostnameFromProvider(ctx, "kube_apiserver", nil)
+		name, err := getHostnameFromProvider(ctx, "kube_apiserver", nil)
 		if err == nil {
 			return name
 		}
@@ -30,7 +30,7 @@ func getContainerHostname(ctx context.Context) string {
 
 	// Node-agent logic: docker or kubelet
 	if config.IsFeaturePresent(config.Docker) {
-		name, err := GetHostnameFromProvider(ctx, "docker", nil)
+		name, err := getHostnameFromProvider(ctx, "docker", nil)
 		if err == nil {
 			return name
 		}
@@ -38,7 +38,7 @@ func getContainerHostname(ctx context.Context) string {
 	}
 
 	if config.IsFeaturePresent(config.Kubernetes) {
-		name, err := GetHostnameFromProvider(ctx, "kubelet", nil)
+		name, err := getHostnameFromProvider(ctx, "kubelet", nil)
 		if err == nil {
 			return name
 		}

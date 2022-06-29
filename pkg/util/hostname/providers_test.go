@@ -26,44 +26,44 @@ func dummyInvalidProvider(ctx context.Context, options map[string]interface{}) (
 }
 
 func TestRegisterHostnameProvider(t *testing.T) {
-	RegisterHostnameProvider("dummy", dummyProvider)
+	registerHostnameProvider("dummy", dummyProvider)
 	assert.Contains(t, providerCatalog, "dummy")
 	delete(providerCatalog, "dummy")
 }
 
 func TestGetProvider(t *testing.T) {
-	RegisterHostnameProvider("dummy", dummyProvider)
+	registerHostnameProvider("dummy", dummyProvider)
 	defer delete(providerCatalog, "dummy")
-	assert.NotNil(t, GetProvider("dummy"))
-	assert.Nil(t, GetProvider("does not exists"))
+	assert.NotNil(t, getProvider("dummy"))
+	assert.Nil(t, getProvider("does not exists"))
 }
 
 func TestGetHostname(t *testing.T) {
-	RegisterHostnameProvider("dummy", dummyProvider)
+	registerHostnameProvider("dummy", dummyProvider)
 	defer delete(providerCatalog, "dummy")
 
-	name, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
+	name, err := getHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "dummy-hostname", name)
 }
 
 func TestGetHostnameUnknown(t *testing.T) {
-	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
+	_, err := getHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }
 
 func TestGetHostnameError(t *testing.T) {
-	RegisterHostnameProvider("dummy", dummyErrorProvider)
+	registerHostnameProvider("dummy", dummyErrorProvider)
 	defer delete(providerCatalog, "dummy")
 
-	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
+	_, err := getHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }
 
 func TestGetHostnameInvalid(t *testing.T) {
-	RegisterHostnameProvider("dummy", dummyInvalidProvider)
+	registerHostnameProvider("dummy", dummyInvalidProvider)
 	defer delete(providerCatalog, "dummy")
 
-	_, err := GetHostnameFromProvider(context.Background(), "dummy", nil)
+	_, err := getHostnameFromProvider(context.Background(), "dummy", nil)
 	assert.Error(t, err)
 }

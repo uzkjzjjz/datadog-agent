@@ -13,27 +13,27 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
-// Provider is a generic function to grab the hostname and return it
-type Provider func(ctx context.Context, options map[string]interface{}) (string, error)
+// provider is a generic function to grab the hostname and return it
+type provider func(ctx context.Context, options map[string]interface{}) (string, error)
 
 // providerCatalog holds all the various kinds of hostname providers
-var providerCatalog = make(map[string]Provider)
+var providerCatalog = make(map[string]provider)
 
-// RegisterHostnameProvider registers a hostname provider as part of the catalog
-func RegisterHostnameProvider(name string, p Provider) {
+// registerHostnameProvider registers a hostname provider as part of the catalog
+func registerHostnameProvider(name string, p provider) {
 	providerCatalog[name] = p
 }
 
-// GetProvider returns a Provider if it was register before.
-func GetProvider(providerName string) Provider {
+// getProvider returns a provider if it was registered before.
+func getProvider(providerName string) provider {
 	if provider, found := providerCatalog[providerName]; found {
 		return provider
 	}
 	return nil
 }
 
-// GetHostnameFromProvider returns the hostname for a specific Provider if it was registered.
-func GetHostnameFromProvider(ctx context.Context, providerName string, options map[string]interface{}) (string, error) {
+// getHostnameFromProvider returns the hostname for a specific Provider if it was registered.
+func getHostnameFromProvider(ctx context.Context, providerName string, options map[string]interface{}) (string, error) {
 	if provider, found := providerCatalog[providerName]; found {
 		log.Debugf("GetHostname trying provider '%s' ...", providerName)
 		name, err := provider(ctx, options)

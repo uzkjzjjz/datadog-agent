@@ -144,13 +144,14 @@ func saveAndValidateHostnameWithProvider(ctx context.Context, cacheHostnameKey s
 
 // GetHostnameWithProvider retrieves the host name for the Agent and hostname provider, trying to query these
 // environments/api, in order:
-// * Config (`hostname')
-// * Config (`hostname_file')
-// * GCE
-// * Docker
-// * kubernetes
-// * os
-// * EC2
+//
+//     * Config (`hostname')
+//     * Config (`hostname_file')
+//     * GCE
+//     * Docker
+//     * kubernetes
+//     * os
+//     * EC2
 func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 	cacheHostnameKey := cache.BuildAgentKey("hostname")
 	if cacheHostname, found := cache.Cache.Get(cacheHostnameKey); found {
@@ -183,7 +184,7 @@ func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 	configHostnameFilepath := config.Datadog.GetString("hostname_file")
 	if configHostnameFilepath != "" {
 		log.Debug("GetHostname trying `hostname_file` config option...")
-		if fileHostnameProvider := GetProvider("file"); fileHostnameProvider != nil {
+		if fileHostnameProvider := getProvider("file"); fileHostnameProvider != nil {
 			if hostname, err := fileHostnameProvider(
 				ctx,
 				map[string]interface{}{
@@ -210,7 +211,7 @@ func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 
 	// GCE metadata
 	log.Debug("GetHostname trying GCE metadata...")
-	if getGCEHostname := GetProvider("gce"); getGCEHostname != nil {
+	if getGCEHostname := getProvider("gce"); getGCEHostname != nil {
 		gceName, err := getGCEHostname(ctx, nil)
 		if err == nil {
 			hostnameData := saveHostnameWithProvider(cacheHostnameKey, gceName, "gce")
@@ -274,7 +275,7 @@ func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 	// We use the instance id if we're on an ECS cluster or we're on EC2 and the hostname is one of the default ones
 	// or ec2_prioritize_instance_id_as_hostname is set to true
 	prioritizeEC2Hostname := config.Datadog.GetBool("ec2_prioritize_instance_id_as_hostname")
-	if getEC2Hostname := GetProvider("ec2"); getEC2Hostname != nil {
+	if getEC2Hostname := getProvider("ec2"); getEC2Hostname != nil {
 		log.Debug("GetHostname trying EC2 metadata...")
 
 		if ecs.IsECSInstance() || ec2.IsDefaultHostname(hostName) || prioritizeEC2Hostname {
@@ -320,7 +321,7 @@ func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 		hostnameErrors.Set("forced EC2 hostname", expErr)
 	}
 
-	if getAzureHostname := GetProvider("azure"); getAzureHostname != nil {
+	if getAzureHostname := getProvider("azure"); getAzureHostname != nil {
 		log.Debug("GetHostname trying Azure metadata...")
 
 		azureHostname, err := getAzureHostname(ctx, nil)
@@ -375,7 +376,7 @@ func isHostnameCanonicalForIntake(ctx context.Context, hostname string) bool {
 
 // getValidEC2Hostname gets a valid EC2 hostname
 // Returns (hostname, error)
-func getValidEC2Hostname(ctx context.Context, ec2Provider Provider) (string, error) {
+func getValidEC2Hostname(ctx context.Context, ec2Provider provider) (string, error) {
 	instanceID, err := ec2Provider(ctx, nil)
 	if err == nil {
 		err = validate.ValidHostname(instanceID)

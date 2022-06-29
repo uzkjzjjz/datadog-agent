@@ -109,13 +109,13 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 	config.Datadog.Set("ec2_prioritize_instance_id_as_hostname", true)
 	defer config.Datadog.Set("ec2_prioritize_instance_id_as_hostname", false)
 
-	oldProvider := GetProvider("ec2")
+	oldProvider := getProvider("ec2")
 	if oldProvider != nil {
-		defer RegisterHostnameProvider("ec2", oldProvider)
+		defer registerHostnameProvider("ec2", oldProvider)
 	}
 
 	// Failure if EC2 provider returns an error
-	RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
+	registerHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("some error")
 	})
 
@@ -129,7 +129,7 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 	assert.Equal(t, h, data.Hostname) // check that we fallback on OS
 
 	// Failure if EC2 provider returns an error
-	RegisterHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
+	registerHostnameProvider("ec2", func(ctx context.Context, options map[string]interface{}) (string, error) {
 		return "someHostname", nil
 	})
 

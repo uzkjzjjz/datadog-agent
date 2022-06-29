@@ -13,5 +13,5 @@ import (
 )
 
 func init() {
-	RegisterHostnameProvider("kubelet", kubelet.HostnameProvider)
+	registerHostnameProvider("kubelet", kubelet.HostnameProvider)
 }
