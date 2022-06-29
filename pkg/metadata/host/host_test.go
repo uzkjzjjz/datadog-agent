@@ -30,7 +30,7 @@ import (
 
 func TestGetPayload(t *testing.T) {
 	ctx := context.Background()
-	p := GetPayload(ctx, hostname.HostnameData{Hostname: "myhostname", Provider: ""})
+	p := GetPayload(ctx, hostname.WithProvider{Hostname: "myhostname", Provider: ""})
 	assert.NotEmpty(t, p.Os)
 	assert.NotEmpty(t, p.AgentFlavor)
 	assert.NotEmpty(t, p.PythonVersion)
@@ -77,7 +77,7 @@ func TestGetHostInfo(t *testing.T) {
 
 func TestGetMeta(t *testing.T) {
 	ctx := context.Background()
-	meta := getMeta(ctx, hostname.HostnameData{})
+	meta := getMeta(ctx, hostname.WithProvider{})
 	assert.NotEmpty(t, meta.SocketHostname)
 	assert.NotEmpty(t, meta.Timezones)
 	assert.NotEmpty(t, meta.SocketFqdn)

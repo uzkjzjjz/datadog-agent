@@ -15,6 +15,6 @@ import (
 
 func TestGetPayload(t *testing.T) {
 	ctx := context.Background()
-	pl := GetPayload(ctx, hostname.HostnameData{Hostname: "testhostname", Provider: ""})
+	pl := GetPayload(ctx, hostname.WithProvider{Hostname: "testhostname", Provider: ""})
 	assert.NotNil(t, pl)
 }

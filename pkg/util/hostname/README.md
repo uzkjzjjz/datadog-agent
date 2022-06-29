@@ -5,9 +5,9 @@ host in the backend. It must be consistent between agent restart and unique to t
 
 The hostname is cached for the entire life span of the Agent.
 
-## GetHostnameData
+## GetHostnameWithProvider
 
-`GetHostnameData` will return the hostname detected and the provider used to fetch it. This function is also in charge
+`GetHostnameWithProvider` will return the hostname detected and the provider used to fetch it. This function is also in charge
 of updating `goexpvar` and `inventories` with the correct information, so the `status` page and metadata are updated
 correctly.
 

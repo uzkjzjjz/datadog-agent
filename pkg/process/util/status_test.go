@@ -68,10 +68,10 @@ func TestGetStatus(t *testing.T) {
 	ddconfig.Mock(t)
 	ddconfig.DetectFeatures()
 
-	hostnameData, err := hostname.GetHostnameData(context.Background())
+	hostnameData, err := hostname.GetHostnameWithProvider(context.Background())
 	var metadata *host.Payload
 	if err != nil {
-		metadata = host.GetPayloadFromCache(context.Background(), hostname.HostnameData{Hostname: "unknown", Provider: "unknown"})
+		metadata = host.GetPayloadFromCache(context.Background(), hostname.WithProvider{Hostname: "unknown", Provider: "unknown"})
 	} else {
 		metadata = host.GetPayloadFromCache(context.Background(), hostnameData)
 	}

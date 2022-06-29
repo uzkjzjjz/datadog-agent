@@ -48,7 +48,7 @@ type installInfo struct {
 
 // GetPayload builds a metadata payload every time is called.
 // Some data is collected only once, some is cached, some is collected at every call.
-func GetPayload(ctx context.Context, hostnameData hostname.HostnameData) *Payload {
+func GetPayload(ctx context.Context, hostnameData hostname.WithProvider) *Payload {
 	meta := getMeta(ctx, hostnameData)
 	meta.Hostname = hostnameData.Hostname
 
@@ -76,7 +76,7 @@ func GetPayload(ctx context.Context, hostnameData hostname.HostnameData) *Payloa
 
 // GetPayloadFromCache returns the payload from the cache if it exists, otherwise it creates it.
 // The metadata reporting should always grab it fresh. Any other uses, e.g. status, should use this
-func GetPayloadFromCache(ctx context.Context, hostnameData hostname.HostnameData) *Payload {
+func GetPayloadFromCache(ctx context.Context, hostnameData hostname.WithProvider) *Payload {
 	key := buildKey("payload")
 	if x, found := cache.Cache.Get(key); found {
 		return x.(*Payload)
@@ -86,7 +86,7 @@ func GetPayloadFromCache(ctx context.Context, hostnameData hostname.HostnameData
 
 // GetMeta grabs the metadata from the cache and returns it,
 // if the cache is empty, then it queries the information directly
-func GetMeta(ctx context.Context, hostnameData hostname.HostnameData) *Meta {
+func GetMeta(ctx context.Context, hostnameData hostname.WithProvider) *Meta {
 	key := buildKey("meta")
 	if x, found := cache.Cache.Get(key); found {
 		return x.(*Meta)
@@ -124,7 +124,7 @@ func getPublicIPv4(ctx context.Context) (string, error) {
 }
 
 // getMeta grabs the information and refreshes the cache
-func getMeta(ctx context.Context, hostnameData hostname.HostnameData) *Meta {
+func getMeta(ctx context.Context, hostnameData hostname.WithProvider) *Meta {
 	host, _ := os.Hostname()
 	tzname, _ := time.Now().Zone()
 	ec2Hostname, _ := ec2.GetHostname(ctx)

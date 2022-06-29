@@ -420,7 +420,7 @@ func metadataPayload(w http.ResponseWriter, r *http.Request) {
 	switch payloadType {
 	case "v5":
 		ctx := context.Background()
-		hostnameData, err := hostname.GetHostnameData(ctx)
+		hostnameData, err := hostname.GetHostnameWithProvider(ctx)
 		if err != nil {
 			setJSONError(w, err, 500)
 			return

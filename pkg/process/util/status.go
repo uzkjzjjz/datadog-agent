@@ -119,11 +119,11 @@ func OverrideTime(t time.Time) StatusOption {
 }
 
 func getCoreStatus() (s CoreStatus) {
-	hostnameData, err := hostname.GetHostnameData(context.Background())
+	hostnameData, err := hostname.GetHostnameWithProvider(context.Background())
 	var metadata *host.Payload
 	if err != nil {
 		log.Errorf("Error grabbing hostname for status: %v", err)
-		metadata = host.GetPayloadFromCache(context.Background(), hostname.HostnameData{Hostname: "unknown", Provider: "unknown"})
+		metadata = host.GetPayloadFromCache(context.Background(), hostname.WithProvider{Hostname: "unknown", Provider: "unknown"})
 	} else {
 		metadata = host.GetPayloadFromCache(context.Background(), hostnameData)
 	}

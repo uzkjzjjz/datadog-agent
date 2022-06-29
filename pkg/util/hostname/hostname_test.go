@@ -123,7 +123,7 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 	cacheHostnameKey := cache.BuildAgentKey("hostname")
 	cache.Cache.Delete(cacheHostnameKey)
 
-	data, err := GetHostnameData(context.Background())
+	data, err := GetHostnameWithProvider(context.Background())
 	assert.NoError(t, err)
 	h, _ := os.Hostname()
 	assert.Equal(t, h, data.Hostname) // check that we fallback on OS
@@ -135,7 +135,7 @@ func TestForcedHosntameEC2ID(t *testing.T) {
 
 	cache.Cache.Delete(cacheHostnameKey)
 
-	data, err = GetHostnameData(context.Background())
+	data, err = GetHostnameWithProvider(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "someHostname", data.Hostname)
 	assert.Equal(t, "aws", data.Provider)

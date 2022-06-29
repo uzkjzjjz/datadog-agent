@@ -304,11 +304,11 @@ func getCommonStatus() (map[string]interface{}, error) {
 
 	stats["version"] = version.AgentVersion
 	stats["flavor"] = flavor.GetFlavor()
-	hostnameData, err := hostname.GetHostnameData(context.TODO())
+	hostnameData, err := hostname.GetHostnameWithProvider(context.TODO())
 
 	if err != nil {
 		log.Errorf("Error grabbing hostname for status: %v", err)
-		stats["metadata"] = host.GetPayloadFromCache(context.TODO(), hostname.HostnameData{Hostname: "unknown", Provider: "unknown"})
+		stats["metadata"] = host.GetPayloadFromCache(context.TODO(), hostname.WithProvider{Hostname: "unknown", Provider: "unknown"})
 	} else {
 		stats["metadata"] = host.GetPayloadFromCache(context.TODO(), hostnameData)
 	}

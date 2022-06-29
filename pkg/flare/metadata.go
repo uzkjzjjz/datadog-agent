@@ -31,7 +31,7 @@ func zipMetadataInventories(tempDir, hostname string) error {
 
 func zipMetadataV5(tempDir, host string) error {
 	ctx := context.Background()
-	hostnameData, _ := hostname.GetHostnameData(ctx)
+	hostnameData, _ := hostname.GetHostnameWithProvider(ctx)
 	payload := v5.GetPayload(ctx, hostnameData)
 
 	data, err := json.MarshalIndent(payload, "", "    ")

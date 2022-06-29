@@ -10,9 +10,9 @@ package util
 
 import "context"
 
-// HostnameData contains hostname and the hostname provider
+// WithProvider contains hostname and the hostname provider
 // Copy of the original struct in hostname.go
-type HostnameData struct {
+type WithProvider struct {
 	Hostname string
 	Provider string
 }
@@ -30,6 +30,6 @@ func GetHostname(ctx context.Context) (string, error) {
 	return "", nil
 }
 
-func GetHostnameData() (HostnameData, error) {
-	return HostnameData{}, nil
+func GetHostnameWithProvider() (WithProvider, error) {
+	return WithProvider{}, nil
 }

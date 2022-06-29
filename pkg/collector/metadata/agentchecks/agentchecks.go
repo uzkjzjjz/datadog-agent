@@ -23,7 +23,7 @@ import (
 // GetPayload builds a payload of all the agentchecks metadata
 func GetPayload(ctx context.Context) *Payload {
 	agentChecksPayload := ACPayload{}
-	hostnameData, _ := hostname.GetHostnameData(ctx)
+	hostnameData, _ := hostname.GetHostnameWithProvider(ctx)
 	hostname := hostnameData.Hostname
 	checkStats := expvars.GetCheckStats()
 	jmxStartupError := status.GetJMXStartupError()

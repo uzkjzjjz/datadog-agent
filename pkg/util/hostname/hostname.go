@@ -103,25 +103,25 @@ func isOSHostnameUsable(ctx context.Context) (osHostnameUsable bool) {
 	return true
 }
 
-// GetHostname retrieves the host name from GetHostnameData
+// GetHostname retrieves the host name for the agent.
 func GetHostname(ctx context.Context) (string, error) {
-	hostnameData, err := GetHostnameData(ctx)
+	hostnameData, err := GetHostnameWithProvider(ctx)
 	return hostnameData.Hostname, err
 }
 
 // HostnameProviderConfiguration is the key for the hostname provider associated to datadog.yaml
 const HostnameProviderConfiguration = "configuration"
 
-// HostnameData contains hostname and the hostname provider
-type HostnameData struct {
+// WithProvider contains hostname and the hostname provider
+type WithProvider struct {
 	Hostname string
 	Provider string
 }
 
-// saveHostnameData creates a HostnameData struct, saves it in the cache under cacheHostnameKey
+// saveHostnameWithProvider creates a WithProvider struct, saves it in the cache under cacheHostnameKey
 // and calls setHostnameProvider with the provider if it is not empty.
-func saveHostnameData(cacheHostnameKey string, hostname string, provider string) HostnameData {
-	hostnameData := HostnameData{Hostname: hostname, Provider: provider}
+func saveHostnameWithProvider(cacheHostnameKey string, hostname string, provider string) WithProvider {
+	hostnameData := WithProvider{Hostname: hostname, Provider: provider}
 	cache.Cache.Set(cacheHostnameKey, hostnameData, cache.NoExpiration)
 	if provider != "" {
 		setHostnameProvider(provider)
@@ -129,8 +129,8 @@ func saveHostnameData(cacheHostnameKey string, hostname string, provider string)
 	return hostnameData
 }
 
-func saveAndValidateHostnameData(ctx context.Context, cacheHostnameKey string, hostname string, provider string) HostnameData {
-	hostnameData := saveHostnameData(cacheHostnameKey, hostname, HostnameProviderConfiguration)
+func saveAndValidateHostnameWithProvider(ctx context.Context, cacheHostnameKey string, hostname string, provider string) WithProvider {
+	hostnameData := saveHostnameWithProvider(cacheHostnameKey, hostname, HostnameProviderConfiguration)
 	if !isHostnameCanonicalForIntake(ctx, hostname) && !config.Datadog.GetBool("hostname_force_config_as_canonical") {
 		log.Warnf(
 			"Hostname '%s' defined in configuration will not be used as the in-app hostname. "+
@@ -142,7 +142,7 @@ func saveAndValidateHostnameData(ctx context.Context, cacheHostnameKey string, h
 	return hostnameData
 }
 
-// GetHostnameData retrieves the host name for the Agent and hostname provider, trying to query these
+// GetHostnameWithProvider retrieves the host name for the Agent and hostname provider, trying to query these
 // environments/api, in order:
 // * Config (`hostname')
 // * Config (`hostname_file')
@@ -151,10 +151,10 @@ func saveAndValidateHostnameData(ctx context.Context, cacheHostnameKey string, h
 // * kubernetes
 // * os
 // * EC2
-func GetHostnameData(ctx context.Context) (HostnameData, error) {
+func GetHostnameWithProvider(ctx context.Context) (WithProvider, error) {
 	cacheHostnameKey := cache.BuildAgentKey("hostname")
 	if cacheHostname, found := cache.Cache.Get(cacheHostnameKey); found {
-		return cacheHostname.(HostnameData), nil
+		return cacheHostname.(WithProvider), nil
 	}
 
 	var hostName string
@@ -165,7 +165,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 	configName := config.Datadog.GetString("hostname")
 	err = validate.ValidHostname(configName)
 	if err == nil {
-		return saveAndValidateHostnameData(
+		return saveAndValidateHostnameWithProvider(
 			ctx,
 			cacheHostnameKey,
 			configName,
@@ -190,7 +190,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 					"filename": configHostnameFilepath,
 				},
 			); err == nil {
-				return saveAndValidateHostnameData(ctx, cacheHostnameKey, hostname, "file"), nil
+				return saveAndValidateHostnameWithProvider(ctx, cacheHostnameKey, hostname, "file"), nil
 			}
 
 			expErr := new(expvar.String)
@@ -204,7 +204,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 
 	// If fargate we strip the hostname
 	if fargate.IsFargateInstance(ctx) {
-		hostnameData := saveHostnameData(cacheHostnameKey, "", "")
+		hostnameData := saveHostnameWithProvider(cacheHostnameKey, "", "")
 		return hostnameData, nil
 	}
 
@@ -213,7 +213,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 	if getGCEHostname := GetProvider("gce"); getGCEHostname != nil {
 		gceName, err := getGCEHostname(ctx, nil)
 		if err == nil {
-			hostnameData := saveHostnameData(cacheHostnameKey, gceName, "gce")
+			hostnameData := saveHostnameWithProvider(cacheHostnameKey, gceName, "gce")
 			return hostnameData, err
 		}
 		expErr := new(expvar.String)
@@ -282,7 +282,7 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 
 			if err == nil {
 				if prioritizeEC2Hostname {
-					return saveHostnameData(cacheHostnameKey, ec2Hostname, "aws"), nil
+					return saveHostnameWithProvider(cacheHostnameKey, ec2Hostname, "aws"), nil
 				}
 
 				hostName = ec2Hostname
@@ -354,12 +354,12 @@ func GetHostnameData(ctx context.Context) (HostnameData, error) {
 		expErr := new(expvar.String)
 		expErr.Set(err.Error())
 		hostnameErrors.Set("all", expErr)
-		return HostnameData{}, err
+		return WithProvider{}, err
 	}
 
 	// we have a hostname, cache it and return it
 
-	hostnameData := saveHostnameData(cacheHostnameKey, hostName, provider)
+	hostnameData := saveHostnameWithProvider(cacheHostnameKey, hostName, provider)
 	return hostnameData, nil
 }
 

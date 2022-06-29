@@ -23,7 +23,7 @@ type HostCollector struct{}
 
 // Send collects the data needed and submits the payload
 func (hp *HostCollector) Send(ctx context.Context, s serializer.MetricSerializer) error {
-	hostnameData, _ := hostname.GetHostnameData(ctx)
+	hostnameData, _ := hostname.GetHostnameWithProvider(ctx)
 	payload := v5.GetPayload(ctx, hostnameData)
 	if err := s.SendHostMetadata(payload); err != nil {
 		return fmt.Errorf("unable to submit host metadata payload, %s", err)
