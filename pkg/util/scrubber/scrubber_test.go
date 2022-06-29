@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,4 +83,56 @@ func TestScrubLine(t *testing.T) {
 	})
 	res := scrubber.ScrubLine("https://foo:bar@example.com")
 	require.Equal(t, "https://foo:********@example.com", res)
+}
+
+func TestNewlineBehavior(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "\nhelloworld\n",
+			expected: "\nhelloworld",
+		},
+		{
+			input:    "\nhelloworld",
+			expected: "\nhelloworld",
+		},
+		{
+			input:    "helloworld\n",
+			expected: "helloworld",
+		},
+		{
+			input:    "hello\nworld",
+			expected: "hello\nworld",
+		},
+		{
+			input:    "hello\nbig\nworld",
+			expected: "hello\nbig\nworld",
+		},
+		{
+			input:    "hello\n   \nworld",
+			expected: "hello\nworld",
+		},
+		{
+			input:    "\n\n\nhelloworld",
+			expected: "\n\n\nhelloworld",
+		},
+		{
+			input:    "helloworld\n\n\n",
+			expected: "helloworld",
+		},
+		{
+			input:    "\n",
+			expected: "\n",
+		},
+	}
+
+	scrubber := New()
+	for _, tc := range cases {
+		cleaned, err := scrubber.ScrubBytes([]byte(tc.input))
+		assert.Nil(t, err)
+		cleanedString := string(cleaned)
+		assert.Equal(t, tc.expected, cleanedString)
+	}
 }
