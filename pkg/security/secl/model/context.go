@@ -13,8 +13,8 @@ import (
 
 // Context describes the context used during a rule evaluation
 type Context struct {
-	Event    interface{}
-	UserData interface{}
+	Event    unsafe.Pointer
+	UserData unsafe.Pointer
 
 	// cache available across all the evaluations
 	Cache map[string]unsafe.Pointer
@@ -31,12 +31,12 @@ func (c *Context) Now() time.Time {
 }
 
 // SetEvent set the given event to the context
-func (c *Context) SetEvent(event interface{}) {
+func (c *Context) SetEvent(event unsafe.Pointer) {
 	c.Event = event
 }
 
 // SetUserData set the given data to the context
-func (c *Context) SetUserData(data interface{}) {
+func (c *Context) SetUserData(data unsafe.Pointer) {
 	c.UserData = data
 }
 
@@ -65,7 +65,7 @@ type ContextPool struct {
 }
 
 // Get returns a context with the given object
-func (c *ContextPool) Get(event interface{}, data interface{}) *Context {
+func (c *ContextPool) Get(event unsafe.Pointer, data unsafe.Pointer) *Context {
 	ctx := c.pool.Get().(*Context)
 	ctx.Event, ctx.UserData = event, data
 	return ctx

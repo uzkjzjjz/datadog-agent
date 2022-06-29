@@ -81,6 +81,16 @@ type Event struct {
 	probe               *Probe
 }
 
+// GetEvent return a model.Event from the eval.Context
+func GetEvent(ctx *eval.Context) *model.Event {
+	return &(*Event)(ctx.Object).Event
+}
+
+// GetHandlerContext return the handler context from the eval.Context
+func GetHandlerContext(ctx *eval.Context) *Resolvers {
+	return (*Event)(ctx.Object).resolvers
+}
+
 // Retain the event
 func (ev *Event) Retain() Event {
 	if ev.ProcessCacheEntry != nil {

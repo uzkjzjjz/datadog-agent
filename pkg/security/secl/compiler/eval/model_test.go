@@ -48,7 +48,7 @@ type testItemListIterator struct {
 }
 
 func (t *testItemListIterator) Front(ctx *Context) unsafe.Pointer {
-	if front := (*testEvent)(ctx.Object).process.list.Front(); front != nil {
+	if front := (*testEvent)(ctx.Event).process.list.Front(); front != nil {
 		t.prev = front
 		return unsafe.Pointer(front)
 	}
@@ -71,7 +71,7 @@ type testItemArrayIterator struct {
 func (t *testItemArrayIterator) Front(ctx *Context) unsafe.Pointer {
 	t.ctx = ctx
 
-	array := (*testEvent)(ctx.Object).process.array
+	array := (*testEvent)(ctx.Event).process.array
 	if t.index < len(array) {
 		t.index++
 		return unsafe.Pointer(array[0])
@@ -80,7 +80,7 @@ func (t *testItemArrayIterator) Front(ctx *Context) unsafe.Pointer {
 }
 
 func (t *testItemArrayIterator) Next() unsafe.Pointer {
-	array := (*testEvent)(t.ctx.Object).process.array
+	array := (*testEvent)(t.ctx.Event).process.array
 	if t.index < len(array) {
 		value := array[t.index]
 		t.index++
@@ -179,7 +179,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 
 		return &CIDREvaluator{
 			EvalFnc: func(ctx *Context) net.IPNet {
-				return (*testEvent)(ctx.Object).network.ip
+				return (*testEvent)(ctx.Event).network.ip
 			},
 			Field: field,
 		}, nil
@@ -188,7 +188,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 
 		return &CIDREvaluator{
 			EvalFnc: func(ctx *Context) net.IPNet {
-				return (*testEvent)(ctx.Object).network.cidr
+				return (*testEvent)(ctx.Event).network.cidr
 			},
 			Field: field,
 		}, nil
@@ -198,7 +198,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &CIDRArrayEvaluator{
 			EvalFnc: func(ctx *Context) []net.IPNet {
 				var ipnets []net.IPNet
-				for _, ip := range (*testEvent)(ctx.Object).network.ips {
+				for _, ip := range (*testEvent)(ctx.Event).network.ips {
 					ipnets = append(ipnets, ip)
 				}
 				return ipnets
@@ -209,7 +209,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 
 		return &CIDRArrayEvaluator{
 			EvalFnc: func(ctx *Context) []net.IPNet {
-				return (*testEvent)(ctx.Object).network.cidrs
+				return (*testEvent)(ctx.Event).network.cidrs
 			},
 			Field: field,
 		}, nil
@@ -217,7 +217,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	case "process.name":
 
 		return &StringEvaluator{
-			EvalFnc:     func(ctx *Context) string { return (*testEvent)(ctx.Object).process.name },
+			EvalFnc:     func(ctx *Context) string { return (*testEvent)(ctx.Event).process.name },
 			Field:       field,
 			OpOverrides: GlobCmp,
 		}, nil
@@ -225,7 +225,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	case "process.argv0":
 
 		return &StringEvaluator{
-			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Object).process.argv0 },
+			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Event).process.argv0 },
 			Field:   field,
 		}, nil
 
@@ -234,9 +234,9 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &IntEvaluator{
 			EvalFnc: func(ctx *Context) int {
 				// to test optimisation
-				(*testEvent)(ctx.Object).uidEvaluated = true
+				(*testEvent)(ctx.Event).uidEvaluated = true
 
-				return (*testEvent)(ctx.Object).process.uid
+				return (*testEvent)(ctx.Event).process.uid
 			},
 			Field: field,
 		}, nil
@@ -246,9 +246,9 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &IntEvaluator{
 			EvalFnc: func(ctx *Context) int {
 				// to test optimisation
-				(*testEvent)(ctx.Object).gidEvaluated = true
+				(*testEvent)(ctx.Event).gidEvaluated = true
 
-				return (*testEvent)(ctx.Object).process.gid
+				return (*testEvent)(ctx.Event).process.gid
 			},
 			Field: field,
 		}, nil
@@ -258,9 +258,9 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &IntEvaluator{
 			EvalFnc: func(ctx *Context) int {
 				// to test optimisation
-				(*testEvent)(ctx.Object).uidEvaluated = true
+				(*testEvent)(ctx.Event).uidEvaluated = true
 
-				return (*testEvent)(ctx.Object).process.pid
+				return (*testEvent)(ctx.Event).process.pid
 			},
 			Field: field,
 		}, nil
@@ -268,7 +268,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	case "process.is_root":
 
 		return &BoolEvaluator{
-			EvalFnc: func(ctx *Context) bool { return (*testEvent)(ctx.Object).process.isRoot },
+			EvalFnc: func(ctx *Context) bool { return (*testEvent)(ctx.Event).process.isRoot },
 			Field:   field,
 		}, nil
 
@@ -277,11 +277,11 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &IntArrayEvaluator{
 			EvalFnc: func(ctx *Context) []int {
 				// to test optimisation
-				(*testEvent)(ctx.Object).listEvaluated = true
+				(*testEvent)(ctx.Event).listEvaluated = true
 
 				var result []int
 
-				el := (*testEvent)(ctx.Object).process.list.Front()
+				el := (*testEvent)(ctx.Event).process.list.Front()
 				for el != nil {
 					result = append(result, el.Value.(*testItem).key)
 					el = el.Next()
@@ -298,11 +298,11 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &StringArrayEvaluator{
 			EvalFnc: func(ctx *Context) []string {
 				// to test optimisation
-				(*testEvent)(ctx.Object).listEvaluated = true
+				(*testEvent)(ctx.Event).listEvaluated = true
 
 				var values []string
 
-				el := (*testEvent)(ctx.Object).process.list.Front()
+				el := (*testEvent)(ctx.Event).process.list.Front()
 				for el != nil {
 					values = append(values, el.Value.(*testItem).value)
 					el = el.Next()
@@ -319,11 +319,11 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 		return &BoolArrayEvaluator{
 			EvalFnc: func(ctx *Context) []bool {
 				// to test optimisation
-				(*testEvent)(ctx.Object).listEvaluated = true
+				(*testEvent)(ctx.Event).listEvaluated = true
 
 				var result []bool
 
-				el := (*testEvent)(ctx.Object).process.list.Front()
+				el := (*testEvent)(ctx.Event).process.list.Front()
 				for el != nil {
 					result = append(result, el.Value.(*testItem).flag)
 					el = el.Next()
@@ -341,7 +341,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			EvalFnc: func(ctx *Context) []int {
 				var result []int
 
-				for _, el := range (*testEvent)(ctx.Object).process.array {
+				for _, el := range (*testEvent)(ctx.Event).process.array {
 					result = append(result, el.key)
 				}
 
@@ -357,7 +357,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			EvalFnc: func(ctx *Context) []string {
 				var values []string
 
-				for _, el := range (*testEvent)(ctx.Object).process.array {
+				for _, el := range (*testEvent)(ctx.Event).process.array {
 					values = append(values, el.value)
 				}
 
@@ -373,7 +373,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			EvalFnc: func(ctx *Context) []bool {
 				var result []bool
 
-				for _, el := range (*testEvent)(ctx.Object).process.array {
+				for _, el := range (*testEvent)(ctx.Event).process.array {
 					result = append(result, el.flag)
 				}
 
@@ -387,7 +387,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 
 		return &IntEvaluator{
 			EvalFnc: func(ctx *Context) int {
-				return int((*testEvent)(ctx.Object).process.createdAt)
+				return int((*testEvent)(ctx.Event).process.createdAt)
 			},
 			Field: field,
 		}, nil
@@ -396,14 +396,14 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 
 		return &StringEvaluator{
 			EvalFnc: func(ctx *Context) string {
-				return (*testEvent)(ctx.Object).process.orName
+				return (*testEvent)(ctx.Event).process.orName
 			},
 			Field: field,
 			OpOverrides: &OpOverrides{
 				StringValuesContains: func(a *StringEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
-							return (*testEvent)(ctx.Object).process.orNameValues()
+							return (*testEvent)(ctx.Event).process.orNameValues()
 						},
 					}
 
@@ -412,7 +412,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 				StringEquals: func(a *StringEvaluator, b *StringEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
-							return (*testEvent)(ctx.Object).process.orNameValues()
+							return (*testEvent)(ctx.Event).process.orNameValues()
 						},
 					}
 
@@ -427,7 +427,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			EvalFnc: func(ctx *Context) []string {
 				var values []string
 
-				for _, el := range (*testEvent)(ctx.Object).process.orArray {
+				for _, el := range (*testEvent)(ctx.Event).process.orArray {
 					values = append(values, el.value)
 				}
 
@@ -438,7 +438,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 				StringArrayContains: func(a *StringEvaluator, b *StringArrayEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
-							return (*testEvent)(ctx.Object).process.orArrayValues()
+							return (*testEvent)(ctx.Event).process.orArrayValues()
 						},
 					}
 
@@ -447,7 +447,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 				StringArrayMatches: func(a *StringArrayEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
-							return (*testEvent)(ctx.Object).process.orArrayValues()
+							return (*testEvent)(ctx.Event).process.orArrayValues()
 						},
 					}
 
@@ -459,35 +459,35 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	case "open.filename":
 
 		return &StringEvaluator{
-			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Object).open.filename },
+			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Event).open.filename },
 			Field:   field,
 		}, nil
 
 	case "open.flags":
 
 		return &IntEvaluator{
-			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Object).open.flags },
+			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Event).open.flags },
 			Field:   field,
 		}, nil
 
 	case "open.mode":
 
 		return &IntEvaluator{
-			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Object).open.mode },
+			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Event).open.mode },
 			Field:   field,
 		}, nil
 
 	case "mkdir.filename":
 
 		return &StringEvaluator{
-			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Object).mkdir.filename },
+			EvalFnc: func(ctx *Context) string { return (*testEvent)(ctx.Event).mkdir.filename },
 			Field:   field,
 		}, nil
 
 	case "mkdir.mode":
 
 		return &IntEvaluator{
-			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Object).mkdir.mode },
+			EvalFnc: func(ctx *Context) int { return (*testEvent)(ctx.Event).mkdir.mode },
 			Field:   field,
 		}, nil
 	}

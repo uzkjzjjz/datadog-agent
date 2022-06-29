@@ -37,14 +37,15 @@ const (
 )
 
 var (
-	filename             string
-	pkgname              string
-	output               string
-	verbose              bool
-	mock                 bool
-	docOutput            string
-	fieldsResolverOutput string
-	buildTags            string
+	filename          string
+	pkgname           string
+	output            string
+	verbose           bool
+	genAccessors      bool
+	genFieldsResolver bool
+	mock              bool
+	docOutput         string
+	buildTags         string
 )
 
 var (
@@ -72,8 +73,12 @@ func qualifiedType(module *common.Module, kind string) string {
 	case "int", "string", "bool":
 		return kind
 	default:
-		return module.SourcePkgPrefix + kind
+		if module.SourcePkgBase != "" {
+			return module.SourcePkgBase + "." + kind
+		}
 	}
+
+	return kind
 }
 
 func handleBasic(module *common.Module, name, alias, kind, event string, iterator *common.StructField, isArray bool, opOverrides string, constants string, commentText string) {
@@ -472,9 +477,11 @@ func parseFile(filename string, pkgName string) (*common.Module, error) {
 		Mock:       mock,
 	}
 
+	fmt.Printf("%s %s\n", pkgName, pkgName)
+
 	// If the target package is different from the model package
 	if module.Name != path.Base(pkgName) {
-		module.SourcePkgPrefix = path.Base(pkgName) + "."
+		module.SourcePkgBase = path.Base(pkgName)
 		module.TargetPkg = path.Clean(path.Join(pkgName, path.Dir(output)))
 	}
 
@@ -540,6 +547,9 @@ var funcMap = map[string]interface{}{
 //go:embed accessors.tmpl
 var accessorsTemplateCode string
 
+//go:embed evaluators.tmpl
+var evaluatorsTemplateCode string
+
 //go:embed fields_resolver.tmpl
 var fieldsResolverTemplate string
 
@@ -549,8 +559,11 @@ func main() {
 		panic(err)
 	}
 
-	if len(fieldsResolverOutput) > 0 {
-		if err = GenerateContent(fieldsResolverOutput, module, fieldsResolverTemplate); err != nil {
+	if genFieldsResolver {
+		filename := path.Join(output, "fields_resolver.go")
+		os.Remove(filename)
+
+		if err = GenerateContent(filename, module, fieldsResolverTemplate); err != nil {
 			panic(err)
 		}
 	}
@@ -562,8 +575,19 @@ func main() {
 		}
 	}
 
-	os.Remove(output)
-	if err := GenerateContent(output, module, accessorsTemplateCode); err != nil {
+	if genAccessors {
+		filename := path.Join(output, "accessors.go")
+		os.Remove(filename)
+
+		if err := GenerateContent(filename, module, accessorsTemplateCode); err != nil {
+			panic(err)
+		}
+	}
+
+	filename := path.Join(output, "evaluators.go")
+	os.Remove(filename)
+
+	if err := GenerateContent(filename, module, evaluatorsTemplateCode); err != nil {
 		panic(err)
 	}
 }
@@ -616,9 +640,10 @@ func removeEmptyLines(input *bytes.Buffer) string {
 
 func init() {
 	flag.BoolVar(&verbose, "verbose", false, "Be verbose")
-	flag.BoolVar(&mock, "mock", false, "Mock accessors")
+	flag.BoolVar(&mock, "mock", false, "Generate a mock version")
+	flag.BoolVar(&genAccessors, "accessors", false, "Generate accessors")
+	flag.BoolVar(&genFieldsResolver, "fields-resolver", false, "Generate fields resolver")
 	flag.StringVar(&docOutput, "doc", "", "Generate documentation JSON")
-	flag.StringVar(&fieldsResolverOutput, "fields-resolver", "", "Fields resolver output file")
 	flag.StringVar(&filename, "input", os.Getenv("GOFILE"), "Go file to generate decoders from")
 	flag.StringVar(&pkgname, "package", pkgPrefix+"/"+os.Getenv("GOPACKAGE"), "Go package name")
 	flag.StringVar(&buildTags, "tags", "", "build tags used for parsing")

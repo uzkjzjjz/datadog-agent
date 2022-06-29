@@ -1491,7 +1491,7 @@ func BenchmarkPool(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := pool.Get(unsafe.Pointer(event))
+		ctx := pool.Get(unsafe.Pointer(event), nil)
 		if evaluator.Eval(ctx) != true {
 			b.Fatal("unexpected result")
 		}
