@@ -84,7 +84,7 @@ type Delta struct {
 type telemetry struct {
 	closedConnDropped  int64
 	connDropped        int64
-	statsResets        int64
+	statsUnderflows    int64
 	timeSyncCollisions int64
 	dnsStatsDropped    int64
 	httpStatsDropped   int64
@@ -438,6 +438,22 @@ func (ns *networkState) getClient(clientID string) *client {
 	return c
 }
 
+func maxUInt64(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+func maxUInt32(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
 // mergeConnections return the connections and takes care of updating their last stat counters
 func (ns *networkState) mergeConnections(id string, active map[string]*ConnectionStats, buffer *clientBuffer) {
 	now := time.Now()
@@ -452,29 +468,18 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 		key := string(closedConn.ByteKey(ns.buf))
 		closedKeys[key] = struct{}{}
 
-		// If the connection is also active, check the epochs to understand what's going on
+		// If the connection is also active, take the max of each stat
 		if activeConn, ok := active[key]; ok {
-			// If closed conn is newer it means that the active connection is outdated, let's ignore it
-			if closedConn.LastUpdateEpoch > activeConn.LastUpdateEpoch {
-				ns.updateConnWithStats(client, key, closedConn)
-			} else if closedConn.LastUpdateEpoch < activeConn.LastUpdateEpoch {
-				// Else if the active conn is newer, it likely means that it became active again
-				// in this case we aggregate the two
-				addConnections(closedConn, activeConn)
-				ns.createStatsForKey(client, key)
-				ns.updateConnWithStatWithActiveConn(client, key, activeConn, closedConn)
-			} else {
-				// Else the closed connection and the active connection have the same epoch
-				// XXX: For now we assume that the closed connection is the more recent one but this is not guaranteed
-				// To fix this we should have a way to uniquely identify a connection
-				// (using the startTimestamp or a monotonic counter)
-				ns.telemetry.timeSyncCollisions++
-				log.Tracef("Time collision for connections: closed:%+v, active:%+v", closedConn, activeConn)
-				ns.updateConnWithStats(client, key, closedConn)
-			}
-		} else {
-			ns.updateConnWithStats(client, key, closedConn)
+			closedConn.Monotonic.RecvBytes = maxUInt64(closedConn.Monotonic.RecvBytes, activeConn.Monotonic.RecvBytes)
+			closedConn.Monotonic.SentBytes = maxUInt64(closedConn.Monotonic.SentBytes, activeConn.Monotonic.SentBytes)
+			closedConn.Monotonic.RecvPackets = maxUInt64(closedConn.Monotonic.RecvPackets, activeConn.Monotonic.RecvPackets)
+			closedConn.Monotonic.SentPackets = maxUInt64(closedConn.Monotonic.SentPackets, activeConn.Monotonic.SentPackets)
+			closedConn.Monotonic.TCPClosed = maxUInt32(closedConn.Monotonic.TCPClosed, activeConn.Monotonic.TCPClosed)
+			closedConn.Monotonic.TCPEstablished = maxUInt32(closedConn.Monotonic.TCPEstablished, activeConn.Monotonic.TCPEstablished)
+			closedConn.Monotonic.Retransmits = maxUInt32(closedConn.Monotonic.Retransmits, activeConn.Monotonic.Retransmits)
 		}
+
+		ns.updateConnWithStats(client, key, closedConn)
 	}
 	buffer.Append(closed)
 
@@ -485,76 +490,31 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 			continue
 		}
 
-		ns.createStatsForKey(client, key)
 		ns.updateConnWithStats(client, key, c)
 
 		*buffer.Next() = *c
 	}
 }
 
-// This is used to update the stats when we process a closed connection that became active again
-// in this case we want the stats to reflect the new active connections in order to avoid resets
-func (ns *networkState) updateConnWithStatWithActiveConn(client *client, key string, active *ConnectionStats, closed *ConnectionStats) {
-	if st, ok := client.stats[key]; ok {
-		// Check for underflows
-		ns.handleStatsUnderflow(key, st, closed)
-
-		closed.Last.SentBytes = closed.Monotonic.SentBytes - st.SentBytes
-		closed.Last.RecvBytes = closed.Monotonic.RecvBytes - st.RecvBytes
-		closed.Last.SentPackets = closed.Monotonic.SentPackets - st.SentPackets
-		closed.Last.RecvPackets = closed.Monotonic.RecvPackets - st.RecvPackets
-
-		closed.Last.Retransmits = closed.Monotonic.Retransmits - st.Retransmits
-		closed.Last.TCPEstablished = closed.Monotonic.TCPEstablished - st.TCPEstablished
-		closed.Last.TCPClosed = closed.Monotonic.TCPClosed - st.TCPClosed
-
-		// We also update the counters to reflect only the active connection
-		// The monotonic counters will be the sum of all connections that cross our interval start + finish.
-		*st = active.Monotonic
-	} else {
-		closed.Last = closed.Monotonic
-	}
-}
-
 func (ns *networkState) updateConnWithStats(client *client, key string, c *ConnectionStats) {
-	if st, ok := client.stats[key]; ok {
-		// Check for underflows
-		ns.handleStatsUnderflow(key, st, c)
-
-		c.Last.SentBytes = c.Monotonic.SentBytes - st.SentBytes
-		c.Last.RecvBytes = c.Monotonic.RecvBytes - st.RecvBytes
-		c.Last.SentPackets = c.Monotonic.SentPackets - st.SentPackets
-		c.Last.RecvPackets = c.Monotonic.RecvPackets - st.RecvPackets
-		c.Last.Retransmits = c.Monotonic.Retransmits - st.Retransmits
-		c.Last.TCPEstablished = c.Monotonic.TCPEstablished - st.TCPEstablished
-		c.Last.TCPClosed = c.Monotonic.TCPClosed - st.TCPClosed
-
-		*st = c.Monotonic
-	} else {
-		c.Last = c.Monotonic
-	}
-}
-
-// handleStatsUnderflow checks if we are going to have an underflow when computing last stats and if it's the case it resets the stats to avoid it
-func (ns *networkState) handleStatsUnderflow(key string, st *StatCounters, c *ConnectionStats) {
-	if c.Monotonic.SentBytes < st.SentBytes || c.Monotonic.RecvBytes < st.RecvBytes || c.Monotonic.Retransmits < st.Retransmits {
-		ns.telemetry.statsResets++
-		log.Debugf("Stats reset triggered for key:%s, stats:%+v, connection:%+v", BeautifyKey(key), *st, *c)
-		st.SentBytes = 0
-		st.RecvBytes = 0
-		st.Retransmits = 0
-	}
-}
-
-// createStatsForKey will create a new stats object for a key if it doesn't already exist.
-func (ns *networkState) createStatsForKey(client *client, key string) {
-	if _, ok := client.stats[key]; !ok {
+	st := client.stats[key]
+	if st == nil {
 		if len(client.stats) >= ns.maxClientStats {
 			ns.telemetry.connDropped++
 			return
 		}
-		client.stats[key] = &StatCounters{}
+
+		st = &StatCounters{}
+		client.stats[key] = st
 	}
+
+	var underflow bool
+	if c.Last, underflow = c.Monotonic.Sub(*st); underflow {
+		ns.telemetry.statsUnderflows++
+		log.Debugf("Stats underflow for key:%s, stats:%+v, connection:%+v", BeautifyKey(key), *st, *c)
+	}
+
+	*st = c.Monotonic
 }
 
 func (ns *networkState) RemoveClient(clientID string) {
@@ -588,9 +548,9 @@ func (ns *networkState) RemoveConnections(keys []string) {
 	}
 
 	// Flush log line if any metric is non zero
-	if ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
+	if ns.telemetry.statsUnderflows > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
 		s := "state telemetry: "
-		s += " [%d stats stats_resets]"
+		s += " [%d stats underflows]"
 		s += " [%d connections dropped due to stats]"
 		s += " [%d closed connections dropped]"
 		s += " [%d dns stats dropped]"
@@ -598,7 +558,7 @@ func (ns *networkState) RemoveConnections(keys []string) {
 		s += " [%d DNS pid collisions]"
 		s += " [%d time sync collisions]"
 		log.Warnf(s,
-			ns.telemetry.statsResets,
+			ns.telemetry.statsUnderflows,
 			ns.telemetry.connDropped,
 			ns.telemetry.closedConnDropped,
 			ns.telemetry.dnsStatsDropped,
@@ -627,7 +587,7 @@ func (ns *networkState) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"clients": clientInfo,
 		"telemetry": map[string]int64{
-			"stats_resets":         ns.telemetry.statsResets,
+			"stats_underflows":     ns.telemetry.statsUnderflows,
 			"closed_conn_dropped":  ns.telemetry.closedConnDropped,
 			"conn_dropped":         ns.telemetry.connDropped,
 			"time_sync_collisions": ns.telemetry.timeSyncCollisions,
@@ -719,13 +679,7 @@ func (ns *networkState) determineConnectionIntraHost(connections []ConnectionSta
 }
 
 func addConnections(a, b *ConnectionStats) {
-	a.Monotonic.SentBytes += b.Monotonic.SentBytes
-	a.Monotonic.RecvBytes += b.Monotonic.RecvBytes
-	a.Monotonic.SentPackets += b.Monotonic.SentPackets
-	a.Monotonic.RecvPackets += b.Monotonic.RecvPackets
-	a.Monotonic.Retransmits += b.Monotonic.Retransmits
-	a.Monotonic.TCPEstablished += b.Monotonic.TCPEstablished
-	a.Monotonic.TCPClosed += b.Monotonic.TCPClosed
+	a.Monotonic = a.Monotonic.Add(b.Monotonic)
 
 	if b.LastUpdateEpoch > a.LastUpdateEpoch {
 		a.LastUpdateEpoch = b.LastUpdateEpoch

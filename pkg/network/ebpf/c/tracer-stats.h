@@ -84,6 +84,12 @@ static __always_inline void update_conn_stats(conn_tuple_t *t, size_t sent_bytes
         }
         val->direction = (port_count != NULL && *port_count > 0) ? CONN_DIRECTION_INCOMING : CONN_DIRECTION_OUTGOING;
     }
+
+    // make sure we update the map once again since the entry
+    // may have been deleted in the closed connection path
+    if (bpf_map_update_elem(&conn_stats, t, val, BPF_ANY) == -E2BIG) {
+        increment_telemetry_count(conn_stats_max_entries_hit);
+    }
 }
 
 static __always_inline void update_tcp_stats(conn_tuple_t *t, tcp_stats_t stats) {
