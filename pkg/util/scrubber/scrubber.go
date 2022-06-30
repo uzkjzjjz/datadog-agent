@@ -49,7 +49,6 @@ const (
 )
 
 var commentRegex = regexp.MustCompile(`(?s)^\s*#.*$`)
-var blankRegex = regexp.MustCompile(`^\s*$`)
 
 // Scrubber implements support for cleaning sensitive information out of strings
 // and files.  Its intended use is to "clean" data before it is logged or
