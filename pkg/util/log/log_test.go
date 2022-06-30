@@ -100,6 +100,39 @@ func TestBasicLogging(t *testing.T) {
 	})
 }
 
+func TestWhitespaceLogging(t *testing.T) {
+	cases := []struct {
+		toBeLogged     string
+		expectedResult string
+	}{
+		{
+			toBeLogged:     "Hello World",
+			expectedResult: "[INFO] Hello World\n",
+		},
+		{
+			toBeLogged:     "\nHello World",
+			expectedResult: "[INFO] \nHello World\n",
+		},
+		{
+			toBeLogged:     "\nHello\n    \n World",
+			expectedResult: "[INFO] \nHello\n    \n World\n",
+		},
+	}
+	for _, tc := range cases {
+		var b bytes.Buffer
+		w := bufio.NewWriter(&b)
+
+		l, err := seelog.LoggerFromWriterWithMinLevelAndFormat(w, seelog.DebugLvl, "[%LEVEL] %Msg\n")
+		assert.Nil(t, err)
+		SetupLogger(l, "info")
+
+		Info(tc.toBeLogged)
+		w.Flush()
+
+		assert.Equal(t, tc.expectedResult, b.String())
+	}
+}
+
 func TestLogBuffer(t *testing.T) {
 	// reset buffer state
 	logsBuffer = []func(){}

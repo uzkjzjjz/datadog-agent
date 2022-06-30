@@ -40,25 +40,25 @@ func TestReplFunc(t *testing.T) {
 	require.Equal(t, "dog FOOd", string(res))
 }
 
-func TestSkipCommentsAndBlanks(t *testing.T) {
+func TestChainedReplaces(t *testing.T) {
 	scrubber := New()
 	scrubber.AddReplacer(SingleLine, Replacer{
 		Regex: regexp.MustCompile("foo"),
 		Repl:  []byte("bar"),
 	})
 	scrubber.AddReplacer(MultiLine, Replacer{
-		Regex: regexp.MustCompile("with bar\nanother"),
+		Regex: regexp.MustCompile("with bar"),
 		Repl:  []byte("..."),
 	})
-	res, err := scrubber.ScrubBytes([]byte("a line with foo\n\n  \n  # a comment with foo\nanother line"))
+	res, err := scrubber.ScrubBytes([]byte("a line with foo"))
 	require.NoError(t, err)
-	require.Equal(t, "a line ... line", string(res))
+	require.Equal(t, "a line ...", string(res))
 }
 
 func TestCleanFile(t *testing.T) {
 	dir := t.TempDir()
 	filename := filepath.Join(dir, "test.yml")
-	ioutil.WriteFile(filename, []byte("a line with foo\n\na line with bar"), 0666)
+	ioutil.WriteFile(filename, []byte("a line with foo\na line with bar"), 0666)
 
 	scrubber := New()
 	scrubber.AddReplacer(SingleLine, Replacer{
@@ -85,6 +85,15 @@ func TestScrubLine(t *testing.T) {
 	require.Equal(t, "https://foo:********@example.com", res)
 }
 
+func TestSimpleComment(t *testing.T) {
+
+	scrubber := New()
+	cleaned, err := scrubber.ScrubBytes([]byte("hello\n#comment\nworld"))
+	assert.Nil(t, err)
+	cleanedString := string(cleaned)
+	assert.Equal(t, "hello\nworld", cleanedString)
+}
+
 func TestNewlineBehavior(t *testing.T) {
 	cases := []struct {
 		input    string
@@ -92,7 +101,7 @@ func TestNewlineBehavior(t *testing.T) {
 	}{
 		{
 			input:    "\nhelloworld\n",
-			expected: "\nhelloworld",
+			expected: "\nhelloworld\n",
 		},
 		{
 			input:    "\nhelloworld",
@@ -100,7 +109,7 @@ func TestNewlineBehavior(t *testing.T) {
 		},
 		{
 			input:    "helloworld\n",
-			expected: "helloworld",
+			expected: "helloworld\n",
 		},
 		{
 			input:    "hello\nworld",
@@ -112,7 +121,15 @@ func TestNewlineBehavior(t *testing.T) {
 		},
 		{
 			input:    "hello\n   \nworld",
-			expected: "hello\nworld",
+			expected: "hello\n   \nworld",
+		},
+		{
+			input:    "hello\n  \n \nworld",
+			expected: "hello\n  \n \nworld",
+		},
+		{
+			input:    "==\nComponentName\n==\n\nData About Component",
+			expected: "==\nComponentName\n==\n\nData About Component",
 		},
 		{
 			input:    "\n\n\nhelloworld",
@@ -120,7 +137,7 @@ func TestNewlineBehavior(t *testing.T) {
 		},
 		{
 			input:    "helloworld\n\n\n",
-			expected: "helloworld",
+			expected: "helloworld\n\n\n",
 		},
 		{
 			input:    "\n",

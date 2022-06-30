@@ -48,7 +48,7 @@ const (
 	MultiLine
 )
 
-var commentRegex = regexp.MustCompile(`^\s*#.*$`)
+var commentRegex = regexp.MustCompile(`(?s)^\s*#.*$`)
 var blankRegex = regexp.MustCompile(`^\s*$`)
 
 // Scrubber implements support for cleaning sensitive information out of strings
@@ -112,24 +112,17 @@ func (c *Scrubber) scrubReader(file io.Reader) ([]byte, error) {
 	var cleanedFile []byte
 
 	scanner := bufio.NewScanner(file)
+	scanner.Split(ScanLinesWithTrailingNewline)
 
 	// First, we go through the file line by line, applying any
 	// single-line replacer that matches the line.
-	first := true
 	for scanner.Scan() {
 		b := scanner.Bytes()
 
-		if first && blankRegex.Match(b) {
-			cleanedFile = append(cleanedFile, byte('\n'))
-		} else if !commentRegex.Match(b) && !blankRegex.Match(b) && string(b) != "" {
+		if !commentRegex.Match(b) {
 			b = c.scrub(b, c.singleLineReplacers)
 
-			if !first {
-				cleanedFile = append(cleanedFile, byte('\n'))
-			}
-
 			cleanedFile = append(cleanedFile, b...)
-			first = false
 		}
 	}
 
