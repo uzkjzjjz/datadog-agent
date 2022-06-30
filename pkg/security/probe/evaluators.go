@@ -103,9 +103,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				result := make([]int, len(ResolveHelpers(handlerCtx, &event.BPF.Program)))
-				for i, v := range ResolveHelpers(handlerCtx, &event.BPF.Program) {
+				probeCtx := GetProbeContext(ctx)
+				result := make([]int, len(ResolveHelpers(probeCtx, event, &event.BPF.Program)))
+				for i, v := range ResolveHelpers(probeCtx, event, &event.BPF.Program) {
 					result[i] = int(v)
 				}
 				return result
@@ -198,8 +198,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Chmod.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Chmod.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -217,8 +217,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Chmod.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Chmod.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -227,8 +227,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Chmod.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Chmod.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -274,8 +274,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Chmod.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Chmod.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -285,8 +285,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Chmod.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Chmod.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -295,8 +295,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Chmod.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Chmod.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -314,8 +314,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Chmod.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Chmod.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -351,8 +351,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveChownGID(handlerCtx, &event.Chown)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveChownGID(probeCtx, event, &event.Chown)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -370,8 +370,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveChownUID(handlerCtx, &event.Chown)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveChownUID(probeCtx, event, &event.Chown)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -380,8 +380,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Chown.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Chown.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -399,8 +399,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Chown.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Chown.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -409,8 +409,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Chown.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Chown.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -456,8 +456,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Chown.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Chown.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -467,8 +467,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Chown.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Chown.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -477,8 +477,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Chown.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Chown.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -496,8 +496,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Chown.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Chown.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -515,8 +515,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveContainerID(handlerCtx, &event.ContainerContext)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveContainerID(probeCtx, event, &event.ContainerContext)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -525,8 +525,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveContainerTags(handlerCtx, &event.ContainerContext)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveContainerTags(probeCtx, event, &event.ContainerContext)
 			},
 			Field:  field,
 			Weight: 9999 * eval.HandlerWeight,
@@ -581,8 +581,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgs(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgs(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -591,8 +591,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsFlags(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsFlags(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -601,8 +601,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsOptions(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsOptions(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -611,8 +611,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsTruncated(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsTruncated(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -621,8 +621,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -631,8 +631,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv0(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv0(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -686,8 +686,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveProcessCreatedAt(handlerCtx, event.Exec.Process))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveProcessCreatedAt(probeCtx, event, event.Exec.Process))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -714,8 +714,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvp(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvp(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -724,8 +724,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvs(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvs(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -734,8 +734,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvsTruncated(handlerCtx, event.Exec.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvsTruncated(probeCtx, event, event.Exec.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -771,8 +771,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Exec.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Exec.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -790,8 +790,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Exec.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Exec.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -800,8 +800,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Exec.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Exec.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -847,8 +847,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Exec.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Exec.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -858,8 +858,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Exec.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Exec.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -868,8 +868,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Exec.Process.FileEvent.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Exec.Process.FileEvent.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -887,8 +887,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Exec.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Exec.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1014,8 +1014,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgs(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgs(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -1024,8 +1024,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsFlags(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsFlags(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1034,8 +1034,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsOptions(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsOptions(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1044,8 +1044,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsTruncated(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsTruncated(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1054,8 +1054,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -1064,8 +1064,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv0(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv0(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -1137,8 +1137,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveProcessCreatedAt(handlerCtx, event.Exit.Process))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveProcessCreatedAt(probeCtx, event, event.Exit.Process))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1165,8 +1165,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvp(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvp(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1175,8 +1175,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvs(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvs(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1185,8 +1185,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvsTruncated(handlerCtx, event.Exit.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvsTruncated(probeCtx, event, event.Exit.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1222,8 +1222,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Exit.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Exit.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1241,8 +1241,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Exit.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Exit.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1251,8 +1251,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Exit.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Exit.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1298,8 +1298,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Exit.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Exit.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1309,8 +1309,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Exit.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Exit.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1319,8 +1319,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Exit.Process.FileEvent.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Exit.Process.FileEvent.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1338,8 +1338,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Exit.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Exit.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1483,8 +1483,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Link.Target)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Link.Target)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1502,8 +1502,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Link.Target.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Link.Target.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1512,8 +1512,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Link.Target.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Link.Target.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1559,8 +1559,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Link.Target)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Link.Target)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1570,8 +1570,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Link.Target)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Link.Target)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1580,8 +1580,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Link.Target.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Link.Target.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1599,8 +1599,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Link.Target.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Link.Target.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1609,8 +1609,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Link.Source)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Link.Source)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1628,8 +1628,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Link.Source.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Link.Source.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1638,8 +1638,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Link.Source.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Link.Source.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1685,8 +1685,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Link.Source)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Link.Source)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1696,8 +1696,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Link.Source)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Link.Source)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1706,8 +1706,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Link.Source.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Link.Source.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1725,8 +1725,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Link.Source.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Link.Source.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1753,8 +1753,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.LoadModule.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.LoadModule.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1772,8 +1772,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.LoadModule.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.LoadModule.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1782,8 +1782,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.LoadModule.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.LoadModule.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1829,8 +1829,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.LoadModule.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.LoadModule.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1840,8 +1840,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.LoadModule.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.LoadModule.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1850,8 +1850,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.LoadModule.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.LoadModule.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1869,8 +1869,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.LoadModule.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.LoadModule.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1933,8 +1933,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Mkdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Mkdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1952,8 +1952,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Mkdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Mkdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -1962,8 +1962,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Mkdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Mkdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2009,8 +2009,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Mkdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Mkdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2020,8 +2020,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Mkdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Mkdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2030,8 +2030,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Mkdir.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Mkdir.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2049,8 +2049,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Mkdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Mkdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2077,8 +2077,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.MMap.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.MMap.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2096,8 +2096,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.MMap.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.MMap.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2106,8 +2106,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.MMap.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.MMap.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2153,8 +2153,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.MMap.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.MMap.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2164,8 +2164,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.MMap.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.MMap.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2174,8 +2174,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.MMap.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.MMap.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2193,8 +2193,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.MMap.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.MMap.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2284,8 +2284,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveNetworkDeviceIfName(handlerCtx, &event.NetworkContext.Device)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveNetworkDeviceIfName(probeCtx, event, &event.NetworkContext.Device)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2357,8 +2357,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Open.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Open.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2376,8 +2376,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Open.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Open.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2386,8 +2386,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Open.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Open.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2433,8 +2433,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Open.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Open.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2444,8 +2444,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Open.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Open.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2454,8 +2454,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Open.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Open.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2473,8 +2473,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Open.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Open.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -2510,9 +2510,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -2534,9 +2534,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsFlags(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsFlags(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -2558,9 +2558,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsOptions(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsOptions(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -2582,9 +2582,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -2606,9 +2606,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -2630,9 +2630,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv0(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv0(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -2764,9 +2764,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveProcessCreatedAt(hanlderCtx, &element.ProcessContext.Process))
+					result := int(ResolveProcessCreatedAt(probeCtx, event, &element.ProcessContext.Process))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -2832,9 +2832,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvp(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvp(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -2856,9 +2856,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -2880,9 +2880,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -2970,9 +2970,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFilesystem(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileFilesystem(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3016,9 +3016,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsGroup(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsGroup(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3040,9 +3040,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsInUpperLayer(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsInUpperLayer(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3153,9 +3153,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileBasename(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileBasename(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3178,9 +3178,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFilePath(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFilePath(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3202,9 +3202,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveRights(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields))
+					result := int(ResolveRights(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3248,9 +3248,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsUser(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsUser(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -3549,8 +3549,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgs(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgs(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -3559,8 +3559,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsFlags(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsFlags(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3569,8 +3569,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsOptions(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsOptions(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3579,8 +3579,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsTruncated(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsTruncated(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3589,8 +3589,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -3599,8 +3599,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv0(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv0(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -3654,8 +3654,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveProcessCreatedAt(handlerCtx, &event.ProcessContext.Process))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveProcessCreatedAt(probeCtx, event, &event.ProcessContext.Process))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3682,8 +3682,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvp(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvp(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3692,8 +3692,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvs(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvs(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3702,8 +3702,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvsTruncated(handlerCtx, &event.ProcessContext.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvsTruncated(probeCtx, event, &event.ProcessContext.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3739,8 +3739,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.ProcessContext.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.ProcessContext.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3758,8 +3758,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.ProcessContext.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.ProcessContext.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3768,8 +3768,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.ProcessContext.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.ProcessContext.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3815,8 +3815,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.ProcessContext.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.ProcessContext.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3826,8 +3826,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.ProcessContext.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.ProcessContext.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3836,8 +3836,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.ProcessContext.Process.FileEvent.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.ProcessContext.Process.FileEvent.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -3855,8 +3855,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.ProcessContext.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.ProcessContext.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -4009,9 +4009,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4033,9 +4033,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsFlags(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsFlags(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -4057,9 +4057,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsOptions(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsOptions(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -4081,9 +4081,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4105,9 +4105,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -4129,9 +4129,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv0(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv0(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4263,9 +4263,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveProcessCreatedAt(hanlderCtx, &element.ProcessContext.Process))
+					result := int(ResolveProcessCreatedAt(probeCtx, event, &element.ProcessContext.Process))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4331,9 +4331,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvp(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvp(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -4355,9 +4355,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -4379,9 +4379,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4469,9 +4469,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFilesystem(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileFilesystem(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4515,9 +4515,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsGroup(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsGroup(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4539,9 +4539,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsInUpperLayer(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsInUpperLayer(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4652,9 +4652,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileBasename(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileBasename(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4677,9 +4677,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFilePath(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFilePath(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4701,9 +4701,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveRights(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields))
+					result := int(ResolveRights(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -4747,9 +4747,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsUser(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsUser(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -5048,8 +5048,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgs(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgs(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -5058,8 +5058,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsFlags(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsFlags(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5068,8 +5068,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsOptions(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsOptions(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5078,8 +5078,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsTruncated(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsTruncated(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5088,8 +5088,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -5098,8 +5098,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv0(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv0(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -5153,8 +5153,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveProcessCreatedAt(handlerCtx, &event.PTrace.Tracee.Process))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveProcessCreatedAt(probeCtx, event, &event.PTrace.Tracee.Process))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5181,8 +5181,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvp(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvp(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5191,8 +5191,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvs(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvs(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5201,8 +5201,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvsTruncated(handlerCtx, &event.PTrace.Tracee.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvsTruncated(probeCtx, event, &event.PTrace.Tracee.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5238,8 +5238,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.PTrace.Tracee.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5257,8 +5257,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.PTrace.Tracee.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5267,8 +5267,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.PTrace.Tracee.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5314,8 +5314,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.PTrace.Tracee.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5325,8 +5325,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.PTrace.Tracee.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5335,8 +5335,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.PTrace.Tracee.Process.FileEvent.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5354,8 +5354,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.PTrace.Tracee.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.PTrace.Tracee.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5490,8 +5490,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveXAttrName(handlerCtx, &event.RemoveXAttr)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveXAttrName(probeCtx, event, &event.RemoveXAttr)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5500,8 +5500,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveXAttrNamespace(handlerCtx, &event.RemoveXAttr)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveXAttrNamespace(probeCtx, event, &event.RemoveXAttr)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5510,8 +5510,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.RemoveXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.RemoveXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5529,8 +5529,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.RemoveXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.RemoveXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5539,8 +5539,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.RemoveXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.RemoveXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5586,8 +5586,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.RemoveXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.RemoveXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5597,8 +5597,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.RemoveXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.RemoveXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5607,8 +5607,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.RemoveXAttr.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.RemoveXAttr.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5626,8 +5626,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.RemoveXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.RemoveXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5663,8 +5663,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Rename.New)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Rename.New)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5682,8 +5682,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Rename.New.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Rename.New.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5692,8 +5692,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Rename.New.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Rename.New.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5739,8 +5739,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Rename.New)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Rename.New)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5750,8 +5750,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Rename.New)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Rename.New)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5760,8 +5760,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Rename.New.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Rename.New.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5779,8 +5779,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Rename.New.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Rename.New.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5789,8 +5789,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Rename.Old)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Rename.Old)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5808,8 +5808,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Rename.Old.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Rename.Old.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5818,8 +5818,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Rename.Old.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Rename.Old.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5865,8 +5865,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Rename.Old)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Rename.Old)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5876,8 +5876,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Rename.Old)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Rename.Old)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5886,8 +5886,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Rename.Old.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Rename.Old.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5905,8 +5905,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Rename.Old.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Rename.Old.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5933,8 +5933,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Rmdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Rmdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5952,8 +5952,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Rmdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Rmdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -5962,8 +5962,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Rmdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Rmdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6009,8 +6009,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Rmdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Rmdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6020,8 +6020,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Rmdir.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Rmdir.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6030,8 +6030,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Rmdir.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Rmdir.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6049,8 +6049,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Rmdir.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Rmdir.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6068,8 +6068,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSELinuxBoolName(handlerCtx, &event.SELinux)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSELinuxBoolName(probeCtx, event, &event.SELinux)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6114,8 +6114,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetgidEGroup(handlerCtx, &event.SetGID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetgidEGroup(probeCtx, event, &event.SetGID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6133,8 +6133,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetgidFSGroup(handlerCtx, &event.SetGID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetgidFSGroup(probeCtx, event, &event.SetGID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6152,8 +6152,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetgidGroup(handlerCtx, &event.SetGID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetgidGroup(probeCtx, event, &event.SetGID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6171,8 +6171,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetuidEUser(handlerCtx, &event.SetUID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetuidEUser(probeCtx, event, &event.SetUID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6190,8 +6190,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetuidFSUser(handlerCtx, &event.SetUID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetuidFSUser(probeCtx, event, &event.SetUID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6209,8 +6209,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveSetuidUser(handlerCtx, &event.SetUID)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveSetuidUser(probeCtx, event, &event.SetUID)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6228,8 +6228,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveXAttrName(handlerCtx, &event.SetXAttr)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveXAttrName(probeCtx, event, &event.SetXAttr)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6238,8 +6238,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveXAttrNamespace(handlerCtx, &event.SetXAttr)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveXAttrNamespace(probeCtx, event, &event.SetXAttr)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6248,8 +6248,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.SetXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.SetXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6267,8 +6267,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.SetXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.SetXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6277,8 +6277,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.SetXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.SetXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6324,8 +6324,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.SetXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.SetXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6335,8 +6335,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.SetXAttr.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.SetXAttr.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6345,8 +6345,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.SetXAttr.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.SetXAttr.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6364,8 +6364,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.SetXAttr.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.SetXAttr.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -6410,9 +6410,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6434,9 +6434,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsFlags(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsFlags(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -6458,9 +6458,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsOptions(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsOptions(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -6482,9 +6482,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6506,9 +6506,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -6530,9 +6530,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessArgv0(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessArgv0(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6664,9 +6664,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveProcessCreatedAt(hanlderCtx, &element.ProcessContext.Process))
+					result := int(ResolveProcessCreatedAt(probeCtx, event, &element.ProcessContext.Process))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6732,9 +6732,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvp(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvp(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -6756,9 +6756,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvs(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvs(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result...)
 					value = iterator.Next()
 				}
@@ -6780,9 +6780,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveProcessEnvsTruncated(hanlderCtx, &element.ProcessContext.Process)
+					result := ResolveProcessEnvsTruncated(probeCtx, event, &element.ProcessContext.Process)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6870,9 +6870,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFilesystem(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileFilesystem(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6916,9 +6916,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsGroup(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsGroup(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -6940,9 +6940,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsInUpperLayer(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsInUpperLayer(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -7053,9 +7053,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileBasename(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFileBasename(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -7078,9 +7078,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFilePath(hanlderCtx, &element.ProcessContext.Process.FileEvent)
+					result := ResolveFilePath(probeCtx, event, &element.ProcessContext.Process.FileEvent)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -7102,9 +7102,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := int(ResolveRights(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields))
+					result := int(ResolveRights(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields))
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -7148,9 +7148,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 				value := iterator.Front(ctx)
 				for value != nil {
 					element := (*model.ProcessCacheEntry)(value)
-					handlerCtx := GetUserData(ctx)
+					probeCtx := GetProbeContext(ctx)
 					event := GetEvent(ctx)
-					result := ResolveFileFieldsUser(hanlderCtx, &element.ProcessContext.Process.FileEvent.FileFields)
+					result := ResolveFileFieldsUser(probeCtx, event, &element.ProcessContext.Process.FileEvent.FileFields)
 					results = append(results, result)
 					value = iterator.Next()
 				}
@@ -7449,8 +7449,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgs(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgs(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -7459,8 +7459,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsFlags(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsFlags(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7469,8 +7469,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsOptions(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsOptions(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7479,8 +7479,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgsTruncated(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgsTruncated(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7489,8 +7489,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -7499,8 +7499,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessArgv0(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessArgv0(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: 100 * eval.HandlerWeight,
@@ -7554,8 +7554,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveProcessCreatedAt(handlerCtx, &event.Signal.Target.Process))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveProcessCreatedAt(probeCtx, event, &event.Signal.Target.Process))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7582,8 +7582,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvp(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvp(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7592,8 +7592,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringArrayEvaluator{
 			EvalFnc: func(ctx *eval.Context) []string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvs(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvs(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7602,8 +7602,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveProcessEnvsTruncated(handlerCtx, &event.Signal.Target.Process)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveProcessEnvsTruncated(probeCtx, event, &event.Signal.Target.Process)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7639,8 +7639,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Signal.Target.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Signal.Target.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7658,8 +7658,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Signal.Target.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Signal.Target.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7668,8 +7668,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Signal.Target.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Signal.Target.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7715,8 +7715,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Signal.Target.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Signal.Target.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7726,8 +7726,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Signal.Target.Process.FileEvent)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Signal.Target.Process.FileEvent)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7736,8 +7736,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Signal.Target.Process.FileEvent.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Signal.Target.Process.FileEvent.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7755,8 +7755,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Signal.Target.Process.FileEvent.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Signal.Target.Process.FileEvent.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7900,8 +7900,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Splice.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Splice.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7919,8 +7919,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Splice.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Splice.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7929,8 +7929,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Splice.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Splice.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7976,8 +7976,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Splice.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Splice.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7987,8 +7987,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Splice.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Splice.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -7997,8 +7997,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Splice.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Splice.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8016,8 +8016,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Splice.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Splice.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8062,8 +8062,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Unlink.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Unlink.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8081,8 +8081,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Unlink.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Unlink.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8091,8 +8091,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Unlink.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Unlink.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8138,8 +8138,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Unlink.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Unlink.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8149,8 +8149,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Unlink.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Unlink.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8159,8 +8159,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Unlink.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Unlink.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8178,8 +8178,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Unlink.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Unlink.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8233,8 +8233,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFilesystem(handlerCtx, &event.Utimes.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFilesystem(probeCtx, event, &event.Utimes.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8252,8 +8252,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsGroup(handlerCtx, &event.Utimes.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsGroup(probeCtx, event, &event.Utimes.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8262,8 +8262,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.BoolEvaluator{
 			EvalFnc: func(ctx *eval.Context) bool {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsInUpperLayer(handlerCtx, &event.Utimes.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsInUpperLayer(probeCtx, event, &event.Utimes.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8309,8 +8309,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkBasename,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileBasename(handlerCtx, &event.Utimes.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileBasename(probeCtx, event, &event.Utimes.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8320,8 +8320,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 			OpOverrides: model.ProcessSymlinkPathname,
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFilePath(handlerCtx, &event.Utimes.File)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFilePath(probeCtx, event, &event.Utimes.File)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8330,8 +8330,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return int(ResolveRights(handlerCtx, &event.Utimes.File.FileFields))
+				probeCtx := GetProbeContext(ctx)
+				return int(ResolveRights(probeCtx, event, &event.Utimes.File.FileFields))
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,
@@ -8349,8 +8349,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 		return &eval.StringEvaluator{
 			EvalFnc: func(ctx *eval.Context) string {
 				event := GetEvent(ctx)
-				handlerCtx := GetUserData(ctx)
-				return ResolveFileFieldsUser(handlerCtx, &event.Utimes.File.FileFields)
+				probeCtx := GetProbeContext(ctx)
+				return ResolveFileFieldsUser(probeCtx, event, &event.Utimes.File.FileFields)
 			},
 			Field:  field,
 			Weight: eval.HandlerWeight,

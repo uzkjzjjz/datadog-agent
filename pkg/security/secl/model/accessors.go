@@ -5,12 +5,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"net"
 	"reflect"
-	"unsafe"
-)
-
-// suppress unused package warning
-var (
-	_ *unsafe.Pointer
 )
 
 func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
@@ -746,6 +740,8 @@ func (e *Event) GetFields() []eval.Field {
 		"utimes.retval",
 	}
 }
+
+// TODO(safchain) move to evaluator because of context and handlers
 func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 	switch field {
 	case "async":
@@ -1278,7 +1274,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.Open.SyscallEvent.Retval), nil
 	case "process.ancestors.args":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1290,7 +1286,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.args_flags":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1302,7 +1298,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.args_options":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1314,7 +1310,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.args_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1326,7 +1322,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.argv":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1338,7 +1334,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.argv0":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1350,7 +1346,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.cap_effective":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1362,7 +1358,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.cap_permitted":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1374,7 +1370,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.comm":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1386,7 +1382,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.container.id":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1398,7 +1394,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.cookie":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1410,7 +1406,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.created_at":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1422,7 +1418,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.egid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1434,7 +1430,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.egroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1446,7 +1442,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.envp":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1458,7 +1454,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.envs":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1470,7 +1466,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.envs_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1482,7 +1478,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.euid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1494,7 +1490,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.euser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1506,7 +1502,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.change_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1518,7 +1514,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.filesystem":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1530,7 +1526,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1542,7 +1538,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1554,7 +1550,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.in_upper_layer":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1566,7 +1562,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.inode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1578,7 +1574,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.mode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1590,7 +1586,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.modification_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1602,7 +1598,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.mount_id":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1614,7 +1610,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1626,7 +1622,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.path":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1638,7 +1634,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.rights":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1650,7 +1646,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1662,7 +1658,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.file.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1674,7 +1670,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.fsgid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1686,7 +1682,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.fsgroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1698,7 +1694,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.fsuid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1710,7 +1706,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.fsuser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1722,7 +1718,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1734,7 +1730,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1746,7 +1742,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.is_thread":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1758,7 +1754,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.pid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1770,7 +1766,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.ppid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1782,7 +1778,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.tid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1794,7 +1790,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.tty_name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1806,7 +1802,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1818,7 +1814,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "process.ancestors.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1926,7 +1922,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.PTrace.SyscallEvent.Retval), nil
 	case "ptrace.tracee.ancestors.args":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1938,7 +1934,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.args_flags":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1950,7 +1946,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.args_options":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1962,7 +1958,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.args_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1974,7 +1970,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.argv":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1986,7 +1982,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.argv0":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -1998,7 +1994,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.cap_effective":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2010,7 +2006,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.cap_permitted":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2022,7 +2018,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.comm":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2034,7 +2030,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.container.id":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2046,7 +2042,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.cookie":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2058,7 +2054,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.created_at":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2070,7 +2066,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.egid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2082,7 +2078,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.egroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2094,7 +2090,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.envp":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2106,7 +2102,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.envs":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2118,7 +2114,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.envs_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2130,7 +2126,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.euid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2142,7 +2138,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.euser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2154,7 +2150,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.change_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2166,7 +2162,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.filesystem":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2178,7 +2174,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2190,7 +2186,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2202,7 +2198,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.in_upper_layer":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2214,7 +2210,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.inode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2226,7 +2222,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.mode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2238,7 +2234,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.modification_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2250,7 +2246,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.mount_id":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2262,7 +2258,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2274,7 +2270,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.path":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2286,7 +2282,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.rights":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2298,7 +2294,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2310,7 +2306,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.file.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2322,7 +2318,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.fsgid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2334,7 +2330,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.fsgroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2346,7 +2342,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.fsuid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2358,7 +2354,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.fsuser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2370,7 +2366,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2382,7 +2378,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2394,7 +2390,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.is_thread":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2406,7 +2402,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.pid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2418,7 +2414,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.ppid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2430,7 +2426,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.tid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2442,7 +2438,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.tty_name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2454,7 +2450,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2466,7 +2462,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "ptrace.tracee.ancestors.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2762,7 +2758,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.Signal.SyscallEvent.Retval), nil
 	case "signal.target.ancestors.args":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2774,7 +2770,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.args_flags":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2786,7 +2782,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.args_options":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2798,7 +2794,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.args_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2810,7 +2806,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.argv":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2822,7 +2818,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.argv0":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2834,7 +2830,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.cap_effective":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2846,7 +2842,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.cap_permitted":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2858,7 +2854,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.comm":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2870,7 +2866,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.container.id":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2882,7 +2878,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.cookie":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2894,7 +2890,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.created_at":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2906,7 +2902,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.egid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2918,7 +2914,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.egroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2930,7 +2926,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.envp":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2942,7 +2938,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.envs":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2954,7 +2950,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.envs_truncated":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2966,7 +2962,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.euid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2978,7 +2974,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.euser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -2990,7 +2986,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.change_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3002,7 +2998,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.filesystem":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3014,7 +3010,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3026,7 +3022,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3038,7 +3034,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.in_upper_layer":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3050,7 +3046,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.inode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3062,7 +3058,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.mode":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3074,7 +3070,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.modification_time":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3086,7 +3082,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.mount_id":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3098,7 +3094,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3110,7 +3106,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.path":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3122,7 +3118,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.rights":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3134,7 +3130,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3146,7 +3142,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.file.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3158,7 +3154,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.fsgid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3170,7 +3166,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.fsgroup":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3182,7 +3178,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.fsuid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3194,7 +3190,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.fsuser":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3206,7 +3202,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.gid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3218,7 +3214,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.group":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3230,7 +3226,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.is_thread":
 		var values []bool
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3242,7 +3238,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.pid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3254,7 +3250,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.ppid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3266,7 +3262,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.tid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3278,7 +3274,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.tty_name":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3290,7 +3286,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.uid":
 		var values []int
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {
@@ -3302,7 +3298,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return values, nil
 	case "signal.target.ancestors.user":
 		var values []string
-		ctx := eval.NewContext(unsafe.Pointer(e))
+		ctx := eval.NewContext(e, nil)
 		iterator := &ProcessAncestorsIterator{}
 		ptr := iterator.Front(ctx)
 		for ptr != nil {

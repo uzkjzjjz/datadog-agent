@@ -17,20 +17,18 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/security/api"
+	"github.com/DataDog/datadog-agent/pkg/security/config"
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/dump"
 )
 
 // ActivityDumpRemoteStorageForwarder is a remote storage that forwards dumps to the security-agent
 type ActivityDumpRemoteStorageForwarder struct {
-	probe *Probe
 }
 
 // NewActivityDumpRemoteStorageForwarder returns a new instance of ActivityDumpRemoteStorageForwarder
-func NewActivityDumpRemoteStorageForwarder(p *Probe) (ActivityDumpStorage, error) {
-	return &ActivityDumpRemoteStorageForwarder{
-		probe: p,
-	}, nil
+func NewActivityDumpRemoteStorageForwarder(cfg *config.Config) (ActivityDumpStorage, error) {
+	return &ActivityDumpRemoteStorageForwarder{}, nil
 }
 
 // GetStorageType returns the storage type of the ActivityDumpRemoteStorage
@@ -71,7 +69,8 @@ func (storage *ActivityDumpRemoteStorageForwarder) Persist(request dump.StorageR
 	// override storage request so that it contains only the current persisted data
 	msg.Dump.Storage = []*api.StorageRequestMessage{request.ToStorageRequestMessage(ad.DumpMetadata.Name)}
 
-	storage.probe.DispatchActivityDump(msg)
+	// TODO(safchain) restore this
+	//storage.probe.DispatchActivityDump(msg)
 
 	seclog.Infof("[%s] file for activity dump [%s] was forwarded to the security-agent", request.Format, ad.GetSelectorStr())
 	return nil

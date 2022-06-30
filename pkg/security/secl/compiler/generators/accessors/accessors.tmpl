@@ -9,15 +9,9 @@ package {{.Name}}
 import (
 	"net"
 	"reflect"
-	"unsafe"
 
 	{{if ne $.SourcePkg $.TargetPkg}}"{{.SourcePkg}}"{{end}}
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
-)
-
-// suppress unused package warning
-var (
-	_ *unsafe.Pointer
 )
 
 func (m *Model) GetIterator(field eval.Field) (eval.Iterator, error) {
@@ -49,6 +43,7 @@ func (e *Event) GetFields() []eval.Field {
 	}
 }
 
+// TODO(safchain) move to evaluator because of context and handlers
 func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 	switch field {
 		{{range $Name, $Field := .Fields}}
@@ -56,7 +51,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		{{if $Field.Iterator}}
 			var values []{{$Field.ReturnType}}
 
-			ctx := eval.NewContext(unsafe.Pointer(e))
+			ctx := eval.NewContext(e, nil)
 
 			iterator := &{{$Field.Iterator.ReturnType}}{}
 			ptr := iterator.Front(ctx)

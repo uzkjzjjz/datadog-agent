@@ -24,6 +24,7 @@ type Opts struct {
 	EventTypeEnabled    map[eval.EventType]bool
 	StateScopes         map[Scope]VariableProviderFactory
 	Logger              Logger
+	ProbeContext        interface{}
 }
 
 // WithSupportedDiscarders set supported discarders
@@ -53,5 +54,11 @@ func (o *Opts) WithLogger(logger Logger) *Opts {
 // WithStateScopes set state scopes
 func (o *Opts) WithStateScopes(stateScopes map[Scope]VariableProviderFactory) *Opts {
 	o.StateScopes = stateScopes
+	return o
+}
+
+// WithProbeContext set the probe context
+func (o *Opts) WithProbeContext(ctx interface{}) *Opts {
+	o.ProbeContext = ctx
 	return o
 }

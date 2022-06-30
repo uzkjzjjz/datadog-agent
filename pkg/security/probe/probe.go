@@ -55,7 +55,7 @@ type ActivityDumpHandler interface {
 
 // EventHandler represents an handler for the events sent by the probe
 type EventHandler interface {
-	HandleEvent(event *Event)
+	HandleEvent(event *model.Event)
 	HandleCustomEvent(rule *rules.Rule, event *CustomEvent)
 }
 
@@ -81,11 +81,13 @@ type Probe struct {
 	ctx            context.Context
 	cancelFnc      context.CancelFunc
 	wg             sync.WaitGroup
+	probeContext   *ProbeContext
+
 	// Events section
 	handlers    [model.MaxAllEventType][]EventHandler
 	monitor     *Monitor
 	resolvers   *Resolvers
-	event       *Event
+	event       *model.Event
 	eventStream EventStream
 	scrubber    *pconfig.DataScrubber
 
@@ -330,7 +332,7 @@ func (p *Probe) AddEventHandler(eventType model.EventType, handler EventHandler)
 }
 
 // DispatchEvent sends an event to the probe event handler
-func (p *Probe) DispatchEvent(event *Event) {
+func (p *Probe) DispatchEvent(event *model.Event) {
 	seclog.TraceTagf(event.GetEventType(), "Dispatching event %s", event)
 
 	// send wildcard first
@@ -344,7 +346,7 @@ func (p *Probe) DispatchEvent(event *Event) {
 	}
 
 	// Process after evaluation because some monitors need the DentryResolver to have been called first.
-	p.monitor.ProcessEvent(event)
+	p.monitor.ProcessEvent(p.probeContext, event)
 }
 
 // DispatchActivityDump sends an activity dump to the probe activity dump handler
@@ -393,12 +395,12 @@ func (p *Probe) GetMonitor() *Monitor {
 	return p.monitor
 }
 
-func (p *Probe) zeroEvent() *Event {
+func (p *Probe) zeroEvent() *model.Event {
 	*p.event = eventZero
 	return p.event
 }
 
-func (p *Probe) unmarshalContexts(data []byte, event *Event) (int, error) {
+func (p *Probe) unmarshalContexts(data []byte, event *model.Event) (int, error) {
 	read, err := model.UnmarshalBinary(data, &event.PIDContext, &event.SpanContext, &event.ContainerContext)
 	if err != nil {
 		return 0, err
@@ -510,9 +512,9 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		}
 
 		// Resolve mount point
-		event.SetMountPoint(&event.Mount)
+		SetMountPoint(p.probeContext, event, &event.Mount)
 		// Resolve root
-		event.SetMountRoot(&event.Mount)
+		SetMountRoot(p.probeContext, event, &event.Mount)
 		// Insert new mount point in cache
 		err = p.resolvers.MountResolver.Insert(event.Mount)
 		if err != nil {
@@ -623,7 +625,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 	case model.ForkEventType:
-		if _, err = event.UnmarshalProcessCacheEntry(data[offset:]); err != nil {
+		if _, err = UnmarshalProcessCacheEntry(p.probeContext, event, data[offset:]); err != nil {
 			log.Errorf("failed to decode fork event: %s (offset %d, len %d)", err, offset, dataLen)
 			return
 		}
@@ -638,7 +640,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		p.resolvers.ProcessResolver.AddForkEntry(event.ProcessCacheEntry)
 	case model.ExecEventType:
 		// unmarshal and fill event.processCacheEntry
-		if _, err = event.UnmarshalProcessCacheEntry(data[offset:]); err != nil {
+		if _, err = UnmarshalProcessCacheEntry(p.probeContext, event, data[offset:]); err != nil {
 			log.Errorf("failed to decode exec event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
@@ -656,20 +658,20 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 
-		event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
+		event.ProcessCacheEntry = ResolveProcessCacheEntry(p.probeContext, event)
 		event.Exit.Process = &event.ProcessCacheEntry.Process
 	case model.SetuidEventType:
 		if _, err = event.SetUID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setuid event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-		defer p.resolvers.ProcessResolver.UpdateUID(event.PIDContext.Pid, event)
+		defer p.resolvers.ProcessResolver.UpdateUID(p.probeContext, event, event.PIDContext.Pid)
 	case model.SetgidEventType:
 		if _, err = event.SetGID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setgid event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-		defer p.resolvers.ProcessResolver.UpdateGID(event.PIDContext.Pid, event)
+		defer p.resolvers.ProcessResolver.UpdateGID(p.probeContext, event, event.PIDContext.Pid)
 	case model.CapsetEventType:
 		if _, err = event.Capset.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode capset event: %s (offset %d, len %d)", err, offset, len(data))
@@ -692,7 +694,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 		// resolve tracee process context
-		cacheEntry := event.resolvers.ProcessResolver.Resolve(event.PTrace.PID, event.PTrace.PID)
+		cacheEntry := p.resolvers.ProcessResolver.Resolve(event.PTrace.PID, event.PTrace.PID)
 		if cacheEntry != nil {
 			event.PTrace.Tracee = &cacheEntry.ProcessContext
 		}
@@ -733,7 +735,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 		// resolve target process context
-		cacheEntry := event.resolvers.ProcessResolver.Resolve(event.Signal.PID, event.Signal.PID)
+		cacheEntry := p.resolvers.ProcessResolver.Resolve(event.Signal.PID, event.Signal.PID)
 		if cacheEntry != nil {
 			event.Signal.Target = &cacheEntry.ProcessContext
 		}
@@ -770,7 +772,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	}
 
 	// resolve the process cache entry
-	event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
+	event.ProcessCacheEntry = ResolveProcessCacheEntry(p.probeContext, event)
 
 	// use ProcessCacheEntry process context as process context
 	event.ProcessContext = &event.ProcessCacheEntry.ProcessContext
@@ -780,7 +782,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	}
 
 	if eventType == model.ExitEventType {
-		defer p.resolvers.ProcessResolver.DeleteEntry(event.ProcessCacheEntry.Pid, event.ResolveEventTimestamp())
+		defer p.resolvers.ProcessResolver.DeleteEntry(event.ProcessCacheEntry.Pid, ResolveEventTimestamp(p.probeContext, event))
 	}
 
 	p.DispatchEvent(event)
@@ -790,14 +792,14 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 }
 
 // OnRuleMatch is called when a rule matches just before sending
-func (p *Probe) OnRuleMatch(rule *rules.Rule, event *Event) {
+func (p *Probe) OnRuleMatch(rule *rules.Rule, event *model.Event) {
 	// ensure that all the fields are resolved before sending
-	event.ResolveContainerID(&event.ContainerContext)
-	event.ResolveContainerTags(&event.ContainerContext)
+	ResolveContainerID(p.probeContext, event, &event.ContainerContext)
+	ResolveContainerTags(p.probeContext, event, &event.ContainerContext)
 }
 
 // OnNewDiscarder is called when a new discarder is found
-func (p *Probe) OnNewDiscarder(rs *rules.RuleSet, event *Event, field eval.Field, eventType eval.EventType) error {
+func (p *Probe) OnNewDiscarder(rs *rules.RuleSet, event *model.Event, field eval.Field, eventType eval.EventType) error {
 	// discarders disabled
 	if !p.config.EnableDiscarders {
 		return nil
@@ -1095,13 +1097,15 @@ func (p *Probe) GetDebugStats() map[string]interface{} {
 }
 
 // NewRuleSet returns a new rule set
-func (p *Probe) NewRuleSet(opts *rules.Opts, evalOpts *eval.Opts, macroStore *eval.MacroStore) *rules.RuleSet {
+func (p *Probe) NewRuleSet(opts *rules.Opts, evalOpts *eval.Opts) *rules.RuleSet {
 	eventCtor := func() eval.Event {
-		return NewEvent(p.resolvers, p.scrubber, p)
+		return &model.Event{}
 	}
-	opts.WithLogger(&seclog.PatternLogger{})
+	opts.
+		WithLogger(&seclog.PatternLogger{}).
+		WithProbeContext(p.resolvers)
 
-	return rules.NewRuleSet(&Model{probe: p}, eventCtor, opts, evalOpts, macroStore)
+	return rules.NewRuleSet(&Model{probe: p}, eventCtor, opts, evalOpts)
 }
 
 // QueuedNetworkDeviceError is used to indicate that the new network device was queued until its namespace handle is
@@ -1392,11 +1396,7 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 	p.scrubber = pconfig.NewDefaultDataScrubber()
 	p.scrubber.AddCustomSensitiveWords(config.CustomSensitiveWords)
 
-	p.event = NewEvent(p.resolvers, p.scrubber, p)
-
-	eventZero.resolvers = p.resolvers
-	eventZero.scrubber = p.scrubber
-	eventZero.probe = p
+	p.event = &model.Event{}
 
 	if useRingBuffers {
 		p.eventStream = NewRingBuffer(p.handleEvent)

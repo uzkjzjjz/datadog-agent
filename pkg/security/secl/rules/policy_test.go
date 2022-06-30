@@ -41,7 +41,7 @@ func TestMacroMerge(t *testing.T) {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(map[eval.EventType]bool{"*": true})
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
 			ID:         "test_rule",
@@ -94,9 +94,9 @@ func TestMacroMerge(t *testing.T) {
 		t.Error(err)
 	}
 
-	macro := rs.macroStore.Macros["test_macro"]
+	macro := rs.evalOpts.MacroStore.Macros["test_macro"]
 	if macro == nil {
-		t.Fatalf("failed to find test_macro in ruleset: %+v", rs.macroStore.Macros)
+		t.Fatalf("failed to find test_macro in ruleset: %+v", rs.evalOpts.MacroStore.Macros)
 	}
 
 	testPolicy2.Macros[0].Combine = ""
@@ -121,7 +121,7 @@ func TestRuleMerge(t *testing.T) {
 	opts.
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(map[eval.EventType]bool{"*": true})
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -186,7 +186,7 @@ func (t *testVariableProvider) GetVariable(name string, value interface{}) (eval
 	switch value.(type) {
 	case []int:
 		intVar := eval.NewIntArrayVariable(func(ctx *eval.Context) []int {
-			processName := (*testEvent)(ctx.Object).process.name
+			processName := ctx.Event.(*testEvent).process.name
 			processVars, found := t.vars[processName]
 			if !found {
 				return nil
@@ -200,7 +200,7 @@ func (t *testVariableProvider) GetVariable(name string, value interface{}) (eval
 			i, _ := v.([]int)
 			return i
 		}, func(ctx *eval.Context, value interface{}) error {
-			processName := (*testEvent)(ctx.Object).process.name
+			processName := ctx.Event.(*testEvent).process.name
 			if _, found := t.vars[processName]; !found {
 				t.vars[processName] = map[string]interface{}{}
 			}
@@ -237,7 +237,7 @@ func TestActionSetVariable(t *testing.T) {
 		WithEventTypeEnabled(enabled).
 		WithStateScopes(stateScopes)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -392,7 +392,7 @@ func TestActionSetVariableConflict(t *testing.T) {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -451,7 +451,7 @@ func loadPolicy(t *testing.T, testPolicy *PolicyDef, agentVersion *semver.Versio
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 
 	tmpDir, err := os.MkdirTemp("", "test-policy")
 	if err != nil {

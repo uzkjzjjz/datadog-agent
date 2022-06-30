@@ -97,7 +97,7 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil)
+		ctx := NewContext(nil, nil)
 		_ = ctx
 
 		return &{{ .FuncReturnType }}{

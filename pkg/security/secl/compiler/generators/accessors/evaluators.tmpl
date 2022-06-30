@@ -18,10 +18,6 @@ var (
 )
 
 {{$Mock := .Mock}}
-{{$Event := "Event"}}
-{{if ne .SourcePkgBase ""}}
-{{$Event = printf "%s.Event" .SourcePkgBase}}
-{{end}}
 
 func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, error) {
 	switch field {
@@ -58,11 +54,11 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 
 						{{$Return := $SubName | printf "element%s"}}
 						{{if and (ne $Field.Handler "") (not $Mock) }}
-							handlerCtx := GetUserData(ctx)
+							probeCtx := GetProbeContext(ctx)
 							event := GetEvent(ctx)
 							{{$SubName = $Field.Iterator.Name | TrimPrefix $Field.Prefix}}
 							{{$Handler := $Field.Iterator.Name | TrimPrefix $Field.Handler}}
-							{{$Return = print $Handler "(hanlderCtx, &element" $SubName ")"}}
+							{{$Return = print $Handler "(probeCtx, event, &element" $SubName ")"}}
 						{{end}}
 
 						{{if eq $Field.ReturnType "int"}}
@@ -98,8 +94,8 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 							{{$Ptr = ""}}
 						{{end}}
 
-						handlerCtx := GetUserData(ctx)
-						{{$Return = print $Field.Handler "(handlerCtx, " $Ptr "event." $Field.Prefix ")"}}
+						probeCtx := GetProbeContext(ctx)
+						{{$Return = print $Field.Handler "(probeCtx, event, " $Ptr "event." $Field.Prefix ")"}}
 					{{end}}
 
 					{{- if eq $ReturnType "int"}}

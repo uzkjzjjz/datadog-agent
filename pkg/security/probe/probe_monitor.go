@@ -19,6 +19,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/security/api"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
+	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -55,7 +56,7 @@ func NewMonitor(p *Probe) (*Monitor, error) {
 	}
 
 	if p.config.ActivityDumpEnabled {
-		m.activityDumpManager, err = NewActivityDumpManager(p)
+		m.activityDumpManager, err = NewActivityDumpManager(p.probeContext, p.manager, p.kernelVersion, p.statsdClient, p.config)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create the activity dump manager")
 		}
@@ -175,13 +176,13 @@ func (m *Monitor) GetStats() (map[string]interface{}, error) {
 }
 
 // ProcessEvent processes an event through the various monitors and controllers of the probe
-func (m *Monitor) ProcessEvent(event *Event) {
+func (m *Monitor) ProcessEvent(ctx *ProbeContext, event *model.Event) {
 	m.loadController.Count(event)
 
 	// Look for an unresolved path
-	if err := event.GetPathResolutionError(); err != nil {
+	if err := event.PathResolutionError; err != nil {
 		m.probe.DispatchCustomEvent(
-			NewAbnormalPathEvent(event, err),
+			NewAbnormalPathEvent(ctx, event, err),
 		)
 	} else {
 		if m.activityDumpManager != nil {

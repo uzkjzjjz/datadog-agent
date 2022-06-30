@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/security/config"
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/dump"
 	"github.com/hashicorp/golang-lru/simplelru"
@@ -61,12 +62,8 @@ type ActivityDumpLocalStorage struct {
 }
 
 // NewActivityDumpLocalStorage creates a new ActivityDumpLocalStorage instance
-func NewActivityDumpLocalStorage(p *Probe) (ActivityDumpStorage, error) {
-	if p == nil {
-		return &ActivityDumpLocalStorage{}, nil
-	}
-
-	lru, err := simplelru.NewLRU(p.config.ActivityDumpLocalStorageMaxDumpsCount, func(key interface{}, value interface{}) {
+func NewActivityDumpLocalStorage(cfg *config.Config) (ActivityDumpStorage, error) {
+	lru, err := simplelru.NewLRU(cfg.ActivityDumpLocalStorageMaxDumpsCount, func(key interface{}, value interface{}) {
 		files, ok := key.([]string)
 		if !ok || len(files) == 0 {
 			return
@@ -81,13 +78,13 @@ func NewActivityDumpLocalStorage(p *Probe) (ActivityDumpStorage, error) {
 	}
 
 	// snapshot the dumps in the default output directory
-	if len(p.config.ActivityDumpLocalStorageDirectory) > 0 {
+	if len(cfg.ActivityDumpLocalStorageDirectory) > 0 {
 		// list all the files in the activity dump output directory
-		files, err := os.ReadDir(p.config.ActivityDumpLocalStorageDirectory)
+		files, err := os.ReadDir(cfg.ActivityDumpLocalStorageDirectory)
 		if err != nil {
 			if os.IsNotExist(err) {
 				files = make([]os.DirEntry, 0)
-				if err = os.MkdirAll(p.config.ActivityDumpLocalStorageDirectory, 0400); err != nil {
+				if err = os.MkdirAll(cfg.ActivityDumpLocalStorageDirectory, 0400); err != nil {
 					return nil, fmt.Errorf("couldn't create output directory for cgroup activity dumps: %w", err)
 				}
 			} else {

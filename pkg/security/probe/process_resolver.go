@@ -881,7 +881,7 @@ func (p *ProcessResolver) Get(pid uint32) *model.ProcessCacheEntry {
 }
 
 // UpdateUID updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateUID(pid uint32, e *Event) {
+func (p *ProcessResolver) UpdateUID(ctx *ProbeContext, e *model.Event, pid uint32) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}
@@ -891,16 +891,16 @@ func (p *ProcessResolver) UpdateUID(pid uint32, e *Event) {
 	entry := p.entryCache[pid]
 	if entry != nil {
 		entry.Credentials.UID = e.SetUID.UID
-		entry.Credentials.User = e.ResolveSetuidUser(&e.SetUID)
+		entry.Credentials.User = ResolveSetuidUser(ctx, e, &e.SetUID)
 		entry.Credentials.EUID = e.SetUID.EUID
-		entry.Credentials.EUser = e.ResolveSetuidEUser(&e.SetUID)
+		entry.Credentials.EUser = ResolveSetuidEUser(ctx, e, &e.SetUID)
 		entry.Credentials.FSUID = e.SetUID.FSUID
-		entry.Credentials.FSUser = e.ResolveSetuidFSUser(&e.SetUID)
+		entry.Credentials.FSUser = ResolveSetuidFSUser(ctx, e, &e.SetUID)
 	}
 }
 
 // UpdateGID updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateGID(pid uint32, e *Event) {
+func (p *ProcessResolver) UpdateGID(ctx *ProbeContext, e *model.Event, pid uint32) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}
@@ -910,16 +910,16 @@ func (p *ProcessResolver) UpdateGID(pid uint32, e *Event) {
 	entry := p.entryCache[pid]
 	if entry != nil {
 		entry.Credentials.GID = e.SetGID.GID
-		entry.Credentials.Group = e.ResolveSetgidGroup(&e.SetGID)
+		entry.Credentials.Group = ResolveSetgidGroup(ctx, e, &e.SetGID)
 		entry.Credentials.EGID = e.SetGID.EGID
-		entry.Credentials.EGroup = e.ResolveSetgidEGroup(&e.SetGID)
+		entry.Credentials.EGroup = ResolveSetgidEGroup(ctx, e, &e.SetGID)
 		entry.Credentials.FSGID = e.SetGID.FSGID
-		entry.Credentials.FSGroup = e.ResolveSetgidFSGroup(&e.SetGID)
+		entry.Credentials.FSGroup = ResolveSetgidFSGroup(ctx, e, &e.SetGID)
 	}
 }
 
 // UpdateCapset updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateCapset(pid uint32, e *Event) {
+func (p *ProcessResolver) UpdateCapset(pid uint32, e *model.Event) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}
@@ -1146,8 +1146,9 @@ func (p *ProcessResolver) Walk(callback func(entry *model.ProcessCacheEntry)) {
 
 // NewProcessVariables returns a provider for variables attached to a process cache entry
 func (p *ProcessResolver) NewProcessVariables() rules.VariableProvider {
+	// TODO(safchain) change to interface
 	scoper := func(ctx *eval.Context) unsafe.Pointer {
-		return unsafe.Pointer((*Event)(ctx.Object).ProcessCacheEntry)
+		return unsafe.Pointer(GetEvent(ctx).ProcessCacheEntry)
 	}
 
 	var variables *eval.ScopedVariables

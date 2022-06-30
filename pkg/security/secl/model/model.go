@@ -177,14 +177,15 @@ type Event struct {
 	Bind BindEvent `field:"bind" event:"bind"` // [7.37] [Network] [Experimental] A bind was executed
 
 	// internal usage
-	Mount            MountEvent            `field:"-"`
-	Umount           UmountEvent           `field:"-"`
-	InvalidateDentry InvalidateDentryEvent `field:"-"`
-	ArgsEnvs         ArgsEnvsEvent         `field:"-"`
-	MountReleased    MountReleasedEvent    `field:"-"`
-	CgroupTracing    CgroupTracingEvent    `field:"-"`
-	NetDevice        NetDeviceEvent        `field:"-"`
-	VethPair         VethPairEvent         `field:"-"`
+	Mount               MountEvent            `field:"-"`
+	Umount              UmountEvent           `field:"-"`
+	InvalidateDentry    InvalidateDentryEvent `field:"-"`
+	ArgsEnvs            ArgsEnvsEvent         `field:"-"`
+	MountReleased       MountReleasedEvent    `field:"-"`
+	CgroupTracing       CgroupTracingEvent    `field:"-"`
+	NetDevice           NetDeviceEvent        `field:"-"`
+	VethPair            VethPairEvent         `field:"-"`
+	PathResolutionError error                 `field:"-"`
 }
 
 // GetType returns the event type
@@ -208,9 +209,19 @@ func (e *Event) GetTags() []string {
 	return tags
 }
 
-// GetPointer return an unsafe.Pointer of the Event
-func (e *Event) GetPointer() unsafe.Pointer {
-	return unsafe.Pointer(e)
+// Retain the event
+func (e *Event) Retain() Event {
+	if e.ProcessCacheEntry != nil {
+		e.ProcessCacheEntry.Retain()
+	}
+	return *e
+}
+
+// Release the event
+func (e *Event) Release() {
+	if e.ProcessCacheEntry != nil {
+		e.ProcessCacheEntry.Release()
+	}
 }
 
 // SetuidEvent represents a setuid event

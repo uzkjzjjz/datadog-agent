@@ -10,12 +10,24 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 )
 
-// GetEvent return a model.Event from the eval.Context
-func GetEvent(ctx *eval.Context) *model.Event {
-	return (*model.Event)(ctx.Event)
+// ProbeContext defines a probe context
+type ProbeContext struct {
+	Resolvers *Resolvers
 }
 
-// GetUserData return the user data from the context
-func GetUserData(ctx *eval.Context) *Resolvers {
-	return (*Resolvers)(ctx.UserData)
+// NewProbeContext returns a new probe context
+func NewProbeContext(resolvers *Resolvers) *ProbeContext {
+	return &ProbeContext{
+		Resolvers: resolvers,
+	}
+}
+
+// GetEvent return a model.Event from the eval.Context
+func GetEvent(ctx *eval.Context) *model.Event {
+	return ctx.Event.(*model.Event)
+}
+
+// GetProbeContext return the probe context
+func GetProbeContext(ctx *eval.Context) *ProbeContext {
+	return ctx.ProbeContext.(*ProbeContext)
 }

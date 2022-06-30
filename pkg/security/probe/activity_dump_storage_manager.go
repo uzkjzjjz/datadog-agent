@@ -12,9 +12,11 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/DataDog/datadog-agent/pkg/security/config"
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/dump"
+	"github.com/DataDog/datadog-go/v5/statsd"
 )
 
 // ActivityDumpStorage defines the interface implemented by all activity dump storages
@@ -27,8 +29,8 @@ type ActivityDumpStorage interface {
 
 // ActivityDumpStorageManager is used to manage activity dump storages
 type ActivityDumpStorageManager struct {
-	probe    *Probe
-	storages map[dump.StorageType]ActivityDumpStorage
+	statsdClient statsd.ClientInterface
+	storages     map[dump.StorageType]ActivityDumpStorage
 }
 
 // NewSecurityAgentStorageManager returns a new instance of ActivityDumpStorageManager
@@ -48,18 +50,18 @@ func NewSecurityAgentStorageManager() (*ActivityDumpStorageManager, error) {
 }
 
 // NewActivityDumpStorageManager returns a new instance of ActivityDumpStorageManager
-func NewActivityDumpStorageManager(p *Probe) (*ActivityDumpStorageManager, error) {
-	storageFactory := []func(p *Probe) (ActivityDumpStorage, error){
+func NewActivityDumpStorageManager(statsdClient statsd.ClientInterface, cfg *config.Config) (*ActivityDumpStorageManager, error) {
+	storageFactory := []func(cfg *config.Config) (ActivityDumpStorage, error){
 		NewActivityDumpLocalStorage,
 		NewActivityDumpRemoteStorageForwarder,
 	}
 
 	manager := &ActivityDumpStorageManager{
-		storages: make(map[dump.StorageType]ActivityDumpStorage),
-		probe:    p,
+		storages:     make(map[dump.StorageType]ActivityDumpStorage),
+		statsdClient: statsdClient,
 	}
 	for _, factory := range storageFactory {
-		storage, err := factory(p)
+		storage, err := factory(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't instantiate storage: %w", err)
 		}
@@ -104,10 +106,10 @@ func (manager *ActivityDumpStorageManager) PersistRaw(requests []dump.StorageReq
 		}
 
 		// send dump metric
-		if manager.probe != nil {
+		if manager.statsdClient != nil {
 			if size := len(raw.Bytes()); size > 0 {
 				tags := []string{"format:" + request.Format.String(), "storage_type:" + request.Type.String(), fmt.Sprintf("compression:%v", request.Compression)}
-				if err := manager.probe.statsdClient.Gauge(metrics.MetricActivityDumpSizeInBytes, float64(size), tags, 1.0); err != nil {
+				if err := manager.statsdClient.Gauge(metrics.MetricActivityDumpSizeInBytes, float64(size), tags, 1.0); err != nil {
 					seclog.Warnf("couldn't send %s metric: %v", metrics.MetricActivityDumpSizeInBytes, err)
 				}
 			}

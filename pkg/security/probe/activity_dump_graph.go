@@ -122,7 +122,7 @@ func (ad *ActivityDump) prepareGraphData(title string) graph {
 
 func (ad *ActivityDump) prepareProcessActivityNode(p *ProcessActivityNode, data *graph) {
 	var args string
-	if argv, _ := ad.adm.probe.resolvers.ProcessResolver.GetProcessScrubbedArgv(&p.Process); len(argv) > 0 {
+	if argv, _ := ad.adm.probeContext.Resolvers.ProcessResolver.GetProcessScrubbedArgv(&p.Process); len(argv) > 0 {
 		args = strings.ReplaceAll(strings.Join(argv, " "), "\"", "\\\"")
 		args = strings.ReplaceAll(args, "\n", " ")
 		args = strings.ReplaceAll(args, ">", "\\>")

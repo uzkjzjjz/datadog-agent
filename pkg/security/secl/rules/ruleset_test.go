@@ -38,7 +38,7 @@ func (f *testHandler) EventDiscarderFound(rs *RuleSet, event eval.Event, field s
 	}
 	evaluator, _ := getEvaluatorTest(field, "")
 
-	ctx := eval.NewContext(event.GetPointer())
+	ctx := eval.NewContext(event, nil)
 
 	value := evaluator.Eval(ctx)
 
@@ -86,7 +86,7 @@ func newRuleSet() *RuleSet {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	return NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts, &eval.MacroStore{})
+	return NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
 }
 
 func TestRuleBuckets(t *testing.T) {

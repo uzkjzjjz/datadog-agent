@@ -13,10 +13,11 @@ import (
 
 // Context describes the context used during a rule evaluation
 type Context struct {
-	Event    interface{}
-	UserData interface{}
+	Event        interface{}
+	ProbeContext interface{}
 
 	// cache available across all the evaluations
+	// TODO(safchain) change to interface{}
 	Cache map[string]unsafe.Pointer
 
 	now time.Time
@@ -35,9 +36,9 @@ func (c *Context) SetEvent(event interface{}) {
 	c.Event = event
 }
 
-// SetUserData set the given data to the context
-func (c *Context) SetUserData(data interface{}) {
-	c.UserData = data
+// SetProbeContext set the given data to the context
+func (c *Context) SetProbeContext(ctx interface{}) {
+	c.ProbeContext = ctx
 }
 
 // Reset the context
@@ -52,10 +53,11 @@ func (c *Context) Reset() {
 }
 
 // NewContext return a new Context
-func NewContext(event unsafe.Pointer) *Context {
+func NewContext(event interface{}, probeContext interface{}) *Context {
 	return &Context{
-		Event: event,
-		Cache: make(map[string]unsafe.Pointer),
+		Event:        event,
+		ProbeContext: probeContext,
+		Cache:        make(map[string]unsafe.Pointer),
 	}
 }
 
@@ -65,23 +67,23 @@ type ContextPool struct {
 }
 
 // Get returns a context with the given object
-func (c *ContextPool) Get(event interface{}, data interface{}) *Context {
-	ctx := c.pool.Get().(*Context)
-	ctx.Event, ctx.UserData = event, data
-	return ctx
+func (cp *ContextPool) Get(event interface{}, probeContext interface{}) *Context {
+	c := cp.pool.Get().(*Context)
+	c.Event, c.ProbeContext = event, probeContext
+	return c
 }
 
 // Put returns the context to the pool
-func (c *ContextPool) Put(ctx *Context) {
+func (cp *ContextPool) Put(ctx *Context) {
 	ctx.Reset()
-	c.pool.Put(ctx)
+	cp.pool.Put(ctx)
 }
 
 // NewContextPool returns a new context pool
 func NewContextPool() *ContextPool {
 	return &ContextPool{
 		pool: sync.Pool{
-			New: func() interface{} { return NewContext(nil) },
+			New: func() interface{} { return NewContext(nil, nil) },
 		},
 	}
 }

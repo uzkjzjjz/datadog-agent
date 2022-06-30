@@ -161,7 +161,6 @@ type RuleSetListener interface {
 type RuleSet struct {
 	opts             *Opts
 	evalOpts         *eval.Opts
-	macroStore       *eval.MacroStore
 	eventRuleBuckets map[eval.EventType]*RuleBucket
 	rules            map[eval.RuleID]*Rule
 	fieldEvaluators  map[string]eval.Evaluator
@@ -172,9 +171,9 @@ type RuleSet struct {
 	globalVariables  eval.GlobalVariables
 	scopedVariables  map[Scope]VariableProvider
 	// fields holds the list of event field queries (like "process.uid") used by the entire set of rules
-	fields []string
-	logger Logger
-	pool   *eval.ContextPool
+	fields  []string
+	logger  Logger
+	ctxPool *eval.ContextPool
 }
 
 // ListRuleIDs returns the list of RuleIDs from the ruleset
@@ -194,7 +193,7 @@ func (rs *RuleSet) GetRules() map[eval.RuleID]*Rule {
 // ListMacroIDs returns the list of MacroIDs from the ruleset
 func (rs *RuleSet) ListMacroIDs() []MacroID {
 	var ids []string
-	for macroID := range rs.macroStore.Macros {
+	for macroID := range rs.evalOpts.MacroStore.Macros {
 		ids = append(ids, macroID)
 	}
 	return ids
@@ -218,7 +217,7 @@ func (rs *RuleSet) AddMacros(macros []*MacroDefinition) *multierror.Error {
 func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 	var err error
 
-	if _, exists := rs.macroStore.Macros[macroDef.ID]; exists {
+	if _, exists := rs.evalOpts.MacroStore.Macros[macroDef.ID]; exists {
 		return nil, &ErrMacroLoad{Definition: macroDef, Err: errors.New("multiple definition with the same ID")}
 	}
 
@@ -237,7 +236,7 @@ func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 		}
 	}
 
-	rs.macroStore.AddMacro(macro.Macro)
+	rs.evalOpts.MacroStore.AddMacro(macro.Macro)
 
 	return macro.Macro, nil
 }
@@ -461,8 +460,8 @@ func (rs *RuleSet) IsDiscarder(event eval.Event, field eval.Field) (bool, error)
 		return false, &ErrNoEventTypeBucket{EventType: eventType}
 	}
 
-	ctx := rs.pool.Get(event.GetPointer())
-	defer rs.pool.Put(ctx)
+	ctx := rs.ctxPool.Get(event, rs.opts.ProbeContext)
+	defer rs.ctxPool.Put(ctx)
 
 	for _, rule := range bucket.rules {
 		isTrue, err := rule.PartialEval(ctx, field)
@@ -514,8 +513,8 @@ func (rs *RuleSet) runRuleActions(ctx *eval.Context, rule *Rule) error {
 
 // Evaluate the specified event against the set of rules
 func (rs *RuleSet) Evaluate(event eval.Event) bool {
-	ctx := rs.pool.Get(event.GetPointer())
-	defer rs.pool.Put(ctx)
+	ctx := rs.ctxPool.Get(event, rs.opts.ProbeContext)
+	defer rs.ctxPool.Put(ctx)
 
 	eventType := event.GetType()
 
@@ -760,7 +759,7 @@ func (rs *RuleSet) LoadPolicies(loader *PolicyLoader) *multierror.Error {
 }
 
 // NewRuleSet returns a new ruleset for the specified data model
-func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts *Opts, evalOpts *eval.Opts, macroStore *eval.MacroStore) *RuleSet {
+func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts *Opts, evalOpts *eval.Opts) *RuleSet {
 	var logger Logger
 
 	if opts.Logger != nil {
@@ -774,11 +773,10 @@ func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts *Opts, evalO
 		eventCtor:        eventCtor,
 		opts:             opts,
 		evalOpts:         evalOpts,
-		macroStore:       macroStore,
 		eventRuleBuckets: make(map[eval.EventType]*RuleBucket),
 		rules:            make(map[eval.RuleID]*Rule),
 		logger:           logger,
-		pool:             eval.NewContextPool(),
+		ctxPool:          eval.NewContextPool(),
 		fieldEvaluators:  make(map[string]eval.Evaluator),
 		scopedVariables:  make(map[Scope]VariableProvider),
 	}

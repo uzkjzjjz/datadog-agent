@@ -18,7 +18,7 @@ import (
 )
 
 func TestSetFieldValue(t *testing.T) {
-	event := &Event{}
+	event := &model.Event{}
 
 	for _, field := range event.GetFields() {
 		kind, err := event.GetFieldType(field)
@@ -58,16 +58,14 @@ func TestSetFieldValue(t *testing.T) {
 }
 
 func TestProcessArgsFlags(t *testing.T) {
-	e := Event{
-		Event: model.Event{
-			Exec: model.ExecEvent{
-				Process: &model.Process{
-					ArgsEntry: &model.ArgsEntry{
-						Values: []string{
-							"cmd", "-abc", "--verbose", "test",
-							"-v=1", "--host=myhost",
-							"-9", "-", "--",
-						},
+	e := &model.Event{
+		Exec: model.ExecEvent{
+			Process: &model.Process{
+				ArgsEntry: &model.ArgsEntry{
+					Values: []string{
+						"cmd", "-abc", "--verbose", "test",
+						"-v=1", "--host=myhost",
+						"-9", "-", "--",
 					},
 				},
 			},
@@ -75,11 +73,13 @@ func TestProcessArgsFlags(t *testing.T) {
 	}
 
 	resolver, _ := NewProcessResolver(&Probe{}, nil, NewProcessResolverOpts(10000))
-	e.resolvers = &Resolvers{
-		ProcessResolver: resolver,
+	ctx := &ProbeContext{
+		Resolvers: &Resolvers{
+			ProcessResolver: resolver,
+		},
 	}
 
-	flags := e.ResolveProcessArgsFlags(e.Exec.Process)
+	flags := ResolveProcessArgsFlags(ctx, e, e.Exec.Process)
 	sort.Strings(flags)
 
 	hasFlag := func(flags []string, flag string) bool {
@@ -117,16 +117,14 @@ func TestProcessArgsFlags(t *testing.T) {
 }
 
 func TestProcessArgsOptions(t *testing.T) {
-	e := Event{
-		Event: model.Event{
-			Exec: model.ExecEvent{
-				Process: &model.Process{
-					ArgsEntry: &model.ArgsEntry{
-						Values: []string{
-							"cmd", "--config", "/etc/myfile", "--host=myhost", "--verbose",
-							"-c", "/etc/myfile", "-e", "", "-h=myhost", "-v",
-							"--", "---", "-9",
-						},
+	e := &model.Event{
+		Exec: model.ExecEvent{
+			Process: &model.Process{
+				ArgsEntry: &model.ArgsEntry{
+					Values: []string{
+						"cmd", "--config", "/etc/myfile", "--host=myhost", "--verbose",
+						"-c", "/etc/myfile", "-e", "", "-h=myhost", "-v",
+						"--", "---", "-9",
 					},
 				},
 			},
@@ -134,11 +132,13 @@ func TestProcessArgsOptions(t *testing.T) {
 	}
 
 	resolver, _ := NewProcessResolver(&Probe{}, nil, NewProcessResolverOpts(10000))
-	e.resolvers = &Resolvers{
-		ProcessResolver: resolver,
+	ctx := &ProbeContext{
+		Resolvers: &Resolvers{
+			ProcessResolver: resolver,
+		},
 	}
 
-	options := e.ResolveProcessArgsOptions(e.Exec.Process)
+	options := ResolveProcessArgsOptions(ctx, e, e.Exec.Process)
 	sort.Strings(options)
 
 	hasOption := func(options []string, option string) bool {

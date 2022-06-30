@@ -54,7 +54,7 @@ func parseRule(expr string, model Model, opts *Opts) (*Rule, error) {
 func eval(t *testing.T, event *testEvent, expr string) (bool, *ast.Rule, error) {
 	model := &testModel{}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 
 	opts := newOptsWithParams(testConstants, nil)
 
@@ -464,7 +464,7 @@ func TestComplex(t *testing.T) {
 }
 
 func TestPartial(t *testing.T) {
-	event := testEvent{
+	event := &testEvent{
 		process: testProcess{
 			name:   "abc",
 			uid:    123,
@@ -541,7 +541,7 @@ func TestPartial(t *testing.T) {
 		{Expr: `process.name =~ "/usr/sbin/*" && process.uid == 0 && process.is_root`, Field: "process.uid", IsDiscarder: true},
 	}
 
-	ctx := NewContext(event.GetPointer())
+	ctx := NewContext(event, nil)
 
 	for _, test := range tests {
 		model := &testModel{}
@@ -590,7 +590,7 @@ func TestMacroList(t *testing.T) {
 		t.Fatalf("error while evaluating `%s`: %s", expr, err)
 	}
 
-	ctx := NewContext(unsafe.Pointer(&testEvent{}))
+	ctx := NewContext(&testEvent{}, nil)
 
 	if !rule.Eval(ctx) {
 		t.Fatalf("should return true")
@@ -629,7 +629,7 @@ func TestMacroExpression(t *testing.T) {
 		t.Fatalf("error while evaluating `%s`: %s", expr, err)
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 	if !rule.Eval(ctx) {
 		t.Fatalf("should return true")
 	}
@@ -671,7 +671,7 @@ func TestMacroPartial(t *testing.T) {
 		t.Fatalf("error while generating partials `%s`: %s", expr, err)
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 
 	result, err := rule.PartialEval(ctx, "open.filename")
 	if err != nil {
@@ -731,7 +731,7 @@ func TestNestedMacros(t *testing.T) {
 		t.Fatalf("error while evaluating `%s`: %s", macro2.ID, err)
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 	if !rule.Eval(ctx) {
 		t.Fatalf("should return true")
 	}
@@ -935,7 +935,7 @@ func TestRegisterPartial(t *testing.T) {
 		//{Expr: `process.list[A].key == 55 && process.list[B].value == "AA"`, Field: "process.list.key", IsDiscarder: true},
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 
 	for _, test := range tests {
 		model := &testModel{}
@@ -1315,7 +1315,7 @@ func TestOpOverridePartials(t *testing.T) {
 		{Expr: `process.or_array.value not in ["not"] || true`, Field: "process.or_array.value", IsDiscarder: false},
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 
 	for _, test := range tests {
 		model := &testModel{}
@@ -1377,7 +1377,7 @@ func BenchmarkArray(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := NewContext(unsafe.Pointer(event))
+		ctx := NewContext(event, nil)
 		if evaluator.Eval(ctx) != true {
 			b.Fatal("unexpected result")
 		}
@@ -1411,7 +1411,7 @@ func BenchmarkComplex(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := NewContext(unsafe.Pointer(event))
+		ctx := NewContext(event, nil)
 		if evaluator.Eval(ctx) != true {
 			b.Fatal("unexpected result")
 		}
@@ -1426,7 +1426,7 @@ func BenchmarkPartial(b *testing.B) {
 		},
 	}
 
-	ctx := NewContext(unsafe.Pointer(event))
+	ctx := NewContext(event, nil)
 
 	base := `(process.name == "/usr/bin/ls" && process.uid != 0)`
 	var exprs []string

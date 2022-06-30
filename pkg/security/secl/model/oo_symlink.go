@@ -14,7 +14,7 @@ var (
 		{
 			EvalFnc: func(ctx *eval.Context) string {
 				// empty symlink, generate a fake so that it doesn't match
-				if path := (*Event)(ctx.Object).Exec.Process.SymlinkPathnameStr[0]; path != "" {
+				if path := GetEvent(ctx).Exec.Process.SymlinkPathnameStr[0]; path != "" {
 					return path
 				}
 				return "~" // to ensure that it will not match an empty path
@@ -23,7 +23,7 @@ var (
 		{
 			EvalFnc: func(ctx *eval.Context) string {
 				// empty symlink, generate a fake so that it doesn't match
-				if path := (*Event)(ctx.Object).Exec.Process.SymlinkPathnameStr[1]; path != "" {
+				if path := GetEvent(ctx).Exec.Process.SymlinkPathnameStr[1]; path != "" {
 					return path
 				}
 				return "~" // to ensure that it will not match an empty path
@@ -33,7 +33,7 @@ var (
 
 	symlinkBasenameEvaluator = &eval.StringEvaluator{
 		EvalFnc: func(ctx *eval.Context) string {
-			return (*Event)(ctx.Object).Exec.Process.SymlinkBasenameStr
+			return GetEvent(ctx).Exec.Process.SymlinkBasenameStr
 		},
 	}
 
