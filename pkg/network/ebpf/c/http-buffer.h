@@ -21,14 +21,9 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
     u32 offset = HTTP_BUFFER_SIZE;
     buffer += (HTTP_BUFFER_SIZE - BLOCK_SIZE);
 
-#pragma unroll
-    for (int i = 0; i < HTTP_BUFFER_SIZE / BLOCK_SIZE; i++) {
-        if (data_size > (offset - BLOCK_SIZE)) break;
-        *(u64 *)buffer = 0;
-        buffer -= BLOCK_SIZE;
-        offset -= BLOCK_SIZE;
-    }
+    goto zero_out;
 
+lbt:
     if (data_size <= (offset - 7)) {
         buffer[1] = 0;
     }
@@ -49,6 +44,17 @@ static __always_inline void read_into_buffer(char *buffer, char *data, size_t da
     }
     if (data_size <= (offset - 1)) {
         buffer[7] = 0;
+    }
+
+    return;
+
+zero_out:
+#pragma unroll
+    for (int i = 0; i < HTTP_BUFFER_SIZE / BLOCK_SIZE; i++) {
+        if (data_size > (offset - BLOCK_SIZE)) goto lbt;
+        *(u64 *)buffer = 0;
+        buffer -= BLOCK_SIZE;
+        offset -= BLOCK_SIZE;
     }
 #undef BLOCK_SIZE
 }
