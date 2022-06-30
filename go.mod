@@ -24,6 +24,7 @@ replace (
 	github.com/mholt/archiver => github.com/mholt/archiver v2.0.1-0.20171012052341-26cf5bb32d07+incompatible
 	github.com/spf13/cast => github.com/DataDog/cast v1.3.1-0.20190301154711-1ee8c8bd14a3
 	github.com/ugorji/go => github.com/ugorji/go v1.1.7
+	google.golang.org/grpc => google.golang.org/grpc v1.40.0
 )
 
 replace (
