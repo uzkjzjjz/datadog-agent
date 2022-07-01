@@ -556,7 +556,8 @@ func TestZipProcessAgentFullConfig(t *testing.T) {
 	exp := `api_key: ***************************aaaaa
 dd_url: https://my-url.com
 process_config:
-  enabled: "true"`
+  enabled: "true"
+`
 
 	t.Run("without process-agent running", func(t *testing.T) {
 		dir, err := ioutil.TempDir("", "TestZipProcessAgentFullConfig")
@@ -566,7 +567,7 @@ process_config:
 		zipProcessAgentFullConfig(dir, "")
 		content, err := ioutil.ReadFile(filepath.Join(dir, "process_agent_runtime_config_dump.yaml"))
 		require.NoError(t, err)
-		assert.Equal(t, "error: process-agent is not running or is unreachable", string(content))
+		assert.Equal(t, "error: process-agent is not running or is unreachable\n", string(content))
 	})
 
 	t.Run("with process-agent running", func(t *testing.T) {
