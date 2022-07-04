@@ -139,6 +139,11 @@ func (cl *PythonCheckLoader) Load(config integration.Config, instance integratio
 		// TrackedCStrings untracked by memory tracker currently
 		moduleName := TrackedCString(name)
 		defer C._free(unsafe.Pointer(moduleName))
+
+		// Log early to have context in case of a panic in C-land while
+		// loading.
+		log.Debugf("Attempting to load python module: %s", name)
+
 		if res := C.get_class(rtloader, moduleName, &checkModule, &checkClass); res != 0 {
 			if strings.HasPrefix(name, fmt.Sprintf("%s.", wheelNamespace)) {
 				loadedAsWheel = true
