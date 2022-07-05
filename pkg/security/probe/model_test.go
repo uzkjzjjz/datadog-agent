@@ -20,8 +20,8 @@ import (
 func TestSetFieldValue(t *testing.T) {
 	event := &model.Event{}
 
-	for _, field := range event.GetFields() {
-		kind, err := event.GetFieldType(field)
+	for _, field := range modelZero.GetFields() {
+		kind, err := modelZero.GetFieldType(field)
 		if err != nil {
 			t.Fatal(err)
 		}

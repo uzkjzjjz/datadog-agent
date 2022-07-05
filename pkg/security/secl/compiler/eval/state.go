@@ -56,7 +56,8 @@ func (s *State) UpdateFieldValues(field Field, value FieldValue) error {
 
 	values = append(values, value)
 	s.fieldValues[field] = values
-	return s.model.ValidateField(field, value)
+
+	return nil
 }
 
 // NewState returns a new State

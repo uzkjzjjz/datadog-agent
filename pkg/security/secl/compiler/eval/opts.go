@@ -27,11 +27,12 @@ func (s *MacroStore) AddMacro(macro *Macro) *MacroStore {
 
 // Opts are the options to be passed to the evaluator
 type Opts struct {
-	EvaluatorGetter EvaluatorGetter
-	LegacyFields    map[Field]Field
-	Constants       map[string]interface{}
-	Variables       map[string]VariableValue
-	MacroStore      *MacroStore
+	EvaluatorGetter    EvaluatorGetter
+	LegacyFields       map[Field]Field
+	Constants          map[string]interface{}
+	Variables          map[string]VariableValue
+	MacroStore         *MacroStore
+	ExtraFieldValidate func(field Field, value FieldValue) error
 }
 
 // WithConstants set constants
@@ -66,5 +67,11 @@ func (o *Opts) WithEvaluatorGetter(getter EvaluatorGetter) *Opts {
 // WithMacroStore set the macroStore
 func (o *Opts) WithMacroStore(store *MacroStore) *Opts {
 	o.MacroStore = store
+	return o
+}
+
+// WithExtraFieldValidate set the macroStore
+func (o *Opts) WithExtraFieldValidate(fnc func(field Field, value FieldValue) error) *Opts {
+	o.ExtraFieldValidate = fnc
 	return o
 }

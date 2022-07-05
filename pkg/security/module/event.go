@@ -17,9 +17,9 @@ type AgentContext struct {
 	Version       string `json:"version,omitempty"`
 }
 
-// Signal - Rule event wrapper used to send an event to the backend
+// BackendEvent - Rule event wrapper used to send an event to the backend
 // easyjson:json
-type Signal struct {
+type BackendEvent struct {
 	AgentContext `json:"agent"`
 	Title        string `json:"title"`
 }

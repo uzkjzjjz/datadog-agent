@@ -27,3 +27,18 @@ type FieldValue struct {
 	Value interface{}
 	Type  FieldValueType
 }
+
+// ValidateField checks validity of a field
+func ValidateField(model Model, field Field, value FieldValue, opts *Opts) error {
+	if err := model.ValidateField(field, value); err != nil {
+		return err
+	}
+
+	if opts.ExtraFieldValidate != nil {
+		if err := opts.ExtraFieldValidate(field, value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

@@ -35,7 +35,7 @@ func (m *Model) GetEventTypes() []eval.EventType {
 	}
 } 
 
-func (e *Event) GetFields() []eval.Field {
+func (m *Model) GetFields() []eval.Field {
 	return []eval.Field{
 		{{range $Name, $Field := .Fields}}
 			"{{$Name}}",
@@ -43,93 +43,7 @@ func (e *Event) GetFields() []eval.Field {
 	}
 }
 
-// TODO(safchain) move to evaluator because of context and handlers
-func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
-	switch field {
-		{{range $Name, $Field := .Fields}}
-		case "{{$Name}}":
-		{{if $Field.Iterator}}
-			var values []{{$Field.ReturnType}}
-
-			ctx := eval.NewContext(e, nil)
-
-			iterator := &{{$Field.Iterator.ReturnType}}{}
-			ptr := iterator.Front(ctx)
-
-			for ptr != nil {
-				{{if $Field.Iterator.IsOrigTypePtr}}
-					element := (*{{$Field.Iterator.OrigType}})(ptr)
-				{{else}}
-					elementPtr := (*{{$Field.Iterator.OrigType}})(ptr)
-					element := *elementPtr
-				{{end}}
-
-				{{$SubName := $Field.Iterator.Name | TrimPrefix $Field.Name}}
-
-				{{$Return := $SubName | printf "element%s"}}
-				{{if and (ne $Field.Handler "") (not $Mock) }}
-					{{$SubName = $Field.Iterator.Name | TrimPrefix $Field.Prefix}}
-					{{$Handler := $Field.Iterator.Name | TrimPrefix $Field.Handler}}
-					{{$Return = print "(*Event)(ctx.Object)." $Handler "(&element" $SubName ")"}}
-				{{end}}
-
-				{{if and (eq $Field.ReturnType "int") (ne $Field.OrigType "int")}}
-					result := int({{$Return}})
-				{{else}}
-					result := {{$Return}}
-				{{end}}
-
-				{{if eq $Field.GetArrayPrefix ""}}
-				values = append(values, result)
-				{{else}}
-				values = append(values, result...)
-				{{end}}
-
-				ptr = iterator.Next()
-			}
-
-			return values, nil
-		{{else}}
-			{{$Return := $Field.Name | printf "e.%s"}}
-			{{if and (ne $Field.Handler "") (not $Mock)}}
-				{{$Ptr := "&"}}
-				{{$Parent := index $.AllFields $Field.Prefix}}
-				{{- if $Parent.IsOrigTypePtr}}
-					{{$Ptr = ""}}
-				{{end}}
-
-				{{$Return = print "e." $Field.Handler "(" $Ptr "e." $Field.Prefix ")"}}
-			{{end}}
-
-			{{if eq $Field.ReturnType "string"}}
-				return {{$Return}}, nil
-			{{else if eq $Field.ReturnType "int"}}
-				{{- if and ($Field.IsArray) (ne $Field.OrigType "int") }}
-					result := make([]int, len({{$Return}}))
-					for i, v := range {{$Return}} {
-						result[i] = int(v)
-					}
-					return result, nil
-				{{- else}}
-					{{- if ne $Field.OrigType "int"}}
-						return int({{$Return}}), nil
-					{{- else}}
-						return {{$Return}}, nil
-					{{end -}}
-				{{end -}}
-			{{else if eq $Field.ReturnType "bool"}}
-				return {{$Return}}, nil
-            {{else if eq $Field.ReturnType "net.IPNet"}}
-                return {{$Return}}, nil
-			{{end}}
-		{{end}}
-		{{end}}
-		}
-
-		return nil, &eval.ErrFieldNotFound{Field: field}
-}
-
-func (e *Event) GetFieldEventType(field eval.Field) (eval.EventType, error) {
+func (m *Model) GetFieldEventType(field eval.Field) (eval.EventType, error) {
 	switch field {
 	{{range $Name, $Field := .Fields}}
 	case "{{$Name}}":
@@ -140,7 +54,7 @@ func (e *Event) GetFieldEventType(field eval.Field) (eval.EventType, error) {
 	return "", &eval.ErrFieldNotFound{Field: field}
 }
 
-func (e *Event) GetFieldType(field eval.Field) (reflect.Kind, error) {
+func (m *Model) GetFieldType(field eval.Field) (reflect.Kind, error) {
 	switch field {
 		{{range $Name, $Field := .Fields}}
 
@@ -155,10 +69,11 @@ func (e *Event) GetFieldType(field eval.Field) (reflect.Kind, error) {
             return reflect.Struct, nil
 		{{end}}
 		{{end}}
-		}
+	}
 
-		return reflect.Invalid, &eval.ErrFieldNotFound{Field: field}
+	return reflect.Invalid, &eval.ErrFieldNotFound{Field: field}
 }
+
 
 func (e *Event) SetFieldValue(field eval.Field, value interface{}) error {
 	switch field {

@@ -43,7 +43,7 @@ import (
 
 {{ range .Operators }}
 
-func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ .FuncReturnType }}, error) {
+func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, opts *Opts, state *State) (*{{ .FuncReturnType }}, error) {
 	{{ if or (eq .FuncName "Or") (eq .FuncName "And") }}
 	isDc := a.IsDeterministicFor(state.field) || b.IsDeterministicFor(state.field)
 	{{ else }}
@@ -110,7 +110,12 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: {{ .ValueType }}}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: {{ .ValueType }}}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -143,7 +148,12 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: {{ .ValueType }}}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: {{ .ValueType }}}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -176,7 +186,7 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 
 {{ range .ArrayOperators }}
 
-func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ .FuncReturnType }}, error) {
+func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, opts *Opts, state *State) (*{{ .FuncReturnType }}, error) {
 	{{ if or (eq .FuncName "Or") (eq .FuncName "And") }}
 	isDc := a.IsDeterministicFor(state.field) || b.IsDeterministicFor(state.field)
 	{{ else }}
@@ -221,7 +231,12 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: {{ .ValueType }}}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -241,7 +256,12 @@ func {{ .FuncName }}(a *{{ .Arg1Type }}, b *{{ .Arg2Type }}, state *State) (*{{ 
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: {{ .ValueType }}}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}

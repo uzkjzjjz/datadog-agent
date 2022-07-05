@@ -350,9 +350,11 @@ func assertReturnValue(t *testing.T, retval, expected int64) bool {
 }
 
 //nolint:deadcode,unused
-func assertFieldEqual(t *testing.T, e *sprobe.Event, field string, value interface{}, msgAndArgs ...interface{}) bool {
+func assertFieldEqual(t *testing.T, event *sprobe.Event, field string, value interface{}, msgAndArgs ...interface{}) bool {
+	ctx := eval.NewContext(event.ModelEvent, event.ProbeContext)
+
 	t.Helper()
-	fieldValue, err := e.GetFieldValue(field)
+	fieldValue, err := sprobe.GetFieldValue(ctx, field)
 	if err != nil {
 		t.Errorf("failed to get field '%s': %s", field, err)
 		return false
@@ -362,8 +364,10 @@ func assertFieldEqual(t *testing.T, e *sprobe.Event, field string, value interfa
 
 //nolint:deadcode,unused
 func assertFieldStringArrayIndexedOneOf(t *testing.T, e *sprobe.Event, field string, index int, values []string, msgAndArgs ...interface{}) bool {
+	ctx := eval.NewContext(e.ModelEvent, e.ProbeContext)
+
 	t.Helper()
-	fieldValue, err := e.GetFieldValue(field)
+	fieldValue, err := sprobe.GetFieldValue(ctx, field)
 	if err != nil {
 		t.Errorf("failed to get field '%s': %s", field, err)
 		return false
@@ -439,8 +443,10 @@ func validateProcessContextSECL(tb testing.TB, event *sprobe.Event) bool {
 		"process.ancestors.file.name",
 	}
 
+	ctx := eval.NewContext(event.ModelEvent, event.ProbeContext)
+
 	for _, field := range fields {
-		fieldValue, err := event.GetFieldValue(field)
+		fieldValue, err := sprobe.GetFieldValue(ctx, field)
 		if err != nil {
 			tb.Errorf("failed to get field '%s': %s", field, err)
 			return false
@@ -675,7 +681,6 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 	testMod.module.SetRulesetLoadedCallback(func(rs *rules.RuleSet, err *multierror.Error) {
 		loadErr = err
 		log.Infof("Adding test module as listener")
-		rs.AddListener(testMod)
 	})
 
 	if err := testMod.module.Init(); err != nil {
@@ -683,6 +688,7 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 	}
 
 	testMod.probe.AddEventHandler(model.UnknownEventType, testMod.probeHandler)
+	testMod.probe.AddRuleHandler(testMod)
 
 	if err := testMod.module.Start(); err != nil {
 		return nil, errors.Wrap(err, "failed to start module")
@@ -724,13 +730,13 @@ func (tm *testModule) Root() string {
 	return tm.st.root
 }
 
-func (tm *testModule) RuleMatch(rule *rules.Rule, event eval.Event) {
+func (tm *testModule) OnRuleMatch(rule *rules.Rule, event *sprobe.Event, service string, extTagsCb func() []string) {
 	tm.ruleHandler.RLock()
 	callback := tm.ruleHandler.callback
 	tm.ruleHandler.RUnlock()
 
 	if callback != nil {
-		callback(event.(*sprobe.Event), rule)
+		callback(event, rule)
 	}
 }
 
@@ -740,13 +746,15 @@ func (tm *testModule) RegisterEventDiscarderHandler(cb eventDiscarderHandler) {
 	tm.eventDiscarderHandler.Unlock()
 }
 
-func (tm *testModule) EventDiscarderFound(rs *rules.RuleSet, event eval.Event, field eval.Field, eventType eval.EventType) {
+func (tm *testModule) EventDiscarderFound(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) {
 	tm.eventDiscarderHandler.RLock()
 	callback := tm.eventDiscarderHandler.callback
 	tm.eventDiscarderHandler.RUnlock()
 
+	event := sprobe.GetEvent(ctx)
+
 	if callback != nil {
-		discarder := &testDiscarder{event: event.(*sprobe.Event), field: field, eventType: eventType}
+		discarder := &testDiscarder{event: event, field: field, eventType: eventType}
 		_ = callback(discarder)
 	}
 }
@@ -997,8 +1005,9 @@ func (tm *testModule) GetProbeEvent(action func() error, cb func(event *sprobe.E
 	tm.RegisterEventHandler(func(event *sprobe.Event) {
 		if len(eventTypes) > 0 {
 			match := false
+
 			for _, eventType := range eventTypes {
-				if event.GetEventType() == eventType {
+				if event.ModelEvent.GetEventType() == eventType {
 					match = true
 					break
 				}
@@ -1331,7 +1340,9 @@ func ifSyscallSupported(syscall string, test func(t *testing.T, syscallNB uintpt
 //nolint:deadcode,unused
 func waitForProbeEvent(test *testModule, action func() error, key string, value interface{}, eventType model.EventType) error {
 	return test.GetProbeEvent(action, func(event *sprobe.Event) bool {
-		if v, _ := event.GetFieldValue(key); v == value {
+		ctx := eval.NewContext(event.ModelEvent, event.ProbeContext)
+
+		if v, _ := sprobe.GetFieldValue(ctx, key); v == value {
 			return true
 		}
 		return false

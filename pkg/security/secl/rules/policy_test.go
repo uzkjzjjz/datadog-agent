@@ -41,7 +41,7 @@ func TestMacroMerge(t *testing.T) {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(map[eval.EventType]bool{"*": true})
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
 			ID:         "test_rule",
@@ -121,7 +121,7 @@ func TestRuleMerge(t *testing.T) {
 	opts.
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(map[eval.EventType]bool{"*": true})
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -237,7 +237,7 @@ func TestActionSetVariable(t *testing.T) {
 		WithEventTypeEnabled(enabled).
 		WithStateScopes(stateScopes)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -392,7 +392,7 @@ func TestActionSetVariableConflict(t *testing.T) {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 
 	testPolicy := &PolicyDef{
 		Rules: []*RuleDefinition{{
@@ -451,7 +451,7 @@ func loadPolicy(t *testing.T, testPolicy *PolicyDef, agentVersion *semver.Versio
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	rs := NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 
 	tmpDir, err := os.MkdirTemp("", "test-policy")
 	if err != nil {

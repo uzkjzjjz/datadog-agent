@@ -392,23 +392,23 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			},
 			Field: field,
 			OpOverrides: &OpOverrides{
-				StringValuesContains: func(a *StringEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
+				StringValuesContains: func(a *StringEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return ctx.Event.(*testEvent).process.orNameValues()
 						},
 					}
 
-					return StringValuesContains(a, &evaluator, state)
+					return StringValuesContains(a, &evaluator, opts, state)
 				},
-				StringEquals: func(a *StringEvaluator, b *StringEvaluator, state *State) (*BoolEvaluator, error) {
+				StringEquals: func(a *StringEvaluator, b *StringEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return ctx.Event.(*testEvent).process.orNameValues()
 						},
 					}
 
-					return StringValuesContains(a, &evaluator, state)
+					return StringValuesContains(a, &evaluator, opts, state)
 				},
 			},
 		}, nil
@@ -427,23 +427,23 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 			},
 			Field: field,
 			OpOverrides: &OpOverrides{
-				StringArrayContains: func(a *StringEvaluator, b *StringArrayEvaluator, state *State) (*BoolEvaluator, error) {
+				StringArrayContains: func(a *StringEvaluator, b *StringArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return ctx.Event.(*testEvent).process.orArrayValues()
 						},
 					}
 
-					return StringArrayMatches(b, &evaluator, state)
+					return StringArrayMatches(b, &evaluator, opts, state)
 				},
-				StringArrayMatches: func(a *StringArrayEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
+				StringArrayMatches: func(a *StringArrayEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return ctx.Event.(*testEvent).process.orArrayValues()
 						},
 					}
 
-					return StringArrayMatches(a, &evaluator, state)
+					return StringArrayMatches(a, &evaluator, opts, state)
 				},
 			},
 		}, nil
@@ -487,75 +487,7 @@ func getEvaluatorTest(field Field, regID RegisterID) (Evaluator, error) {
 	return nil, &ErrFieldNotFound{Field: field}
 }
 
-func (e *testEvent) GetFieldValue(field Field) (interface{}, error) {
-	switch field {
-
-	case "network.ip":
-		return e.network.ip, nil
-
-	case "network.ips":
-		return e.network.ips, nil
-
-	case "network.cidr":
-		return e.network.cidr, nil
-
-	case "network.cidrs":
-		return e.network.cidrs, nil
-
-	case "process.name":
-
-		return e.process.name, nil
-
-	case "process.argv0":
-
-		return e.process.argv0, nil
-
-	case "process.uid":
-
-		return e.process.uid, nil
-
-	case "process.gid":
-
-		return e.process.gid, nil
-
-	case "process.pid":
-
-		return e.process.pid, nil
-
-	case "process.is_root":
-
-		return e.process.isRoot, nil
-
-	case "process.created_at":
-
-		return e.process.createdAt, nil
-
-	case "open.filename":
-
-		return e.open.filename, nil
-
-	case "open.flags":
-
-		return e.open.flags, nil
-
-	case "open.mode":
-
-		return e.open.mode, nil
-
-	case "mkdir.filename":
-
-		return e.mkdir.filename, nil
-
-	case "mkdir.mode":
-
-		return e.mkdir.mode, nil
-
-	}
-
-	return nil, &ErrFieldNotFound{Field: field}
-}
-
-func (e *testEvent) GetFieldEventType(field Field) (string, error) {
+func (m *testModel) GetFieldEventType(field Field) (string, error) {
 	switch field {
 
 	case "network.ip":
@@ -746,7 +678,7 @@ func (e *testEvent) SetFieldValue(field Field, value interface{}) error {
 	return &ErrFieldNotFound{Field: field}
 }
 
-func (e *testEvent) GetFieldType(field Field) (reflect.Kind, error) {
+func (m *testModel) GetFieldType(field Field) (reflect.Kind, error) {
 	switch field {
 
 	case "network.ip":

@@ -15,9 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	manager "github.com/DataDog/ebpf-manager"
 	"github.com/cilium/ebpf/perf"
-	"github.com/mailru/easyjson/jwriter"
 
 	"github.com/DataDog/datadog-agent/pkg/security/probe/constantfetch"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
@@ -29,45 +27,28 @@ const (
 	ServiceEnvVar = "DD_SERVICE"
 )
 
-var eventZero model.Event
+var (
+	eventZero model.Event
+	modelZero model.Model
+)
 
-// Model describes the data model for the runtime security agent probe events
-type Model struct {
-	model.Model
-	probe *Probe
-}
+// ValidateField is used during rule compilation
+func ValidateField(probe *Probe) func(field eval.Field, fieldValue eval.FieldValue) error {
+	return func(field eval.Field, fieldValue eval.FieldValue) error {
+		switch field {
+		case "bpf.map.name":
+			if offset, found := probe.constantOffsets["bpf_map_name_offset"]; !found || offset == constantfetch.ErrorSentinel {
+				return fmt.Errorf("%s is not available on this kernel version", field)
+			}
 
-// ValidateField validates the value of a field
-func (m *Model) ValidateField(field eval.Field, fieldValue eval.FieldValue) error {
-	if err := m.Model.ValidateField(field, fieldValue); err != nil {
-		return err
-	}
-
-	switch field {
-	case "bpf.map.name":
-		if offset, found := m.probe.constantOffsets["bpf_map_name_offset"]; !found || offset == constantfetch.ErrorSentinel {
-			return fmt.Errorf("%s is not available on this kernel version", field)
+		case "bpf.prog.name":
+			if offset, found := probe.constantOffsets["bpf_prog_aux_name_offset"]; !found || offset == constantfetch.ErrorSentinel {
+				return fmt.Errorf("%s is not available on this kernel version", field)
+			}
 		}
 
-	case "bpf.prog.name":
-		if offset, found := m.probe.constantOffsets["bpf_prog_aux_name_offset"]; !found || offset == constantfetch.ErrorSentinel {
-			return fmt.Errorf("%s is not available on this kernel version", field)
-		}
+		return nil
 	}
-
-	return nil
-}
-
-// NewEvent returns a new Event
-func (m *Model) NewEvent() eval.Event {
-	return &model.Event{}
-}
-
-// NetDeviceKey is used to uniquely identify a network device
-type NetDeviceKey struct {
-	IfIndex          uint32
-	NetNS            uint32
-	NetworkDirection manager.TrafficType
 }
 
 // ResolveFilePath resolves the inode to a full path
@@ -393,25 +374,6 @@ func ResolveSELinuxBoolName(ctx *ProbeContext, ev *model.Event, e *model.SELinux
 	return ev.SELinux.BoolName
 }
 
-// EventToString returns string representation of the event
-func EventToString(ctx *ProbeContext, ev *model.Event) string {
-	d, err := MarshalJSONEvent(ctx, ev)
-	if err != nil {
-		return err.Error()
-	}
-	return string(d)
-}
-
-// MarshalJSON returns the JSON encoding of the event
-func MarshalJSONEvent(ctx *ProbeContext, ev *model.Event) ([]byte, error) {
-	s := NewEventSerializer(ctx, ev)
-	w := &jwriter.Writer{
-		Flags: jwriter.NilSliceAsEmpty | jwriter.NilMapAsEmpty,
-	}
-	s.MarshalEasyJSON(w)
-	return w.BuildBytes()
-}
-
 // ExtractEventInfo extracts cpu and timestamp from the raw data event
 func ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
 	if len(record.RawSample) < 16 {
@@ -484,28 +446,9 @@ func GetProcessServiceTag(ctx *ProbeContext, ev *model.Event) string {
 
 // ResolveNetworkDeviceIfName returns the network iterface name from the network context
 func ResolveNetworkDeviceIfName(ctx *ProbeContext, ev *model.Event, device *model.NetworkDeviceContext) string {
-	// TODO(safchain) restore
-	return ""
-	/*if len(device.IfName) == 0 && ev.probe != nil {
-		key := NetDeviceKey{
-			NetNS:            device.NetNS,
-			IfIndex:          device.IfIndex,
-			NetworkDirection: manager.Egress,
-		}
-
-		ev.probe.tcProgramsLock.RLock()
-		defer ev.probe.tcProgramsLock.RUnlock()
-
-		tcProbe, ok := ev.probe.tcPrograms[key]
-		if !ok {
-			key.NetworkDirection = manager.Ingress
-			tcProbe = ev.probe.tcPrograms[key]
-		}
-
-		if tcProbe != nil {
-			device.IfName = tcProbe.IfName
-		}
+	if len(device.IfName) == 0 {
+		device.IfName = ctx.Resolvers.NetworkResovler.ResolveIfName(device)
 	}
 
-	return device.IfName*/
+	return device.IfName
 }

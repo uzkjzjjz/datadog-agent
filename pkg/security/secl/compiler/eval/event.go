@@ -5,10 +5,6 @@
 
 package eval
 
-import (
-	"reflect"
-)
-
 // EventType is the type of an event
 type EventType = string
 
@@ -16,14 +12,9 @@ type EventType = string
 type Event interface {
 	// GetType returns the Type of the Event
 	GetType() EventType
-	// GetFieldEventType returns the Event Type for the given Field
-	GetFieldEventType(field Field) (EventType, error)
 	// SetFieldValue sets the value of the given Field
 	SetFieldValue(field Field, value interface{}) error
 	// GetFieldValue returns the value of the given Field
-	GetFieldValue(field Field) (interface{}, error)
-	// GetFieldType returns the Type of the Field
-	GetFieldType(field Field) (reflect.Kind, error)
 	// GetTags returns a list of tags
 	GetTags() []string
 }
@@ -31,7 +22,7 @@ type Event interface {
 func eventTypesFromFields(model Model, state *State) ([]EventType, error) {
 	events := make(map[EventType]bool)
 	for field := range state.fieldValues {
-		eventType, err := model.NewEvent().GetFieldEventType(field)
+		eventType, err := model.GetFieldEventType(field)
 		if err != nil {
 			return nil, err
 		}

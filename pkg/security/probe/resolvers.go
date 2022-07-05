@@ -34,6 +34,7 @@ type Resolvers struct {
 	UserGroupResolver *UserGroupResolver
 	TagsResolver      *TagsResolver
 	NamespaceResolver *NamespaceResolver
+	NetworkResovler   *NetworkResolver
 }
 
 // NewResolvers creates a new instance of Resolvers
@@ -72,6 +73,7 @@ func NewResolvers(config *config.Config, probe *Probe) (*Resolvers, error) {
 		UserGroupResolver: userGroupResolver,
 		TagsResolver:      NewTagsResolver(config),
 		NamespaceResolver: namespaceResolver,
+		NetworkResovler:   NewNetworkResolver(),
 	}
 
 	processResolver, err := NewProcessResolver(probe, resolvers, NewProcessResolverOpts(probe.config.CookieCacheSize))

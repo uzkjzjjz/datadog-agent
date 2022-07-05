@@ -23,18 +23,18 @@ type ProcessMonitoring struct {
 // HandleEvent implement the EventHandler interface
 func (p *ProcessMonitoring) HandleEvent(event *sprobe.Event) {
 	// Force resolution of all event fields before exposing it through the API server
-	event.ResolveFields()
-	event.ResolveEventTimestamp()
+	sprobe.ResolveFields(event.ProbeContext, event.ModelEvent)
+	sprobe.ResolveEventTimestamp(event.ProbeContext, event.ModelEvent)
 
-	entry := event.ResolveProcessCacheEntry()
+	entry := sprobe.ResolveProcessCacheEntry(event.ProbeContext, event.ModelEvent)
 	if entry == nil {
 		return
 	}
 
 	e := &model.ProcessMonitoringEvent{
 		ProcessCacheEntry: entry,
-		EventType:         event.GetEventType().String(),
-		CollectionTime:    event.Timestamp,
+		EventType:         event.ModelEvent.GetEventType().String(),
+		CollectionTime:    event.ModelEvent.Timestamp,
 	}
 
 	data, err := e.MarshalMsg(nil)

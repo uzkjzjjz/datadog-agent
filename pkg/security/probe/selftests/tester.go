@@ -15,7 +15,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/security/api"
 	"github.com/DataDog/datadog-agent/pkg/security/probe"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/hashicorp/go-multierror"
@@ -188,14 +187,9 @@ type selfTestEvent struct {
 }
 
 // IsExpectedEvent sends an event to the tester
-func (t *SelfTester) IsExpectedEvent(rule *rules.Rule, event eval.Event) bool {
+func (t *SelfTester) IsExpectedEvent(rule *rules.Rule, event *probe.Event) bool {
 	if atomic.LoadUint32(&t.waitingForEvent) != 0 && rule.Definition.Policy.Source == policySource {
-		ev, ok := event.(*probe.Event)
-		if !ok {
-			return true
-		}
-
-		s := probe.NewEventSerializer(ev)
+		s := probe.NewEventSerializer(event.ProbeContext, event.ModelEvent)
 		if s == nil || s.FileEventSerializer == nil {
 			return true
 		}

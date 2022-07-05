@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func Or(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error) {
+func Or(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := a.IsDeterministicFor(state.field) || b.IsDeterministicFor(state.field)
 
@@ -59,7 +59,12 @@ func Or(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -90,7 +95,12 @@ func Or(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -118,7 +128,7 @@ func Or(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error
 	}, nil
 }
 
-func And(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error) {
+func And(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := a.IsDeterministicFor(state.field) || b.IsDeterministicFor(state.field)
 
@@ -171,7 +181,12 @@ func And(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, erro
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -202,7 +217,12 @@ func And(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, erro
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -230,7 +250,7 @@ func And(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, erro
 	}, nil
 }
 
-func IntEquals(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func IntEquals(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -264,7 +284,12 @@ func IntEquals(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, 
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -284,7 +309,12 @@ func IntEquals(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, 
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -301,7 +331,7 @@ func IntEquals(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, 
 	}, nil
 }
 
-func IntAnd(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error) {
+func IntAnd(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -325,7 +355,12 @@ func IntAnd(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: BitmaskValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: BitmaskValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -345,7 +380,12 @@ func IntAnd(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: BitmaskValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: BitmaskValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -362,7 +402,7 @@ func IntAnd(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 	}, nil
 }
 
-func IntOr(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error) {
+func IntOr(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -386,7 +426,12 @@ func IntOr(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: BitmaskValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: BitmaskValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -406,7 +451,12 @@ func IntOr(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: BitmaskValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: BitmaskValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -423,7 +473,7 @@ func IntOr(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error
 	}, nil
 }
 
-func IntXor(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, error) {
+func IntXor(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -447,7 +497,12 @@ func IntXor(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: BitmaskValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: BitmaskValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -467,7 +522,12 @@ func IntXor(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: BitmaskValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: BitmaskValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -484,7 +544,7 @@ func IntXor(a *IntEvaluator, b *IntEvaluator, state *State) (*IntEvaluator, erro
 	}, nil
 }
 
-func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluator, error) {
+func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -518,7 +578,12 @@ func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluato
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -538,7 +603,12 @@ func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluato
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -555,7 +625,7 @@ func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, state *State) (*BoolEvaluato
 	}, nil
 }
 
-func GreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func GreaterThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -589,7 +659,12 @@ func GreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -609,7 +684,12 @@ func GreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -626,7 +706,7 @@ func GreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator
 	}, nil
 }
 
-func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -660,7 +740,12 @@ func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -680,7 +765,12 @@ func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -697,7 +787,7 @@ func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 	}, nil
 }
 
-func LesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func LesserThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -731,7 +821,12 @@ func LesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator,
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -751,7 +846,12 @@ func LesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator,
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -768,7 +868,7 @@ func LesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator,
 	}, nil
 }
 
-func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -802,7 +902,12 @@ func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEva
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -822,7 +927,12 @@ func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEva
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -839,7 +949,7 @@ func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEva
 	}, nil
 }
 
-func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -873,7 +983,12 @@ func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -893,7 +1008,12 @@ func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -910,7 +1030,7 @@ func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEv
 	}, nil
 }
 
-func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -944,7 +1064,12 @@ func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -964,7 +1089,12 @@ func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -981,7 +1111,7 @@ func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (
 	}, nil
 }
 
-func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1015,7 +1145,12 @@ func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolE
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -1035,7 +1170,12 @@ func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolE
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1052,7 +1192,7 @@ func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolE
 	}, nil
 }
 
-func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) (*BoolEvaluator, error) {
+func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1086,7 +1226,12 @@ func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) 
 		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: ScalarValueType}); err != nil {
+			fieldValue := FieldValue{Value: eb, Type: ScalarValueType}
+			if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+				return nil, err
+			}
+
+			if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 				return nil, err
 			}
 		}
@@ -1106,7 +1251,12 @@ func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) 
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1123,7 +1273,7 @@ func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, state *State) 
 	}, nil
 }
 
-func IntArrayEquals(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func IntArrayEquals(a *IntEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1165,7 +1315,12 @@ func IntArrayEquals(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolE
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1185,7 +1340,12 @@ func IntArrayEquals(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolE
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1201,7 +1361,7 @@ func IntArrayEquals(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolE
 	}, nil
 }
 
-func BoolArrayEquals(a *BoolEvaluator, b *BoolArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func BoolArrayEquals(a *BoolEvaluator, b *BoolArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1243,7 +1403,12 @@ func BoolArrayEquals(a *BoolEvaluator, b *BoolArrayEvaluator, state *State) (*Bo
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1263,7 +1428,12 @@ func BoolArrayEquals(a *BoolEvaluator, b *BoolArrayEvaluator, state *State) (*Bo
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1279,7 +1449,7 @@ func BoolArrayEquals(a *BoolEvaluator, b *BoolArrayEvaluator, state *State) (*Bo
 	}, nil
 }
 
-func IntArrayGreaterThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func IntArrayGreaterThan(a *IntEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1321,7 +1491,12 @@ func IntArrayGreaterThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1341,7 +1516,12 @@ func IntArrayGreaterThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1357,7 +1537,7 @@ func IntArrayGreaterThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*
 	}, nil
 }
 
-func IntArrayGreaterOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func IntArrayGreaterOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1399,7 +1579,12 @@ func IntArrayGreaterOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *St
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1419,7 +1604,12 @@ func IntArrayGreaterOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *St
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1435,7 +1625,7 @@ func IntArrayGreaterOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *St
 	}, nil
 }
 
-func IntArrayLesserThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func IntArrayLesserThan(a *IntEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1477,7 +1667,12 @@ func IntArrayLesserThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*B
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1497,7 +1692,12 @@ func IntArrayLesserThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*B
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}
@@ -1513,7 +1713,7 @@ func IntArrayLesserThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*B
 	}, nil
 }
 
-func IntArrayLesserOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
+func IntArrayLesserOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
 
 	isDc := isArithmDeterministic(a, b, state)
 
@@ -1555,7 +1755,12 @@ func IntArrayLesserOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *Sta
 
 		if a.Field != "" {
 			for _, value := range eb {
-				if err := state.UpdateFieldValues(a.Field, FieldValue{Value: value, Type: ScalarValueType}); err != nil {
+				fieldValue := FieldValue{Value: value, Type: ScalarValueType}
+				if err := ValidateField(state.model, a.Field, fieldValue, opts); err != nil {
+					return nil, err
+				}
+
+				if err := state.UpdateFieldValues(a.Field, fieldValue); err != nil {
 					return nil, err
 				}
 			}
@@ -1575,7 +1780,12 @@ func IntArrayLesserOrEqualThan(a *IntEvaluator, b *IntArrayEvaluator, state *Sta
 	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: ScalarValueType}); err != nil {
+		fieldValue := FieldValue{Value: ea, Type: ScalarValueType}
+		if err := ValidateField(state.model, b.Field, fieldValue, opts); err != nil {
+			return nil, err
+		}
+
+		if err := state.UpdateFieldValues(b.Field, fieldValue); err != nil {
 			return nil, err
 		}
 	}

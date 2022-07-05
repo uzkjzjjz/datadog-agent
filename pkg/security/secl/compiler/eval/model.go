@@ -5,6 +5,8 @@
 
 package eval
 
+import "reflect"
+
 // Model - interface that a model has to implement for the rule compilation
 type Model interface {
 	// GetEvaluator returns an evaluator for the given field
@@ -15,4 +17,8 @@ type Model interface {
 	GetIterator(field Field) (Iterator, error)
 	// NewEvent returns a new event instance
 	NewEvent() Event
+	// GetFieldEventType returns the Event Type for the given Field
+	GetFieldEventType(field Field) (EventType, error)
+	// GetFieldType returns the Type of the Field
+	GetFieldType(field Field) (reflect.Kind, error)
 }

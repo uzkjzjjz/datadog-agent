@@ -31,6 +31,7 @@ import (
 	sconfig "github.com/DataDog/datadog-agent/pkg/security/config"
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
+	"github.com/DataDog/datadog-agent/pkg/security/probe"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/selftests"
 	"github.com/DataDog/datadog-agent/pkg/security/rconfig"
@@ -111,6 +112,7 @@ func (m *Module) Init() error {
 	m.apiServer.Start(m.ctx)
 
 	m.probe.AddEventHandler(model.UnknownEventType, m)
+	m.probe.AddRuleHandler(m)
 	m.probe.AddActivityDumpHandler(m)
 
 	// initialize extra event monitors
@@ -307,7 +309,8 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 	evalOpts.
 		WithConstants(model.SECLConstants).
 		WithVariables(probeVariables).
-		WithLegacyFields(model.SECLLegacyFields)
+		WithLegacyFields(model.SECLLegacyFields).
+		WithEvaluatorGetter(model.GetEvaluator)
 
 	var opts rules.Opts
 	opts.
@@ -317,7 +320,7 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 		WithStateScopes(map[rules.Scope]rules.VariableProviderFactory{
 			"process": func() rules.VariableProvider {
 				return eval.NewScopedVariables(func(ctx *eval.Context) unsafe.Pointer {
-					return unsafe.Pointer(&(*model.Event)(ctx.Object).ProcessContext)
+					return unsafe.Pointer(probe.GetEvent(ctx).ProcessContext)
 				}, nil)
 			},
 		}).
@@ -325,16 +328,19 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 
 	// approver ruleset
 	model := &model.Model{}
-	approverRuleSet := rules.NewRuleSet(model, model.NewEvent, &opts, &evalOpts, &eval.MacroStore{})
+	approverRuleSet := rules.NewRuleSet(model, model.NewEvent, opts, evalOpts)
 
 	// switch SECLVariables to use the real Event structure and not the mock model.Event one
-	evalOpts.WithVariables(sprobe.SECLVariables)
+	evalOpts.
+		WithVariables(sprobe.SECLVariables).
+		WithEvaluatorGetter(probe.GetEvaluator)
+
 	opts.WithStateScopes(map[rules.Scope]rules.VariableProviderFactory{
 		"process": m.probe.GetResolvers().ProcessResolver.NewProcessVariables,
 	})
 
 	// standard ruleset
-	ruleSet := m.probe.NewRuleSet(&opts, &evalOpts, &eval.MacroStore{})
+	ruleSet := m.probe.NewRuleSet(opts, evalOpts)
 
 	// load policies
 	m.policyLoader.SetProviders(policyProviders)
@@ -363,9 +369,6 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 	if m.rulesLoaded != nil {
 		m.rulesLoaded(ruleSet, loadErrs)
 	}
-
-	// add module as listener for ruleset events
-	ruleSet.AddListener(m)
 
 	// analyze the ruleset, push default policies in the kernel and generate the policy report
 	report, err := rsa.Apply(ruleSet, approvers)
@@ -424,63 +427,28 @@ func (m *Module) Close() {
 	m.wg.Wait()
 }
 
-// EventDiscarderFound is called by the ruleset when a new discarder discovered
-func (m *Module) EventDiscarderFound(rs *rules.RuleSet, event eval.Event, field eval.Field, eventType eval.EventType) {
-	if m.reloading.Load() {
-		return
-	}
-
-	if err := m.probe.OnNewDiscarder(rs, event.(*sprobe.Event), field, eventType); err != nil {
-		seclog.Trace(err)
-	}
-}
-
 // HandleEvent is called by the probe when an event arrives from the kernel
-func (m *Module) HandleEvent(event *sprobe.Event) {
+func (m *Module) HandleEvent(event *probe.Event) {
 	if ruleSet := m.GetRuleSet(); ruleSet != nil {
-		ruleSet.Evaluate(event)
+		ruleSet.Evaluate(event.ModelEvent)
 	}
 }
 
 // HandleCustomEvent is called by the probe when an event should be sent to Datadog but doesn't need evaluation
 func (m *Module) HandleCustomEvent(rule *rules.Rule, event *sprobe.CustomEvent) {
-	m.SendEvent(rule, event, func() []string { return nil }, "")
+	m.SendEvent(rule, event, "", func() []string { return nil })
 }
 
 // RuleMatch is called by the ruleset when a rule matches
-func (m *Module) RuleMatch(rule *rules.Rule, event eval.Event) {
-	// prepare the event
-	m.probe.OnRuleMatch(rule, event.(*sprobe.Event))
-
-	// needs to be resolved here, outside of the callback as using process tree
-	// which can be modified during queuing
-	service := event.(*sprobe.Event).GetProcessServiceTag()
-
-	id := event.(*sprobe.Event).ContainerContext.ID
-
-	extTagsCb := func() []string {
-		var tags []string
-
-		// check from tagger
-		if service == "" {
-			service = m.probe.GetResolvers().TagsResolver.GetValue(id, "service")
-		}
-
-		if service == "" {
-			service = m.config.HostServiceName
-		}
-
-		return append(tags, m.probe.GetResolvers().TagsResolver.Resolve(id)...)
-	}
-
+func (m *Module) OnRuleMatch(rule *rules.Rule, event *probe.Event, service string, extTagsCb func() []string) {
 	// send if not selftest related events
 	if m.selfTester == nil || !m.selfTester.IsExpectedEvent(rule, event) {
-		m.SendEvent(rule, event, extTagsCb, service)
+		m.SendEvent(rule, event, service, extTagsCb)
 	}
 }
 
 // SendEvent sends an event to the backend after checking that the rate limiter allows it for the provided rule
-func (m *Module) SendEvent(rule *rules.Rule, event Event, extTagsCb func() []string, service string) {
+func (m *Module) SendEvent(rule *rules.Rule, event Event, service string, extTagsCb func() []string) {
 	if m.rateLimiter.Allow(rule.ID) {
 		m.apiServer.SendEvent(rule, event, extTagsCb, service)
 	} else {

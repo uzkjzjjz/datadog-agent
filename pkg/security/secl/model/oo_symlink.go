@@ -39,165 +39,165 @@ var (
 
 	// ProcessSymlinkPathname handles symlink for process enrtries
 	ProcessSymlinkPathname = &eval.OpOverrides{
-		StringEquals: func(a *eval.StringEvaluator, b *eval.StringEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.GlobCmp.StringEquals(a, b, state)
+		StringEquals: func(a *eval.StringEvaluator, b *eval.StringEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.GlobCmp.StringEquals(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.path" {
-				se1, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[0], b, state)
+				se1, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[0], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				se2, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[1], b, state)
+				se2, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[1], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				or, err := eval.Or(se1, se2, state)
+				or, err := eval.Or(se1, se2, opts, state)
 				if err != nil {
 					return nil, err
 				}
 
-				return eval.Or(path, or, state)
+				return eval.Or(path, or, opts, state)
 			} else if b.Field == "exec.file.path" {
-				se1, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[0], a, state)
+				se1, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[0], a, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				se2, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[1], a, state)
+				se2, err := eval.GlobCmp.StringEquals(symlinkPathnameEvaluators[1], a, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				or, err := eval.Or(se1, se2, state)
+				or, err := eval.Or(se1, se2, opts, state)
 				if err != nil {
 					return nil, err
 				}
 
-				return eval.Or(path, or, state)
+				return eval.Or(path, or, opts, state)
 			}
 
 			return path, nil
 		},
-		StringValuesContains: func(a *eval.StringEvaluator, b *eval.StringValuesEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.GlobCmp.StringValuesContains(a, b, state)
+		StringValuesContains: func(a *eval.StringEvaluator, b *eval.StringValuesEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.GlobCmp.StringValuesContains(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.path" {
-				se1, err := eval.GlobCmp.StringValuesContains(symlinkPathnameEvaluators[0], b, state)
+				se1, err := eval.GlobCmp.StringValuesContains(symlinkPathnameEvaluators[0], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				se2, err := eval.GlobCmp.StringValuesContains(symlinkPathnameEvaluators[1], b, state)
+				se2, err := eval.GlobCmp.StringValuesContains(symlinkPathnameEvaluators[1], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				or, err := eval.Or(se1, se2, state)
+				or, err := eval.Or(se1, se2, opts, state)
 				if err != nil {
 					return nil, err
 				}
 
-				return eval.Or(path, or, state)
+				return eval.Or(path, or, opts, state)
 			}
 
 			return path, nil
 		},
-		StringArrayContains: func(a *eval.StringEvaluator, b *eval.StringArrayEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.GlobCmp.StringArrayContains(a, b, state)
+		StringArrayContains: func(a *eval.StringEvaluator, b *eval.StringArrayEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.GlobCmp.StringArrayContains(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.path" {
-				se1, err := eval.GlobCmp.StringArrayContains(symlinkPathnameEvaluators[0], b, state)
+				se1, err := eval.GlobCmp.StringArrayContains(symlinkPathnameEvaluators[0], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				se2, err := eval.GlobCmp.StringArrayContains(symlinkPathnameEvaluators[1], b, state)
+				se2, err := eval.GlobCmp.StringArrayContains(symlinkPathnameEvaluators[1], b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				or, err := eval.Or(se1, se2, state)
+				or, err := eval.Or(se1, se2, opts, state)
 				if err != nil {
 					return nil, err
 				}
 
-				return eval.Or(path, or, state)
+				return eval.Or(path, or, opts, state)
 			}
 
 			return path, nil
 		},
-		StringArrayMatches: func(a *eval.StringArrayEvaluator, b *eval.StringValuesEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			return eval.GlobCmp.StringArrayMatches(a, b, state)
+		StringArrayMatches: func(a *eval.StringArrayEvaluator, b *eval.StringValuesEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			return eval.GlobCmp.StringArrayMatches(a, b, opts, state)
 		},
 	}
 
 	// ProcessSymlinkBasename handles symlink for process enrtries
 	ProcessSymlinkBasename = &eval.OpOverrides{
-		StringEquals: func(a *eval.StringEvaluator, b *eval.StringEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.StringEquals(a, b, state)
+		StringEquals: func(a *eval.StringEvaluator, b *eval.StringEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.StringEquals(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.name" {
-				symlink, err := eval.StringEquals(symlinkBasenameEvaluator, b, state)
+				symlink, err := eval.StringEquals(symlinkBasenameEvaluator, b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				return eval.Or(path, symlink, state)
+				return eval.Or(path, symlink, opts, state)
 			} else if b.Field == "exec.file.name" {
-				symlink, err := eval.StringEquals(a, symlinkBasenameEvaluator, state)
+				symlink, err := eval.StringEquals(a, symlinkBasenameEvaluator, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				return eval.Or(path, symlink, state)
+				return eval.Or(path, symlink, opts, state)
 			}
 
 			return path, nil
 		},
-		StringValuesContains: func(a *eval.StringEvaluator, b *eval.StringValuesEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.StringValuesContains(a, b, state)
+		StringValuesContains: func(a *eval.StringEvaluator, b *eval.StringValuesEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.StringValuesContains(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.name" {
-				symlink, err := eval.StringValuesContains(symlinkBasenameEvaluator, b, state)
+				symlink, err := eval.StringValuesContains(symlinkBasenameEvaluator, b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				return eval.Or(path, symlink, state)
+				return eval.Or(path, symlink, opts, state)
 			}
 
 			return path, nil
 		},
-		StringArrayContains: func(a *eval.StringEvaluator, b *eval.StringArrayEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			path, err := eval.StringArrayContains(a, b, state)
+		StringArrayContains: func(a *eval.StringEvaluator, b *eval.StringArrayEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			path, err := eval.StringArrayContains(a, b, opts, state)
 			if err != nil {
 				return nil, err
 			}
 
 			// currently only override exec events
 			if a.Field == "exec.file.name" {
-				symlink, err := eval.StringArrayContains(symlinkBasenameEvaluator, b, state)
+				symlink, err := eval.StringArrayContains(symlinkBasenameEvaluator, b, opts, state)
 				if err != nil {
 					return nil, err
 				}
-				return eval.Or(path, symlink, state)
+				return eval.Or(path, symlink, opts, state)
 			}
 
 			return path, nil
 		},
-		StringArrayMatches: func(a *eval.StringArrayEvaluator, b *eval.StringValuesEvaluator, state *eval.State) (*eval.BoolEvaluator, error) {
-			return eval.StringArrayMatches(a, b, state)
+		StringArrayMatches: func(a *eval.StringArrayEvaluator, b *eval.StringValuesEvaluator, opts *eval.Opts, state *eval.State) (*eval.BoolEvaluator, error) {
+			return eval.StringArrayMatches(a, b, opts, state)
 		},
 	}
 )

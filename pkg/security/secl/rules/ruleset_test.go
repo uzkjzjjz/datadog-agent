@@ -22,10 +22,12 @@ type testHandler struct {
 	filters map[string]testFieldValues
 }
 
-func (f *testHandler) RuleMatch(rule *Rule, event eval.Event) {
+func (f *testHandler) RuleMatch(ctx *eval.Context, rule *Rule) {
 }
 
-func (f *testHandler) EventDiscarderFound(rs *RuleSet, event eval.Event, field string, eventType eval.EventType) {
+func (f *testHandler) EventDiscarderFound(ctx *eval.Context, rs *RuleSet, field string, eventType eval.EventType) {
+	event := ctx.Event.(*testEvent)
+
 	values, ok := f.filters[event.GetType()]
 	if !ok {
 		values = make(testFieldValues)
@@ -37,8 +39,6 @@ func (f *testHandler) EventDiscarderFound(rs *RuleSet, event eval.Event, field s
 		discarders = []interface{}{}
 	}
 	evaluator, _ := getEvaluatorTest(field, "")
-
-	ctx := eval.NewContext(event, nil)
 
 	value := evaluator.Eval(ctx)
 
@@ -86,7 +86,7 @@ func newRuleSet() *RuleSet {
 		WithSupportedDiscarders(testSupportedDiscarders).
 		WithEventTypeEnabled(enabled)
 
-	return NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, &opts, &evalOpts)
+	return NewRuleSet(&testModel{}, func() eval.Event { return &testEvent{} }, opts, evalOpts)
 }
 
 func TestRuleBuckets(t *testing.T) {
@@ -548,7 +548,9 @@ func TestGetRuleEventType(t *testing.T) {
 
 	rule := eval.NewRule("aaa", `open.filename == "test"`, &opts)
 
-	if err := rule.GenEvaluator(&testModel{}); err != nil {
+	model := &testModel{}
+
+	if err := rule.GenEvaluator(model); err != nil {
 		t.Fatal(err)
 	}
 
@@ -557,8 +559,7 @@ func TestGetRuleEventType(t *testing.T) {
 		t.Fatalf("should get an event type: %s", err)
 	}
 
-	event := &testEvent{}
-	fieldEventType, err := event.GetFieldEventType("open.filename")
+	fieldEventType, err := model.GetFieldEventType("open.filename")
 	if err != nil {
 		t.Fatal("should get a field event type")
 	}

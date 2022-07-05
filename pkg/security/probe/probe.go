@@ -40,6 +40,7 @@ import (
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
 	"github.com/DataDog/datadog-agent/pkg/security/probe/constantfetch"
+	"github.com/DataDog/datadog-agent/pkg/security/probe/network"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
@@ -51,12 +52,6 @@ import (
 // ActivityDumpHandler represents an handler for the activity dumps sent by the probe
 type ActivityDumpHandler interface {
 	HandleActivityDump(dump *api.ActivityDumpStreamMessage)
-}
-
-// EventHandler represents an handler for the events sent by the probe
-type EventHandler interface {
-	HandleEvent(event *model.Event)
-	HandleCustomEvent(rule *rules.Rule, event *CustomEvent)
 }
 
 // EventStream describes the interface implemented by reordered perf maps or ring buffers
@@ -84,12 +79,14 @@ type Probe struct {
 	probeContext   *ProbeContext
 
 	// Events section
-	handlers    [model.MaxAllEventType][]EventHandler
-	monitor     *Monitor
-	resolvers   *Resolvers
-	event       *model.Event
-	eventStream EventStream
-	scrubber    *pconfig.DataScrubber
+	handlers     [model.MaxAllEventType][]EventHandler
+	monitor      *Monitor
+	resolvers    *Resolvers
+	event        *model.Event
+	eventStream  EventStream
+	scrubber     *pconfig.DataScrubber
+	ruleSet      *atomic.Value
+	ruleHandlers []RuleHandler
 
 	// ActivityDumps section
 	activityDumpHandler ActivityDumpHandler
@@ -107,7 +104,7 @@ type Probe struct {
 
 	// network section
 	tcProgramsLock sync.RWMutex
-	tcPrograms     map[NetDeviceKey]*manager.Probe
+	tcPrograms     map[network.NetDeviceKey]*manager.Probe
 }
 
 // GetResolvers returns the resolvers of Probe
@@ -331,18 +328,89 @@ func (p *Probe) AddEventHandler(eventType model.EventType, handler EventHandler)
 	p.handlers[eventType] = append(p.handlers[eventType], handler)
 }
 
+// AddRuleHandler add a rule handler
+func (p *Probe) AddRuleHandler(handler RuleHandler) {
+	p.ruleHandlers = append(p.ruleHandlers, handler)
+}
+
+// EventDiscarderFound is called by the ruleset when a new discarder discovered
+func (p *Probe) EventDiscarderFound(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) {
+	if err := p.OnNewDiscarder(ctx, rs, field, eventType); err != nil {
+		seclog.Trace(err)
+	}
+}
+
+// SetRuleSet stores the current rule set
+func (p *Probe) SetRuleSet(rs *rules.RuleSet) {
+	p.ruleSet.Store(rs)
+	rs.AddListener(p)
+}
+
+// RuleMatch is called by the ruleset when a rule matches
+func (p *Probe) RuleMatch(ctx *eval.Context, rule *rules.Rule) {
+	event := GetEvent(ctx)
+	probeContext := GetProbeContext(ctx)
+
+	// ensure that all the fields are resolved before sending
+	ResolveContainerID(p.probeContext, event, &event.ContainerContext)
+	ResolveContainerTags(p.probeContext, event, &event.ContainerContext)
+
+	// needs to be resolved here, outside of the callback as using process tree
+	// which can be modified during queuing
+	service := GetProcessServiceTag(probeContext, event)
+
+	id := event.ContainerContext.ID
+
+	extTagsCb := func() []string {
+		var tags []string
+
+		// check from tagger
+		if service == "" {
+			service = probeContext.Resolvers.TagsResolver.GetValue(id, "service")
+		}
+
+		if service == "" {
+			service = p.config.HostServiceName
+		}
+
+		return append(tags, probeContext.Resolvers.TagsResolver.Resolve(id)...)
+	}
+
+	probeEvent := Event{
+		ModelEvent:   event,
+		ProbeContext: p.probeContext,
+	}
+
+	for _, handler := range p.ruleHandlers {
+		handler.OnRuleMatch(rule, &probeEvent, service, extTagsCb)
+	}
+}
+
 // DispatchEvent sends an event to the probe event handler
 func (p *Probe) DispatchEvent(event *model.Event) {
 	seclog.TraceTagf(event.GetEventType(), "Dispatching event %s", event)
 
+	value := p.ruleSet.Load()
+	if value == nil {
+		return
+	}
+	rs := value.(*rules.RuleSet)
+
+	probeEvent := &Event{
+		ModelEvent:   event,
+		ProbeContext: p.probeContext,
+	}
+
+	rs.Evaluate(event)
+
 	// send wildcard first
 	for _, handler := range p.handlers[model.UnknownEventType] {
-		handler.HandleEvent(event)
+		handler.HandleEvent(probeEvent)
 	}
 
 	// send specific event
 	for _, handler := range p.handlers[event.GetEventType()] {
-		handler.HandleEvent(event)
+		handler.HandleEvent(probeEvent)
 	}
 
 	// Process after evaluation because some monitors need the DentryResolver to have been called first.
@@ -791,15 +859,8 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	p.resolvers.ProcessResolver.DequeueExited()
 }
 
-// OnRuleMatch is called when a rule matches just before sending
-func (p *Probe) OnRuleMatch(rule *rules.Rule, event *model.Event) {
-	// ensure that all the fields are resolved before sending
-	ResolveContainerID(p.probeContext, event, &event.ContainerContext)
-	ResolveContainerTags(p.probeContext, event, &event.ContainerContext)
-}
-
 // OnNewDiscarder is called when a new discarder is found
-func (p *Probe) OnNewDiscarder(rs *rules.RuleSet, event *model.Event, field eval.Field, eventType eval.EventType) error {
+func (p *Probe) OnNewDiscarder(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) error {
 	// discarders disabled
 	if !p.config.EnableDiscarders {
 		return nil
@@ -809,6 +870,8 @@ func (p *Probe) OnNewDiscarder(rs *rules.RuleSet, event *model.Event, field eval
 		return nil
 	}
 
+	event := GetEvent(ctx)
+
 	fakeTime := time.Unix(0, int64(event.TimestampRaw))
 	if !p.discarderRateLimiter.AllowN(fakeTime, 1) {
 		return nil
@@ -817,7 +880,7 @@ func (p *Probe) OnNewDiscarder(rs *rules.RuleSet, event *model.Event, field eval
 	seclog.Tracef("New discarder of type %s for field %s", eventType, field)
 
 	if handler, ok := allDiscarderHandlers[eventType]; ok {
-		return handler(rs, event, p, Discarder{Field: field})
+		return handler(rs, ctx, event, p, Discarder{Field: field})
 	}
 
 	return nil
@@ -1097,15 +1160,15 @@ func (p *Probe) GetDebugStats() map[string]interface{} {
 }
 
 // NewRuleSet returns a new rule set
-func (p *Probe) NewRuleSet(opts *rules.Opts, evalOpts *eval.Opts) *rules.RuleSet {
-	eventCtor := func() eval.Event {
-		return &model.Event{}
-	}
+func (p *Probe) NewRuleSet(opts rules.Opts, evalOpts eval.Opts) *rules.RuleSet {
 	opts.
 		WithLogger(&seclog.PatternLogger{}).
-		WithProbeContext(p.resolvers)
+		WithProbeContext(p.probeContext)
 
-	return rules.NewRuleSet(&Model{probe: p}, eventCtor, opts, evalOpts)
+	evalOpts.
+		WithExtraFieldValidate(ValidateField(p))
+
+	return rules.NewRuleSet(&modelZero, modelZero.NewEvent, opts, evalOpts)
 }
 
 // QueuedNetworkDeviceError is used to indicate that the new network device was queued until its namespace handle is
@@ -1144,7 +1207,7 @@ func (p *Probe) setupNewTCClassifierWithNetNSHandle(device model.NetDevice, netn
 	var combinedErr multierror.Error
 	for _, tcProbe := range probes.GetTCProbes() {
 		// make sure we're not overriding an existing network probe
-		deviceKey := NetDeviceKey{IfIndex: device.IfIndex, NetNS: device.NetNS, NetworkDirection: tcProbe.NetworkDirection}
+		deviceKey := network.NetDeviceKey{IfIndex: device.IfIndex, NetNS: device.NetNS, NetworkDirection: tcProbe.NetworkDirection}
 		_, ok := p.tcPrograms[deviceKey]
 		if ok {
 			continue
@@ -1169,6 +1232,7 @@ func (p *Probe) setupNewTCClassifierWithNetNSHandle(device model.NetDevice, netn
 			_ = multierror.Append(&combinedErr, fmt.Errorf("couldn't clone %s: %v", tcProbe.ProbeIdentificationPair, err))
 		} else {
 			p.tcPrograms[deviceKey] = newProbe
+			p.resolvers.NetworkResovler.AddIfName(deviceKey, newProbe.IfName)
 		}
 	}
 	return combinedErr.ErrorOrNil()
@@ -1187,6 +1251,8 @@ func (p *Probe) flushInactiveProbes() map[uint32]int {
 		if !tcProbe.IsTCFilterActive() {
 			_ = p.manager.DetachHook(tcProbe.ProbeIdentificationPair)
 			delete(p.tcPrograms, tcKey)
+
+			p.resolvers.NetworkResovler.DelIfName(tcKey)
 		} else {
 			link, err := tcProbe.ResolveLink()
 			if err == nil {
@@ -1221,9 +1287,10 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 		cancelFnc:            cancel,
 		erpc:                 erpc,
 		discarderReq:         newDiscarderRequest(),
-		tcPrograms:           make(map[NetDeviceKey]*manager.Probe),
+		tcPrograms:           make(map[network.NetDeviceKey]*manager.Probe),
 		statsdClient:         statsdClient,
 		discarderRateLimiter: rate.NewLimiter(rate.Every(time.Second), 100),
+		ruleSet:              new(atomic.Value),
 	}
 
 	if err := p.detectKernelVersion(); err != nil {
@@ -1392,6 +1459,9 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 		return nil, err
 	}
 	p.resolvers = resolvers
+
+	// probe context used by resolvers
+	p.probeContext = NewProbeContext(resolvers)
 
 	p.scrubber = pconfig.NewDefaultDataScrubber()
 	p.scrubber.AddCustomSensitiveWords(config.CustomSensitiveWords)

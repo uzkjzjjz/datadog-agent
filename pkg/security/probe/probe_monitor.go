@@ -212,12 +212,6 @@ func (m *Monitor) ReportRuleSetLoaded(report RuleSetLoadedReport) {
 	m.probe.DispatchCustomEvent(report.Rule, report.Event)
 }
 
-// SelfTestReport represents the rule and the custom event related to a SelfTest event; ready to be dispatched
-type SelfTestReport struct {
-	Rule  *rules.Rule
-	Event *CustomEvent
-}
-
 // ReportSelfTest reports to Datadog that a self test was performed
 func (m *Monitor) ReportSelfTest(success []string, fails []string) {
 	// send metric with number of success and fails
@@ -230,9 +224,8 @@ func (m *Monitor) ReportSelfTest(success []string, fails []string) {
 	}
 
 	// send the custom event with the list of succeed and failed self tests
-	r, ev := NewSelfTestEvent(success, fails)
-	report := SelfTestReport{Rule: r, Event: ev}
-	m.probe.DispatchCustomEvent(report.Rule, report.Event)
+	rule, event := NewSelfTestEvent(success, fails)
+	m.probe.DispatchCustomEvent(rule, event)
 }
 
 // ErrActivityDumpManagerDisabled is returned when the activity dump manager is disabled

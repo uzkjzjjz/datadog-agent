@@ -152,15 +152,15 @@ type Rule struct {
 // RuleSetListener describes the methods implemented by an object used to be
 // notified of events on a rule set.
 type RuleSetListener interface {
-	RuleMatch(rule *Rule, event eval.Event)
-	EventDiscarderFound(rs *RuleSet, event eval.Event, field eval.Field, eventType eval.EventType)
+	RuleMatch(ctx *eval.Context, rule *Rule)
+	EventDiscarderFound(ctx *eval.Context, rs *RuleSet, field eval.Field, eventType eval.EventType)
 }
 
 // RuleSet holds a list of rules, grouped in bucket. An event can be evaluated
 // against it. If the rule matches, the listeners for this rule set are notified
 type RuleSet struct {
-	opts             *Opts
-	evalOpts         *eval.Opts
+	opts             Opts
+	evalOpts         eval.Opts
 	eventRuleBuckets map[eval.EventType]*RuleBucket
 	rules            map[eval.RuleID]*Rule
 	fieldEvaluators  map[string]eval.Evaluator
@@ -227,11 +227,11 @@ func (rs *RuleSet) AddMacro(macroDef *MacroDefinition) (*eval.Macro, error) {
 	case macroDef.Expression != "" && len(macroDef.Values) > 0:
 		return nil, &ErrMacroLoad{Definition: macroDef, Err: errors.New("only one of 'expression' and 'values' can be defined")}
 	case macroDef.Expression != "":
-		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, rs.evalOpts); err != nil {
+		if macro.Macro, err = eval.NewMacro(macroDef.ID, macroDef.Expression, rs.model, &rs.evalOpts); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	default:
-		if macro.Macro, err = eval.NewStringValuesMacro(macroDef.ID, macroDef.Values, rs.evalOpts); err != nil {
+		if macro.Macro, err = eval.NewStringValuesMacro(macroDef.ID, macroDef.Values, &rs.evalOpts); err != nil {
 			return nil, &ErrMacroLoad{Definition: macroDef, Err: err}
 		}
 	}
@@ -251,7 +251,7 @@ func (rs *RuleSet) AddRules(rules []*RuleDefinition) *multierror.Error {
 		}
 	}
 
-	if err := rs.generatePartials(*rs.evalOpts); err != nil {
+	if err := rs.generatePartials(); err != nil {
 		result = multierror.Append(result, errors.Wrapf(err, "couldn't generate partials for rule"))
 	}
 
@@ -301,7 +301,7 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 	rule := &Rule{
 		Rule: eval.NewRule(ruleDef.ID,
 			ruleDef.Expression,
-			rs.evalOpts,
+			&rs.evalOpts,
 			tags...,
 		),
 		Definition: ruleDef,
@@ -361,22 +361,22 @@ func (rs *RuleSet) AddRule(ruleDef *RuleDefinition) (*eval.Rule, error) {
 }
 
 // NotifyRuleMatch notifies all the ruleset listeners that an event matched a rule
-func (rs *RuleSet) NotifyRuleMatch(rule *Rule, event eval.Event) {
+func (rs *RuleSet) NotifyRuleMatch(ctx *eval.Context, rule *Rule) {
 	rs.listenersLock.RLock()
 	defer rs.listenersLock.RUnlock()
 
 	for _, listener := range rs.listeners {
-		listener.RuleMatch(rule, event)
+		listener.RuleMatch(ctx, rule)
 	}
 }
 
 // NotifyDiscarderFound notifies all the ruleset listeners that a discarder was found for an event
-func (rs *RuleSet) NotifyDiscarderFound(event eval.Event, field eval.Field, eventType eval.EventType) {
+func (rs *RuleSet) NotifyDiscarderFound(ctx *eval.Context, field eval.Field, eventType eval.EventType) {
 	rs.listenersLock.RLock()
 	defer rs.listenersLock.RUnlock()
 
 	for _, listener := range rs.listeners {
-		listener.EventDiscarderFound(rs, event, field, eventType)
+		listener.EventDiscarderFound(ctx, rs, field, eventType)
 	}
 }
 
@@ -450,7 +450,7 @@ func (rs *RuleSet) GetFieldValues(field eval.Field) []eval.FieldValue {
 
 // IsDiscarder partially evaluates an Event against a field
 func (rs *RuleSet) IsDiscarder(event eval.Event, field eval.Field) (bool, error) {
-	eventType, err := event.GetFieldEventType(field)
+	eventType, err := rs.model.GetFieldEventType(field)
 	if err != nil {
 		return false, err
 	}
@@ -529,7 +529,7 @@ func (rs *RuleSet) Evaluate(event eval.Event) bool {
 		if rule.GetEvaluator().Eval(ctx) {
 			rs.logger.Tracef("Rule `%s` matches with event `%s`\n", rule.ID, event)
 
-			rs.NotifyRuleMatch(rule, event)
+			rs.NotifyRuleMatch(ctx, rule)
 			result = true
 
 			if err := rs.runRuleActions(ctx, rule); err != nil {
@@ -557,7 +557,7 @@ func (rs *RuleSet) Evaluate(event eval.Event) bool {
 				}
 			}
 			if isDiscarder {
-				rs.NotifyDiscarderFound(event, field, eventType)
+				rs.NotifyDiscarderFound(ctx, field, eventType)
 			}
 		}
 	}
@@ -590,7 +590,7 @@ NewFields:
 // generatePartials generates the partials of the ruleset. A partial is a boolean evalution function that only depends
 // on one field. The goal of partial is to determine if a rule depends on a specific field, so that we can decide if
 // we should create an in-kernel filter for that field.
-func (rs *RuleSet) generatePartials(opts eval.Opts) error {
+func (rs *RuleSet) generatePartials() error {
 	// Compute the partials of each rule
 	for _, bucket := range rs.eventRuleBuckets {
 		for _, rule := range bucket.GetRules() {
@@ -659,7 +659,7 @@ func (rs *RuleSet) LoadPolicies(loader *PolicyLoader) *multierror.Error {
 					varName = string(action.Set.Scope) + "." + varName
 				}
 
-				if _, err := rs.model.NewEvent().GetFieldValue(varName); err == nil {
+				if _, err := rs.model.GetFieldType(varName); err == nil {
 					errs = multierror.Append(errs, fmt.Errorf("variable '%s' conflicts with field", varName))
 					continue
 				}
@@ -696,7 +696,7 @@ func (rs *RuleSet) LoadPolicies(loader *PolicyLoader) *multierror.Error {
 
 					variableValue = action.Set.Value
 				} else if action.Set.Field != "" {
-					kind, err := rs.eventCtor().GetFieldType(action.Set.Field)
+					kind, err := rs.model.GetFieldType(action.Set.Field)
 					if err != nil {
 						errs = multierror.Append(errs, fmt.Errorf("failed to get field '%s': %w", action.Set.Field, err))
 						continue
@@ -759,7 +759,7 @@ func (rs *RuleSet) LoadPolicies(loader *PolicyLoader) *multierror.Error {
 }
 
 // NewRuleSet returns a new ruleset for the specified data model
-func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts *Opts, evalOpts *eval.Opts) *RuleSet {
+func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts Opts, evalOpts eval.Opts) *RuleSet {
 	var logger Logger
 
 	if opts.Logger != nil {
@@ -767,6 +767,9 @@ func NewRuleSet(model eval.Model, eventCtor func() eval.Event, opts *Opts, evalO
 	} else {
 		logger = &NullLogger{}
 	}
+
+	evalOpts.
+		WithMacroStore(&eval.MacroStore{})
 
 	return &RuleSet{
 		model:            model,

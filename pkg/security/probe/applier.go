@@ -53,8 +53,7 @@ func (rsa *RuleSetApplier) applyApprovers(eventType eval.EventType, approvers ru
 
 // applyDefaultPolicy this will apply the deny policy if kernel filters are enabled
 func (rsa *RuleSetApplier) applyDefaultFilterPolicies() {
-	var model Model
-	for _, eventType := range model.GetEventTypes() {
+	for _, eventType := range modelZero.GetEventTypes() {
 		if !rsa.config.EnableKernelFilters {
 			_ = rsa.applyFilterPolicy(eventType, PolicyModeNoFilter, math.MaxUint8)
 		} else {
@@ -93,6 +92,9 @@ func (rsa *RuleSetApplier) setupFilters(rs *rules.RuleSet, eventType eval.EventT
 // Apply setup the filters for the provided set of rules and returns the policy report.
 func (rsa *RuleSetApplier) Apply(rs *rules.RuleSet, approvers map[eval.EventType]rules.Approvers) (*Report, error) {
 	if rsa.probe != nil {
+		// change the rule
+		rsa.probe.SetRuleSet(rs)
+
 		// based on the ruleset and the requested rules, select the probes that need to be activated
 		if err := rsa.probe.SelectProbes(rs); err != nil {
 			return nil, errors.Wrap(err, "failed to select probes")

@@ -423,14 +423,14 @@ func (a *APIServer) SendEvent(rule *rules.Rule, event Event, extTagsCb func() []
 		Version:     version.AgentVersion,
 	}
 
-	ruleEvent := &Signal{
+	backendEvent := &BackendEvent{
 		Title:        rule.Definition.Description,
 		AgentContext: agentContext,
 	}
 
 	if policy := rule.Definition.Policy; policy != nil {
-		ruleEvent.AgentContext.PolicyName = policy.Name
-		ruleEvent.AgentContext.PolicyVersion = policy.Version
+		backendEvent.AgentContext.PolicyName = policy.Name
+		backendEvent.AgentContext.PolicyVersion = policy.Version
 	}
 
 	probeJSON, err := json.Marshal(event)
@@ -439,14 +439,14 @@ func (a *APIServer) SendEvent(rule *rules.Rule, event Event, extTagsCb func() []
 		return
 	}
 
-	ruleEventJSON, err := easyjson.Marshal(ruleEvent)
+	backendEventJSON, err := easyjson.Marshal(backendEvent)
 	if err != nil {
 		log.Error(errors.Wrap(err, "failed to marshal event context"))
 		return
 	}
 
 	data := append(probeJSON[:len(probeJSON)-1], ',')
-	data = append(data, ruleEventJSON[1:]...)
+	data = append(data, backendEventJSON[1:]...)
 	seclog.Tracef("Sending event message for rule `%s` to security-agent `%s`", rule.ID, string(data))
 
 	msg := &pendingMsg{
