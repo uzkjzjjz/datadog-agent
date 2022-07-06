@@ -30,13 +30,18 @@ func (tf *factory) useFile(source *sources.LogSource) bool {
 
 	switch logWhat {
 	case containersorpods.LogContainers:
+		log.Debug("LogContainers")
 		// docker_container_use_file is a suggestion
+		log.Debugf("dcuf = %t", coreConfig.Datadog.GetBool("logs_config.docker_container_use_file"))
 		if !coreConfig.Datadog.GetBool("logs_config.docker_container_use_file") {
+			log.Debug("false 1")
 			return false
 		}
 
 		// docker_container_force_use_file is a requirement
+		log.Debugf("dcfuf = %t", coreConfig.Datadog.GetBool("logs_config.docker_container_force_use_file"))
 		if coreConfig.Datadog.GetBool("logs_config.docker_container_force_use_file") {
+			log.Debug("true 2")
 			return true
 		}
 
@@ -44,14 +49,19 @@ func (tf *factory) useFile(source *sources.LogSource) bool {
 		// docker socket path, use socket.
 		if source.Config.Identifier != "" {
 			registryID := fmt.Sprintf("%s:%s", source.Config.Type, source.Config.Identifier)
+			log.Debugf("offset = %v", tf.registry.GetOffset(registryID))
 			if tf.registry.GetOffset(registryID) != "" {
+				log.Debug("false 3")
 				return false
 			}
 		}
 
+		log.Debug("true 4")
 		return true
 
 	case containersorpods.LogPods:
+		log.Debug("LogPods")
+		log.Debugf("kcuf = %t", coreConfig.Datadog.GetBool("logs_config.k8s_container_use_file"))
 		return coreConfig.Datadog.GetBool("logs_config.k8s_container_use_file")
 
 	default:
