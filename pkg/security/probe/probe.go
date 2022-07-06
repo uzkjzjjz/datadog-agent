@@ -1435,7 +1435,10 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 	if useRingBuffers {
 		p.eventStream = NewRingBuffer(p.handleEvent)
 	} else {
-		p.eventStream = NewOrderedPerfMap(p.ctx, p.handleEvent)
+		p.eventStream, err = NewOrderedPerfMap(p.ctx, p.handleEvent, p.statsdClient)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return p, nil
