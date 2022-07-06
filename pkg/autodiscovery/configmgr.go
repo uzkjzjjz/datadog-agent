@@ -7,6 +7,7 @@ package autodiscovery
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/configresolver"
@@ -41,6 +42,21 @@ func (c *configChanges) unscheduleConfig(config integration.Config) {
 // isEmpty determines whether this set of changes is empty
 func (c *configChanges) isEmpty() bool {
 	return len(c.schedule) == 0 && len(c.unschedule) == 0
+}
+
+// isEmpty determines whether this set of changes is empty
+func (c *configChanges) Dump() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "schedule: [")
+	for _, c := range c.schedule {
+		fmt.Fprintf(&b, "%s, ", c.Name)
+	}
+	fmt.Fprintf(&b, "]; unschedule: [")
+	for _, c := range c.unschedule {
+		fmt.Fprintf(&b, "%s, ", c.Name)
+	}
+	fmt.Fprintf(&b, "]")
+	return b.String()
 }
 
 // merge merges the given configChanges into this one.
@@ -210,7 +226,7 @@ func (cm *reconcilingConfigManager) processNewConfig(config integration.Config) 
 
 	digest := config.Digest()
 	if _, found := cm.activeConfigs[digest]; found {
-		log.Debug("Config %v is already tracked by autodiscovery", config.Name)
+		log.Debugf("Config %s (digest %s) is already tracked by autodiscovery", config.Name, config.Digest())
 		return configChanges{}
 	}
 
