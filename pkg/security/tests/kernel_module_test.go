@@ -162,13 +162,14 @@ func TestLoadModule(t *testing.T) {
 			}
 
 			return unix.DeleteModule(testModuleName, unix.O_NONBLOCK)
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
+
 			assert.Equal(t, "test_load_module_from_memory", r.ID, "invalid rule triggered")
-			assert.Equal(t, "", event.ResolveFilePath(&event.LoadModule.File), "shouldn't get a path")
+			assert.Equal(t, "", sprobe.ResolveFilePath(probeEvent.ProbeContext, event, &event.LoadModule.File), "shouldn't get a path")
 			assert.Equal(t, event.Async, false)
 
-			if !validateLoadModuleNoFileSchema(t, event) {
-				t.Error(event.String())
+			if !validateLoadModuleNoFileSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -187,11 +188,11 @@ func TestLoadModule(t *testing.T) {
 			}
 
 			return unix.DeleteModule(testModuleName, unix.O_NONBLOCK)
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "test_load_module", r.ID, "invalid rule triggered")
 
-			if !validateLoadModuleSchema(t, event) {
-				t.Error(event.String())
+			if !validateLoadModuleSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -252,11 +253,11 @@ func TestUnloadModule(t *testing.T) {
 			}
 
 			return unix.DeleteModule(testModuleName, unix.O_NONBLOCK)
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "test_unload_module", r.ID, "invalid rule triggered")
 
-			if !validateUnloadModuleSchema(t, event) {
-				t.Error(event.String())
+			if !validateUnloadModuleSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})

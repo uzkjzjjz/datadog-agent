@@ -39,7 +39,7 @@ func TestSpliceEvent(t *testing.T) {
 	t.Run("test_splice", func(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			return runSyscallTesterFunc(t, syscallTester, "splice")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "splice", event.GetType(), "wrong event type")
 			assert.Equal(t, uint32(0), event.Splice.PipeEntryFlag, "wrong pipe entry flag")
 			assert.Equal(t, uint32(0), event.Splice.PipeExitFlag, "wrong pipe exit flag")

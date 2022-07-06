@@ -202,16 +202,10 @@ type testModule struct {
 
 var testMod *testModule
 
-type testDiscarder struct {
-	event     eval.Event
-	field     string
-	eventType eval.EventType
-}
-
-type ruleHandler func(*sprobe.Event, *rules.Rule)
-type eventHandler func(*sprobe.Event)
+type ruleHandler func(*sprobe.Event, *model.Event, *rules.Rule)
+type eventHandler func(*sprobe.ProbeContext, *model.Event)
 type customEventHandler func(*rules.Rule, *sprobe.CustomEvent)
-type eventDiscarderHandler func(*testDiscarder) bool
+type eventDiscarderHandler func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool
 
 type testEventDiscarderHandler struct {
 	sync.RWMutex
@@ -239,7 +233,7 @@ type testProbeHandler struct {
 	customEventHandler *testcustomEventHandler
 }
 
-func (h *testProbeHandler) HandleEvent(event *sprobe.Event) {
+func (h *testProbeHandler) HandleEvent(probeContext *sprobe.ProbeContext, event *model.Event) {
 	h.RLock()
 	defer h.RUnlock()
 
@@ -247,7 +241,7 @@ func (h *testProbeHandler) HandleEvent(event *sprobe.Event) {
 	defer h.reloading.Unlock()
 
 	if h.eventHandler != nil && h.eventHandler.callback != nil {
-		h.eventHandler.callback(event)
+		h.eventHandler.callback(probeContext, event)
 	}
 }
 
@@ -475,16 +469,16 @@ func validateProcessContextSECL(tb testing.TB, event *sprobe.Event) bool {
 }
 
 //nolint:deadcode,unused
-func validateEvent(tb testing.TB, validate func(event *sprobe.Event, rule *rules.Rule)) func(event *sprobe.Event, rule *rules.Rule) {
-	return func(event *sprobe.Event, rule *rules.Rule) {
-		validate(event, rule)
+func validateEvent(tb testing.TB, validate func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule)) func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
+	return func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
+		validate(probeEvent, event, rule)
 
-		if !validateProcessContextLineage(tb, event) {
-			tb.Error(event.String())
+		if !validateProcessContextLineage(tb, probeEvent) {
+			tb.Error(probeEvent.String())
 		}
 
-		if !validateProcessContextSECL(tb, event) {
-			tb.Error(event.String())
+		if !validateProcessContextSECL(tb, probeEvent) {
+			tb.Error(probeEvent.String())
 		}
 	}
 }
@@ -736,7 +730,7 @@ func (tm *testModule) OnRuleMatch(rule *rules.Rule, event *sprobe.Event, service
 	tm.ruleHandler.RUnlock()
 
 	if callback != nil {
-		callback(event, rule)
+		callback(event, event.ModelEvent, rule)
 	}
 }
 
@@ -751,11 +745,8 @@ func (tm *testModule) EventDiscarderFound(ctx *eval.Context, rs *rules.RuleSet, 
 	callback := tm.eventDiscarderHandler.callback
 	tm.eventDiscarderHandler.RUnlock()
 
-	event := sprobe.GetEvent(ctx)
-
 	if callback != nil {
-		discarder := &testDiscarder{event: event, field: field, eventType: eventType}
-		_ = callback(discarder)
+		_ = callback(ctx, rs, field, eventType)
 	}
 }
 
@@ -767,7 +758,7 @@ func (tm *testModule) GetEventDiscarder(tb testing.TB, action func() error, cb e
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tm.RegisterEventDiscarderHandler(func(d *testDiscarder) bool {
+	tm.RegisterEventDiscarderHandler(func(evalCtx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool {
 		tb.Helper()
 
 		select {
@@ -778,7 +769,7 @@ func (tm *testModule) GetEventDiscarder(tb testing.TB, action func() error, cb e
 			case Skip:
 				cancel()
 			case Continue:
-				if cb(d) {
+				if cb(evalCtx, rs, field, eventType) {
 					cancel()
 				} else {
 					message <- Continue
@@ -893,7 +884,7 @@ func (tm *testModule) GetSignal(tb testing.TB, action func() error, cb ruleHandl
 	message := make(chan ActionMessage, 1)
 	failNow := make(chan bool, 1)
 
-	tm.RegisterRuleEventHandler(func(e *sprobe.Event, r *rules.Rule) {
+	tm.RegisterRuleEventHandler(func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		tb.Helper()
 		select {
 		case <-ctx.Done():
@@ -901,7 +892,7 @@ func (tm *testModule) GetSignal(tb testing.TB, action func() error, cb ruleHandl
 		case msg := <-message:
 			switch msg {
 			case Continue:
-				cb(e, r)
+				cb(probeEvent, event, rule)
 				if tb.Skipped() || tb.Failed() {
 					failNow <- true
 				}
@@ -996,18 +987,18 @@ func (tm *testModule) RegisterCustomEventHandler(cb customEventHandler) {
 	tm.probeHandler.Unlock()
 }
 
-func (tm *testModule) GetProbeEvent(action func() error, cb func(event *sprobe.Event) bool, timeout time.Duration, eventTypes ...model.EventType) error {
+func (tm *testModule) GetProbeEvent(action func() error, cb func(probeContext *sprobe.ProbeContext, event *model.Event) bool, timeout time.Duration, eventTypes ...model.EventType) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	message := make(chan ActionMessage, 1)
 
-	tm.RegisterEventHandler(func(event *sprobe.Event) {
+	tm.RegisterEventHandler(func(probeContext *sprobe.ProbeContext, event *model.Event) {
 		if len(eventTypes) > 0 {
 			match := false
 
 			for _, eventType := range eventTypes {
-				if event.ModelEvent.GetEventType() == eventType {
+				if event.GetEventType() == eventType {
 					match = true
 					break
 				}
@@ -1023,7 +1014,7 @@ func (tm *testModule) GetProbeEvent(action func() error, cb func(event *sprobe.E
 		case msg := <-message:
 			switch msg {
 			case Continue:
-				if cb(event) {
+				if cb(probeContext, event) {
 					cancel()
 				} else {
 					message <- Continue
@@ -1339,8 +1330,8 @@ func ifSyscallSupported(syscall string, test func(t *testing.T, syscallNB uintpt
 // contain a rule on "open.file.path"
 //nolint:deadcode,unused
 func waitForProbeEvent(test *testModule, action func() error, key string, value interface{}, eventType model.EventType) error {
-	return test.GetProbeEvent(action, func(event *sprobe.Event) bool {
-		ctx := eval.NewContext(event.ModelEvent, event.ProbeContext)
+	return test.GetProbeEvent(action, func(probeContext *sprobe.ProbeContext, event *model.Event) bool {
+		ctx := eval.NewContext(event, probeContext)
 
 		if v, _ := sprobe.GetFieldValue(ctx, key); v == value {
 			return true

@@ -16,6 +16,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/security/ebpf/kernel"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
+	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 )
 
@@ -64,7 +65,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "chown", testFile, "100", "200")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(100), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(200), event.Chown.GID, "wrong user")
@@ -76,8 +77,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -91,7 +92,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "fchown", testFile, "101", "201")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(101), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(201), event.Chown.GID, "wrong user")
@@ -103,8 +104,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -118,7 +119,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "fchownat", testFile, "102", "202")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(102), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(202), event.Chown.GID, "wrong user")
@@ -130,8 +131,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -150,7 +151,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "lchown", testSymlink, "103", "203")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(103), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(203), event.Chown.GID, "wrong user")
@@ -162,8 +163,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -182,7 +183,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "lchown32", testSymlink, "104", "204")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(104), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(204), event.Chown.GID, "wrong user")
@@ -194,8 +195,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -210,7 +211,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "fchown32", testFile, "105", "205")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(105), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(205), event.Chown.GID, "wrong user")
@@ -222,8 +223,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -237,7 +238,7 @@ func TestChown32(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			// fchown syscall
 			return runSyscallTesterFunc(t, syscallTester, "chown32", testFile, "106", "206")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assert.Equal(t, int64(106), event.Chown.UID, "wrong user")
 			assert.Equal(t, int64(206), event.Chown.GID, "wrong user")
@@ -249,8 +250,8 @@ func TestChown32(t *testing.T) {
 			assertNearTime(t, event.Chown.File.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateChownSchema(t, event) {
-				t.Error(event.String())
+			if !validateChownSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})

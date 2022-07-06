@@ -46,7 +46,7 @@ func TestDentryResolutionERPC(t *testing.T) {
 			return err
 		}
 		return os.Remove(testFile)
-	}, func(event *sprobe.Event, rule *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		assertTriggeredRule(t, rule, "test_erpc_rule")
 	})
 
@@ -82,7 +82,7 @@ func TestDentryResolutionMap(t *testing.T) {
 			return err
 		}
 		return os.Remove(testFile)
-	}, func(event *sprobe.Event, rule *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		assertTriggeredRule(t, rule, "test_map_rule")
 	})
 
@@ -126,7 +126,7 @@ func BenchmarkERPCDentryResolutionSegment(b *testing.B) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(event *sprobe.Event, _ *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		mountID = event.Open.File.MountID
 		inode = event.Open.File.Inode
 		pathID = event.Open.File.PathID
@@ -195,7 +195,7 @@ func BenchmarkERPCDentryResolutionPath(b *testing.B) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(event *sprobe.Event, _ *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		mountID = event.Open.File.MountID
 		inode = event.Open.File.Inode
 		pathID = event.Open.File.PathID
@@ -264,7 +264,7 @@ func BenchmarkMapDentryResolutionSegment(b *testing.B) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(event *sprobe.Event, _ *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		mountID = event.Open.File.MountID
 		inode = event.Open.File.Inode
 		pathID = event.Open.File.PathID
@@ -333,7 +333,7 @@ func BenchmarkMapDentryResolutionPath(b *testing.B) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(event *sprobe.Event, _ *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 		mountID = event.Open.File.MountID
 		inode = event.Open.File.Inode
 		pathID = event.Open.File.PathID

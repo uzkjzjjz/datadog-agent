@@ -47,7 +47,7 @@ func TestMProtectEvent(t *testing.T) {
 				return fmt.Errorf("couldn't mprotect segment: %w", err)
 			}
 			return nil
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "mprotect", event.GetType(), "wrong event type")
 			assert.NotEqual(t, 0, event.MProtect.VMProtection&(unix.PROT_READ|unix.PROT_WRITE), fmt.Sprintf("wrong initial protection: %s", model.Protection(event.MProtect.VMProtection)))
 			assert.NotEqual(t, 0, event.MProtect.ReqProtection&(unix.PROT_READ|unix.PROT_WRITE|unix.PROT_EXEC), fmt.Sprintf("wrong requested protection: %s", model.Protection(event.MProtect.ReqProtection)))
@@ -57,10 +57,10 @@ func TestMProtectEvent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertFieldEqual(t, event, "process.file.path", executable)
+			assertFieldEqual(t, probeEvent, "process.file.path", executable)
 
-			if !validateMProtectSchema(t, event) {
-				t.Error(event.String())
+			if !validateMProtectSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})

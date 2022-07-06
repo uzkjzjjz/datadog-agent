@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/DataDog/datadog-agent/pkg/security/probe"
+	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 )
@@ -134,12 +135,12 @@ func TestOpenLeafDiscarderFilter(t *testing.T) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(d *testDiscarder) bool {
-		e := d.event.(*probe.Event)
+	}, func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool {
+		e := probe.GetEvent(ctx)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
-		v, _ := e.GetFieldValue("open.file.path")
+		v, _ := probe.GetFieldValue(ctx, "open.file.path")
 		if v == testFile {
 			return true
 		}
@@ -196,12 +197,12 @@ func testOpenParentDiscarderFilter(t *testing.T, parents ...string) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(d *testDiscarder) bool {
-		e := d.event.(*probe.Event)
+	}, func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool {
+		e := probe.GetEvent(ctx)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
-		v, _ := e.GetFieldValue("open.file.path")
+		v, _ := probe.GetFieldValue(ctx, "open.file.path")
 		if v == testFile {
 			return true
 		}
@@ -271,7 +272,7 @@ func TestDiscarderFilterMask(t *testing.T) {
 
 			testFile, testFilePtr, err = test.CreateWithOptions("test-mask", 98, 99, 0o447)
 			return err
-		}, func(event *probe.Event, rule *rules.Rule) {
+		}, func(probeEvent *probe.Event, event *model.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_mask_open_rule")
 		})
 
@@ -304,7 +305,7 @@ func TestDiscarderFilterMask(t *testing.T) {
 				return err
 			}
 			return f.Close()
-		}, func(event *probe.Event, rule *rules.Rule) {
+		}, func(probeEvent *probe.Event, event *model.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_mask_open_rule")
 		})
 	}))
@@ -395,12 +396,12 @@ func TestOpenProcessPidDiscarder(t *testing.T) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(d *testDiscarder) bool {
-		e := d.event.(*probe.Event)
+	}, func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool {
+		e := probe.GetEvent(ctx)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
-		v, _ := e.GetFieldValue("open.file.path")
+		v, _ := probe.GetFieldValue(ctx, "open.file.path")
 		if v == testFile {
 			return true
 		}
@@ -463,13 +464,13 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 			return err
 		}
 		return syscall.Close(fd)
-	}, func(d *testDiscarder) bool {
-		e := d.event.(*probe.Event)
+	}, func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool {
+		e := probe.GetEvent(ctx)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
 
-		v, _ := e.GetFieldValue("open.file.path")
+		v, _ := probe.GetFieldValue(ctx, "open.file.path")
 		if v == testFile {
 			return true
 		}

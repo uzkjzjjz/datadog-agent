@@ -69,7 +69,7 @@ func TestMount(t *testing.T) {
 				return fmt.Errorf("could not create bind mount: %w", err)
 			}
 			return nil
-		}, func(event *sprobe.Event) bool {
+		}, func(probeContext *sprobe.ProbeContext, event *model.Event) bool {
 			mntID = event.Mount.MountID
 
 			if !assert.Equal(t, "mount", event.GetType(), "wrong event type") {
@@ -77,7 +77,7 @@ func TestMount(t *testing.T) {
 			}
 
 			// filter by pid
-			if pce := event.ResolveProcessCacheEntry(); pce.Pid != testSuitePid {
+			if pce := sprobe.ResolveProcessCacheEntry(probeContext, event); pce.Pid != testSuitePid {
 				return false
 			}
 
@@ -107,7 +107,7 @@ func TestMount(t *testing.T) {
 
 		test.WaitSignal(t, func() error {
 			return os.Chmod(file, 0707)
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 			assert.Equal(t, "chmod", event.GetType(), "wrong event type")
 			assert.Equal(t, file, event.Chmod.File.PathnameStr, "wrong path")
 		})
@@ -126,13 +126,13 @@ func TestMount(t *testing.T) {
 				return fmt.Errorf("could not unmount test-mount: %w", err)
 			}
 			return nil
-		}, func(event *sprobe.Event) bool {
+		}, func(probeContext *sprobe.ProbeContext, event *model.Event) bool {
 			if !assert.Equal(t, "umount", event.GetType(), "wrong event type") {
 				return true
 			}
 
 			// filter by process
-			if pce := event.ResolveProcessCacheEntry(); pce.Pid != testSuitePid {
+			if pce := sprobe.ResolveProcessCacheEntry(probeContext, event); pce.Pid != testSuitePid {
 				return false
 			}
 
@@ -146,7 +146,7 @@ func TestMount(t *testing.T) {
 	t.Run("release-mount", func(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			return syscall.Fchownat(int(releaseFile.Fd()), "", 123, 123, unix.AT_EMPTY_PATH)
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 			assert.Equal(t, "chown", event.GetType(), "wrong event type")
 			assertTriggeredRule(t, rule, "test_rule_pending")
 		})

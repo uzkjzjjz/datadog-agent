@@ -396,21 +396,16 @@ func (p *Probe) DispatchEvent(event *model.Event) {
 	}
 	rs := value.(*rules.RuleSet)
 
-	probeEvent := &Event{
-		ModelEvent:   event,
-		ProbeContext: p.probeContext,
-	}
-
 	rs.Evaluate(event)
 
 	// send wildcard first
 	for _, handler := range p.handlers[model.UnknownEventType] {
-		handler.HandleEvent(probeEvent)
+		handler.HandleEvent(p.probeContext, event)
 	}
 
 	// send specific event
 	for _, handler := range p.handlers[event.GetEventType()] {
-		handler.HandleEvent(probeEvent)
+		handler.HandleEvent(p.probeContext, event)
 	}
 
 	// Process after evaluation because some monitors need the DentryResolver to have been called first.

@@ -49,7 +49,7 @@ func TestPTraceEvent(t *testing.T) {
 			}
 
 			return nil
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "ptrace", event.GetType(), "wrong event type")
 			assert.Equal(t, uint64(42), event.PTrace.Address, "wrong address")
 			assert.Equal(t, event.Async, false)

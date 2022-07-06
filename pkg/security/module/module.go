@@ -428,9 +428,9 @@ func (m *Module) Close() {
 }
 
 // HandleEvent is called by the probe when an event arrives from the kernel
-func (m *Module) HandleEvent(event *probe.Event) {
+func (m *Module) HandleEvent(probeContext *sprobe.ProbeContext, event *model.Event) {
 	if ruleSet := m.GetRuleSet(); ruleSet != nil {
-		ruleSet.Evaluate(event.ModelEvent)
+		ruleSet.Evaluate(event)
 	}
 }
 

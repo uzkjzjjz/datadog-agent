@@ -22,7 +22,7 @@ type Event struct {
 
 // EventHandler represents an handler for the events sent by the probe
 type EventHandler interface {
-	HandleEvent(event *Event)
+	HandleEvent(probeContext *ProbeContext, event *model.Event)
 	HandleCustomEvent(rule *rules.Rule, event *CustomEvent)
 }
 

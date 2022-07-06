@@ -54,7 +54,7 @@ func fetchRealisticEventSerializerInner(tb testing.TB) *sprobe.EventSerializer {
 			return error(errno)
 		}
 		return syscall.Close(int(fd))
-	}, func(event *sprobe.Event, r *rules.Rule) {
+	}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 		workingEvent = event
 		assert.Equal(tb, "open", event.GetType(), "wrong event type")
 	})

@@ -45,12 +45,12 @@ func TestBPFEventLoad(t *testing.T) {
 	t.Run("prog_load", func(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			return runSyscallTesterFunc(t, syscallTester, "-load-bpf")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "bpf", event.GetType(), "wrong event type")
 			assert.Equal(t, uint32(model.BpfProgTypeKprobe), event.BPF.Program.Type, "wrong program type")
 
-			if !validateBPFSchema(t, event) {
-				t.Error(event.String())
+			if !validateBPFSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})
@@ -82,12 +82,12 @@ func TestBPFEventMap(t *testing.T) {
 	t.Run("map_lookup", func(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			return runSyscallTesterFunc(t, syscallTester, "-load-bpf", "-clone-bpf")
-		}, func(event *sprobe.Event, r *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, r *rules.Rule) {
 			assert.Equal(t, "bpf", event.GetType(), "wrong event type")
 			assert.Equal(t, uint32(model.BpfMapTypeHash), event.BPF.Map.Type, "wrong map type")
 
-			if !validateBPFSchema(t, event) {
-				t.Error(event.String())
+			if !validateBPFSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 	})

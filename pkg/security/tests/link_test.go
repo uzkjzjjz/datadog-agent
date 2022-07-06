@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
+	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 )
 
@@ -54,7 +55,7 @@ func TestLink(t *testing.T) {
 				return error(errno)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 			assert.Equal(t, "link", event.GetType(), "wrong event type")
 			assert.Equal(t, getInode(t, testNewFile), event.Link.Source.Inode, "wrong inode")
 			assertRights(t, event.Link.Source.Mode, uint16(expectedMode))
@@ -65,8 +66,8 @@ func TestLink(t *testing.T) {
 			assertNearTime(t, event.Link.Target.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateLinkSchema(t, event) {
-				t.Error(event.String())
+			if !validateLinkSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 
@@ -82,7 +83,7 @@ func TestLink(t *testing.T) {
 				return error(errno)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 			assert.Equal(t, "link", event.GetType(), "wrong event type")
 			assert.Equal(t, getInode(t, testNewFile), event.Link.Source.Inode, "wrong inode")
 			assertRights(t, event.Link.Source.Mode, uint16(expectedMode))
@@ -93,8 +94,8 @@ func TestLink(t *testing.T) {
 			assertNearTime(t, event.Link.Target.CTime)
 			assert.Equal(t, event.Async, false)
 
-			if !validateLinkSchema(t, event) {
-				t.Error(event.String())
+			if !validateLinkSchema(t, probeEvent) {
+				t.Error(probeEvent.String())
 			}
 		})
 
@@ -138,7 +139,7 @@ func TestLink(t *testing.T) {
 				return fmt.Errorf("failed to create a link with io_uring: %d", ret)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, func(probeEvent *sprobe.Event, event *model.Event, rule *rules.Rule) {
 			assert.Equal(t, "link", event.GetType(), "wrong event type")
 			assert.Equal(t, getInode(t, testNewFile), event.Link.Source.Inode, "wrong inode")
 			assertRights(t, event.Link.Source.Mode, uint16(expectedMode))
@@ -153,7 +154,7 @@ func TestLink(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertFieldEqual(t, event, "process.file.path", executable)
+			assertFieldEqual(t, probeEvent, "process.file.path", executable)
 		})
 	})
 }
