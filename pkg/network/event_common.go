@@ -351,12 +351,16 @@ func ConnectionSummary(c *ConnectionStats, names map[util.Address][]dns.Hostname
 
 	if c.Type == TCP {
 		str += fmt.Sprintf(
-			", %d retransmits (+%d), RTT %s (± %s)",
+			", %d retransmits (+%d), RTT %s (± %s), %d established (+%d), %d closed (+%d)",
 			c.Monotonic.Retransmits, c.Last.Retransmits,
 			time.Duration(c.RTT)*time.Microsecond,
 			time.Duration(c.RTTVar)*time.Microsecond,
+			c.Monotonic.TCPEstablished, c.Last.TCPEstablished,
+			c.Monotonic.TCPClosed, c.Last.TCPClosed,
 		)
 	}
+
+	str += fmt.Sprintf(", last update epoch: %d", c.LastUpdateEpoch)
 
 	return str
 }
