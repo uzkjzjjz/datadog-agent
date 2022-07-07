@@ -225,8 +225,10 @@ func (cm *reconcilingConfigManager) processNewConfig(config integration.Config) 
 	defer cm.m.Unlock()
 
 	digest := config.Digest()
-	if _, found := cm.activeConfigs[digest]; found {
+	if existing, found := cm.activeConfigs[digest]; found {
 		log.Debugf("Config %s (digest %s) is already tracked by autodiscovery", config.Name, config.Digest())
+		log.Debugf("existing: %s", existing.Dump())
+		log.Debugf("new: %s", config.Dump())
 		return configChanges{}
 	}
 
