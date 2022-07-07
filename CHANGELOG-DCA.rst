@@ -2,6 +2,277 @@
 Release Notes
 =============
 
+.. _Release Notes_dca-1.20.0_dca-1.20.X:
+
+dca-1.20.0
+==========
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Prelude:
+
+Prelude
+-------
+
+Released on: 2022-05-25
+Pinned to datadog-agent v7.36.0: `CHANGELOG <https://github.com/DataDog/datadog-agent/blob/main/CHANGELOG.rst#7360>`_.
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_New Features:
+
+New Features
+------------
+
+- The Datadog Admission Controller supports multiple configuration injection
+  modes through the ``admission_controller.inject_config.mode`` parameter
+  or the ``DD_ADMISSION_CONTROLLER_INJECT_CONFIG_MODE`` environment variable:
+  - ``hostip``: Inject the host IP. (default)
+  - ``service``: Inject Datadog's local-service DNS name.
+  - ``socket``: Inject the Datadog socket path.
+
+- The cluster-agent container now tries to remove any folder beginning by ``..`` in paths of
+  files mounted in ``/conf.d`` while copying them to the cluster-agent config folder
+
+- collect cluster resource for orchestrator explorer.
+
+- Collect the DaemonSet resources for the orchestrator explorer.
+
+- Add ``Ingress`` collection in the orchestrator check.
+
+- Enable collection of PV/PVCs by default in the orchestrator check
+
+- Enable ``StatefulSet`` collection by default in the orchestrator check.
+  Add ``PV`` and ``PVC`` collection in the orchestrator check.
+
+- Collect ResourceRequirements on other K8s workloads as well for live containers (Deployment, StatefulSet, ReplicaSet, DaemonSet)
+
+- Collect ResourceRequirements for jobs and cronjobs for kubernetes live containers.
+
+- Enable ``DaemonSet`` collection by default in the orchestrator check.
+  Add ``StatefulSet`` collection in the orchestrator check.
+
+- Collect PVC tag on pending pods
+
+- It's now possible to template the kube_cluster_name tag in DatadogMetric queries
+  Example: avg:nginx.net.request_per_s{kube_container_name:nginx,kube_cluster_name:%%tag_kube_cluster_name%%}
+
+- It's now possible to template any environment variable (as seen by the Datadog Cluster Agent) as tag in DatadogMetric queries
+  Example: avg:nginx.net.request_per_s{kube_container_name:nginx,kube_cluster_name:%%env_DD_CLUSTER_NAME%%}
+
+- Support file-based endpoint checks.
+
+- File-based cluster checks support Autodiscovery.
+
+- Introduce a `use_component_status` config option to the
+  kubernetes_apiserver check. When set to false, it no longer uses the
+  `ComponentStatus` object (deprecated since Kubernetes 1.19) for the
+  Kubernetes API Server Control Plane health checks, and instead replaces it
+  with a single health check directly to the API Server.
+
+- Add Kubernetes Role, RoleBinding, ClusterRole, ClusterRoleBinding and
+  ServiceAccount collection in the orchestrator check.
+
+- Add the ability to filter for check names in the cluster checks output.
+
+- Support Prometheus Autodiscovery for Kubernetes Services.
+
+- Enable collection of Roles/RoleBindings/ClusterRoles/ClusterRoleBindings/ServiceAccounts
+  by default in the orchestrator check.
+
+- Add an ``external_metrics_provider.endpoints`` parameter that allows to
+  specify a list of external metrics provider endpoints.
+  If the first one fails, the DCA will query the next ones.
+
+- Added possibility to use the `maxAge` attribute defined in the datadogMetric CRD overriding the global `maxAge`.
+
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Enhancement Notes:
+
+Enhancement Notes
+-----------------
+
+- Add Autodiscovery telemetry.
+
+- Added a configuration option to admission controller to allow
+  configuration of the failure policy. Defaults to Ignore which
+  was the previous default. The default of Ignore means that pods
+  will still be admitted even if the webhook is unavailable to
+  inject them. Setting to Fail will require the admission controller
+  to be present and pods to be injected before they are allowed to run.
+
+- The admission controller's reinvocation policy is now set to ``IfNeeded`` by default.
+  It can be changed using the ``admission_controller.reinvocation_policy`` parameter.
+
+- Adds a new histogram metric `admission_webhooks_response_duration` to monitor the admission-webhook's response time. The existing metric `admission_webhooks_webhooks_received` is now a counter.
+
+- Add `external_metrics_provider.api_key` and `external_metrics_provider.app_key` parameters overriding default `api_key` and `app_key` if set.
+
+- It is now possible to configure a custom timeout for the MutatingWebhookConfigurations
+  objects controlled by the Cluster Agent via DD_ADMISSION_CONTROLLER_TIMEOUT_SECONDS. (Default: 30 seconds)
+
+- The Cluster Agent's Admission Controller now uses
+  the ``admissionregistration.k8s.io/v1`` kubernetes API when available.
+
+- The Cluster Agent exposes a new metric `external_metrics.datadog_metrics`
+  to track the validity of DatadogMetric objects.
+
+- The Cluster Agent's external metrics provider now serves an OpenAPI endpoint.
+
+- The Datadog Cluster Agent now supports internal profiling.
+
+- The Datadog Cluster Agent's Admission Controller now uses a namespaced secrets informer.
+  It no longer needs permissions to watch secrets at the cluster scope.
+
+- Add a new external_metrics_provider.endpoint config in datadog-cluster.yaml
+  and a DD_EXTERNAL_METRICS_PROVIDER_ENDPOINT environment variable to
+  override the default Datadog API endpoint to query external metrics from,
+  in place of the global DATADOG_HOST. It also makes the external metrics
+  provider respect DD_SITE if DD_EXTERNAL_METRICS_PROVIDER_ENDPOINT is not
+  set.
+
+- Add autoscaler resource kind (hpa,wpa) inside the DatadogMetrics status references.
+
+- The orchestrator check can now be configured with
+  an extra timeout to ensure the Kubernetes informers have enough time
+  to synchronize (60s by default).
+
+- The Kube State Metrics Core check sends a new metric ``kubernetes_state.pod.count``
+  tagged with owner tags (e.g ``kube_deployment``, ``kube_replica_set``, ``kube_cronjob``, ``kube_job``).
+
+- The Kube State Metrics Core check tags ``kubernetes_state.replicaset.count`` with a ``kube_deployment`` tag.
+
+- The Kube State Metrics Core check tags ``kubernetes_state.job.count`` with a ``kube_cronjob`` tag.
+
+- ``kubernetes_state.node.*`` metrics are tagged with ``kubelet_version``,
+  ``container_runtime_version``, ``kernel_version``, and ``os_image``.
+
+- The Kube State Metrics Core check adds owner tags to pod metrics.
+  (e.g ``kube_deployment``, ``kube_replica_set``, ``kube_cronjob``, ``kube_job``)
+
+- The Kube State Metrics Core check uses ksm v2.1.
+
+- KSM core check: add a new ``kubernetes_state.cronjob.complete``
+  service check that returns the status of the most recent job for
+  a cronjob.
+
+- Report an error message if the kube_apiserver_controlplane.up service
+  check is critical.
+
+- The cluster agent now uses the same configuration than the security agent for
+  the logs endpoints configuration. The parameters (such as `logs_dd_url` can be
+  either be specified in the `compliance_config.endpoints` section or through
+  environment variables (such as DD_COMPLIANCE_CONFIG_ENDPOINTS_LOGS_DD_URL).
+
+- Improve the resilience of the connection of controllers to the External Metrics Server by moving to a dynamic client for the WPA controller.
+
+- Node schedulability is now a dedicated tag on kubernetes node resources.
+
+- Add additional status information in orchestrator section output.
+  Whether collection works and whether cluster name is set.
+
+- Add the ability to change log_level at runtime.
+  To set the log_level to ``debug`` the following command should be used: ``agent config set log_level debug``.
+
+- The Cluster Agent can be instructed to dispatch cluster checks without decrypting secrets.
+  The node Agent or the cluster check runner will fetch the secrets after receiving the configurations from the Cluster Agent.
+  This can be enabled by setting ``DD_SECRET_BACKEND_SKIP_CHECKS`` to ``true`` in the Cluster Agent config.
+
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Upgrade Notes:
+
+Upgrade Notes
+-------------
+
+- Change base Docker image used to build the Cluster Agent imges, moving from debian:bullseye to ubuntu:20.10.
+  In the future the Cluster Agent will follow Ubuntu stable versions.
+
+- Upgrade Docker base image to ubuntu:21.04 as new stable release.
+
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Security Issues:
+
+Security Issues
+---------------
+
+- Fix the removal of the "kubectl.kubernetes.io/last-applied-configuration" annotation on new collected resources
+
+- Cluster Agent API (only used by Node Agents) is now only server with TLS >= 1.3 by default. Setting "cluster_agent.allow_legacy_tls" to true allows to fallback to TLS 1.0.
+
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Bug Fixes:
+
+Bug Fixes
+---------
+
+- Fixed a bug that could prevent the Admission Controller from starting when the External Metrics Provider is enabled.
+
+- Fix the node count reported for Kubernetes clusters.
+
+- The Cluster Agent's admission controller now requires the
+  pod label ``admission.datadoghq.com/enabled=true`` to inject standard labels.
+  This optimizes the number of mutation webhook requests.
+
+- Fix an edge case where the Admission Controller doesn't update
+  the certificate according to the Cluster Agent configuration.
+
+- Some valid clusterNames are not valid hostNames/hostAlias. Additional logging and cleaning should make the problem
+  more clear and handle most of the cases.
+
+- Fix a potential file descriptors leak.
+
+- The Cluster Agent can now be configured to use tls 1.2 via DD_FORCE_TLS_12=true
+
+- Decrease the Admission Controller timeout to avoid edge cases where high timeouts can cause ignoring the ``failurePolicy`` (see kubernetes/kubernetes#71508).
+
+- Fix a bug that prevents scrubbing sensitive content on the DaemonSet resource.
+
+- Fix a bug that prevents scrubbing sensitive content on the StatefulSet resource.
+
+- Autodetect EC2 cluster name
+
+- Fixed an edge case in which the Cluster Agent's Admission Controller
+  doesn't update the Webhook object according to specified configuration.
+
+- Fix dual shipping for orchestrator resources in the cluster agent.
+
+- Fixed an issue that created lots of log messages when the DCA admission controller was enabled on AKS.
+
+- Fix "Error creating expvar server" error log when running the Datadog Cluster Agent CLI commands.
+
+- Fix the caculation of orchestrator cache hits.
+
+- Fix an issue where scrubbing custom sensitive words would not work as intended for the orchestrator check.
+
+- Time-based metrics (for example, `kubernetes_state.pod.age`, `kubernetes_state.pod.uptime`) are now comparable in the Kubernetes state core check.
+
+- Fix a risk of panic when multiple KSM Core check instances run concurrently.
+
+- The Kube State Metrics Core check supports VerticalPodAutoscaler metrics.
+
+- Tag Namespace and PV and PVC metrics correctly with ``phase`` instead of ``pod_phase``
+  in the Kube State Metrics Core check.
+
+- Fix a bug preventing the
+  "DD_ORCHESTRATOR_EXPLORER_ORCHESTRATOR_ADDITIONAL_ENDPOINTS" environment
+  variable to be read.
+
+- Add reworked status output for orchestrator section on CLC setups.
+
+- Show different orchestrator status collection information between follower and leader.
+
+- Remove noisy Kubernetes API deprecation warnings in the Cluster Agent logs.
+
+- Fix the ``Admission Controller``/``Webhooks info`` section of the cluster agent ``agent status`` output on Kubernetes 1.22+.
+  Although the cluster agent was able to register its webhook with both the ``v1beta1`` and the ``v1`` version of the Administrationregistration API, the ``agent status`` command was always using the ``v1beta1``, which has been removed in Kubernetes 1.22.
+
+
+.. _Release Notes_dca-1.20.0_dca-1.20.X_Other Notes:
+
+Other Notes
+-----------
+
+- Change the default value of the external metrics provider port from 443 to 8443.
+  This will allow to run the cluster agent with a non-root user for better security.
+  This was already the default value in the Helm chart and in the datadog operator.
+
+
 .. _Release Notes_dca-1.19.0_dca-1.19.X:
 
 dca-1.19.0
