@@ -43,12 +43,13 @@ func init() {
 	if err != nil {
 		numCPU = 1
 	}
+	_ = numCPU
 
-	if numCPU < 64 {
-		defaultEventsRingBufferSize = uint32(64 * 256 * os.Getpagesize())
-	} else {
-		defaultEventsRingBufferSize = uint32(128 * 256 * os.Getpagesize())
-	}
+	//if numCPU < 64 {
+	defaultEventsRingBufferSize = uint32(64 * 256 * os.Getpagesize())
+	//} else {
+	//	defaultEventsRingBufferSize = uint32(128 * 256 * os.Getpagesize())
+	//}
 }
 
 // AllProbes returns the list of all the probes of the runtime security module

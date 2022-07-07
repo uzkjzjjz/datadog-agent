@@ -1,6 +1,8 @@
 #ifndef _DISCARDERS_H
 #define _DISCARDERS_H
 
+#define INODE_DISCARDERS_SIZE 16384
+#define PID_DISCARDERS_SIZE 512
 #define REVISION_ARRAY_SIZE 4096
 
 #define INODE_DISCARDER_TYPE 0
@@ -185,7 +187,7 @@ struct bpf_map_def SEC("maps/inode_discarders") inode_discarders = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(struct inode_discarder_t),
     .value_size = sizeof(struct inode_discarder_params_t),
-    .max_entries = 4096,
+    .max_entries = INODE_DISCARDERS_SIZE,
     .pinning = 0,
     .namespace = "",
 };
@@ -315,7 +317,7 @@ struct bpf_map_def SEC("maps/pid_discarders") pid_discarders = { \
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(u32),
     .value_size = sizeof(struct pid_discarder_params_t),
-    .max_entries = 512,
+    .max_entries = PID_DISCARDERS_SIZE,
     .pinning = 0,
     .namespace = "",
 };

@@ -18,6 +18,7 @@
 #define DR_MAX_TAIL_CALL          30
 #define DR_MAX_ITERATION_DEPTH    45
 #define DR_MAX_SEGMENT_LENGTH     255
+#define DR_PATHNAMES_SIZE         96000
 
 struct path_leaf_t {
   struct path_key_t parent;
@@ -29,7 +30,7 @@ struct bpf_map_def SEC("maps/pathnames") pathnames = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(struct path_key_t),
     .value_size = sizeof(struct path_leaf_t),
-    .max_entries = 64000,
+    .max_entries = DR_PATHNAMES_SIZE,
     .pinning = 0,
     .namespace = "",
 };
