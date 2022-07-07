@@ -88,6 +88,7 @@ func (pd *configPoller) poll(ac *AutoConfig) {
 
 			// retrieve the list of newly added configurations as well
 			// as removed configurations
+			log.Infof("running provider %v", pd.provider)
 			newConfigs, removedConfigs := pd.collect(ctx)
 			if len(newConfigs) > 0 || len(removedConfigs) > 0 {
 				log.Infof("%v provider: collected %d new configurations, removed %d", pd.provider, len(newConfigs), len(removedConfigs))
@@ -152,11 +153,13 @@ func (pd *configPoller) storeAndDiffConfigs(configs []integration.Config) ([]int
 		if _, found := pd.configs[cHash]; found {
 			delete(pd.configs, cHash)
 		} else {
+			log.Infof("was not in pd.configs: %s %s %s", c.Name, c.Source, c.Digest())
 			newConf = append(newConf, c)
 		}
 	}
 
 	for _, c := range pd.configs {
+		log.Infof("was in pd.configs, removed: %s %s %s", c.Name, c.Source, c.Digest())
 		removedConf = append(removedConf, c)
 	}
 	pd.configs = fetchedMap

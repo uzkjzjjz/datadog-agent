@@ -10,6 +10,8 @@ package providers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -187,6 +189,13 @@ func (d *ContainerConfigProvider) generateConfigs() ([]integration.Config, error
 
 		configs = append(configs, c...)
 	}
+
+	bldr := strings.Builder{}
+	for _, c := range configs {
+		fmt.Fprintf(&bldr, "  %s %s %s\n", c.Name, c.Source, c.Digest())
+	}
+	log.Infof("ContainerConfigProvider#generateConfigs generated:\n%s", bldr.String())
+
 	return configs, nil
 }
 
