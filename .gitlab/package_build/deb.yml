@@ -7,6 +7,8 @@
   - set -x
 
 .agent_build_common_deb:
+  variables:
+    BUNDLE_GEMFILE: /Gemfile
   script:
     - echo "About to build for $RELEASE_VERSION"
     - !reference [.retrieve_linux_go_deps]
