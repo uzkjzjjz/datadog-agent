@@ -148,11 +148,14 @@ func (m *MemBasedRateLimiter) MayWait() error {
 }
 
 func (m *MemBasedRateLimiter) waitWhileHighLimit(rate float64) (float64, error) {
-	for rate > m.highSoftLimitRate {
+	if rate > m.highSoftLimitRate {
 		m.memoryRateLimiter.increaseRate()
 		m.telemetry.incHighLimit()
 		runtime.GC()
 		debug.FreeOSMemory()
+	}
+	for rate > m.highSoftLimitRate {
+		time.Sleep(10 * time.Millisecond)
 		var err error
 		if rate, err = m.getMemoryUsageRate(); err != nil {
 			return 0, err
