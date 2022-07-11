@@ -199,7 +199,11 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 		for bytesUsed := uint32(0); bytesUsed < bytesRead; bytesUsed += driver.PerFlowDataSize {
 			buf = di.readBuffer[bytesUsed:]
 			pfd := (*driver.PerFlowData)(unsafe.Pointer(&(buf[0])))
-
+			if pfd.LocalPort == 80 {
+				if pfd.TransportBytesIn > 130 {
+					log.Infof("Unexpected bytes in %v %v", pfd.RemotePort, pfd.TransportBytesIn)
+				}
+			}
 			if isFlowClosed(pfd.Flags) {
 				c := closedBuf.Next()
 				FlowToConnStat(c, pfd, di.enableMonotonicCounts)
