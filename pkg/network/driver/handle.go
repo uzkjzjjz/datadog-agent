@@ -61,6 +61,7 @@ var handleTypeToPathName = map[HandleType]string{
 // RL: go-ism - define in terms of what actions our types can execute
 // RL: any type that defines the readFile and DeviceIoControl method "satifies" the Handle interface
 type Handle interface {
+	// C++ equivalent of ReadFile() = 0;
 	ReadFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error
 	DeviceIoControl(ioControlCode uint32, inBuffer *byte, inBufferSize uint32, outBuffer *byte, outBufferSize uint32, bytesReturned *uint32, overlapped *windows.Overlapped) (err error)
 	CancelIoEx(ol *windows.Overlapped) error
@@ -71,6 +72,10 @@ type Handle interface {
 
 // Handle struct stores the windows handle for the driver as well as information about what type of filter is set
 type RealDriverHandle struct {
+	//
+	// Implements driver.Handle
+	//
+
 	Handle     windows.Handle
 	handleType HandleType
 

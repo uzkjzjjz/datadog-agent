@@ -80,17 +80,35 @@ type TestDriverHandleSuccess struct {
 	lastReturnBytes uint32
 	lastBufferSize  int
 	lastError       error
+
+	numcalls		uint32
+	minbuffersize   uint32
+	maxbuffersize   uint32
+
+	simulatednumberofflows uint32
 }
 
 func (tdh *TestDriverHandleSuccess) ReadFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error {
 	// check state in struct to see if we've been called before
-	if tdh.hasCalled {
-		if tdh.lastReturnBytes == 0 && tdh.lastError == windows.ERROR_MORE_DATA {
-			// last time we returned empty but more...if caller does that twice in a row it's bad
-			if len(p) <= tdh.lastBufferSize {
-				panic(fmt.Errorf("Consecutive calls"))
-			}
-		}
+	
+	tdh->numcalls++;
+
+	// check size of p
+	// figure out how many flows will fit
+	// generate that many synthetic flows to copy in the buffer
+	// copy as many as we can
+
+	tdh->simulatednumberofflows -= <number we fit>
+
+	// fill in as much of the buffer with flows as we can up to simulatednumberofflows
+	// and return proper bytesread values
+
+
+	if len(p) < tdh.minbuffersize {
+		minbuffersize = len(p)
+	}
+	if len(p) > tdh.maxbuffersize {
+		maxbuffersize = len(p)
 	}
 	return nil
 }
@@ -119,8 +137,24 @@ func NewSuccessHandle(flags uint32, handleType driver.HandleType) (driver.Handle
 }
 
 func TestSetFlowFiltersSuccess(t *testing.T) {
-	CreateDriverHandle = NewSuccessHandle
+	//CreateDriverHandle = NewSuccessHandle
+	localtdh = &TestDriverHandleSuccess{}
 
-	_, err := NewDriverInterface(config.New())
+	CreateDriverHandle =  func(flags uint32, handleType driver.HandleType)(driver.Handle, error) {
+		return localtdh, nil
+	}()
+
+	di, err := NewDriverInterface(config.New())
+	
+	localtdh.simulatednumberofflows = 500
+
+	di.GetConnectionStats()
+	// use some member of di
 	assert.NoError(t, err, "Failed to create new driver interface")
+
+	assert.Equal(t, localtdh.numcalls, <expected number>,  "didn't call ReadFile expected number of times")
+	assert.Equal(t, localtdh.minbuffersize, <expected size>, "smallest buffer not right")
+	assert.Equal(t, localtdh.maxbuffersize, <expected size>, "smallest buffer not right")
+
+	assert.Equal(t, len(di.readBuffer), <expected size>, "wrong ending buffer")
 }
