@@ -42,6 +42,10 @@ const (
 	defaultDriverBufferSize = defaultFlowEntries * driver.PerFlowDataSize
 )
 
+//
+
+var CreateDriverHandle = driver.NewHandle
+
 // DriverExpvarNames is a list of all the DriverExpvar names returned from GetStats
 var DriverExpvarNames = []DriverExpvar{totalFlowStats, flowHandleStats, flowStats, driverStats}
 
@@ -58,12 +62,7 @@ type DriverInterface struct {
 	maxOpenFlows   uint64
 	maxClosedFlows uint64
 
-<<<<<<< Updated upstream
-	driverFlowHandle *driver.Handle
-=======
-	driverFlowHandle  driver.Handle
-	driverStatsHandle *driver.Handle
->>>>>>> Stashed changes
+	driverFlowHandle driver.Handle
 
 	enableMonotonicCounts bool
 
@@ -110,7 +109,7 @@ func (di *DriverInterface) Close() error {
 // setupFlowHandle generates a windows Driver Handle, and creates a DriverHandle struct to pull flows from the driver
 // by setting the necessary filters
 func (di *DriverInterface) setupFlowHandle() error {
-	dh, err := driver.NewHandle(0, driver.FlowHandle)
+	dh, err := CreateDriverHandle(0, driver.FlowHandle)
 	if err != nil {
 		return err
 	}
@@ -122,7 +121,7 @@ func (di *DriverInterface) setupFlowHandle() error {
 	}
 
 	// Create and set flow filters for each interface
-	err = di.driverFlowHandle.SetFlowFilters(filters)
+	err = di.SetFlowFilters(filters)
 	if err != nil {
 		return err
 	}
@@ -131,6 +130,23 @@ func (di *DriverInterface) setupFlowHandle() error {
 	err = di.setFlowParams()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// SetFlowFilters installs the provided filters for flows
+func (di *DriverInterface) SetFlowFilters(filters []driver.FilterDefinition) error {
+	var id int64
+	for _, filter := range filters {
+		err := di.driverFlowHandle.DeviceIoControl(
+			driver.SetFlowFilterIOCTL,
+			(*byte)(unsafe.Pointer(&filter)),
+			uint32(unsafe.Sizeof(filter)),
+			(*byte)(unsafe.Pointer(&id)),
+			uint32(unsafe.Sizeof(id)), nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to set filter: %v", err)
+		}
 	}
 	return nil
 }
@@ -179,7 +195,7 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 	var totalBytesRead uint32
 	// keep reading while driver says there is more data available
 	for err := error(windows.ERROR_MORE_DATA); err == windows.ERROR_MORE_DATA; {
-		err = di.driverFlowHandle.ReadFile(di.driverFlowHandle.Handle, di.readBuffer, &bytesRead, nil)
+		err = di.driverFlowHandle.ReadFile(di.readBuffer, &bytesRead, nil)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break
@@ -259,7 +275,7 @@ func (di *DriverInterface) setFlowParams() error {
 	// larger than the coded defaults above.
 	maxFlows := minUint64(defaultMaxOpenFlows+defaultMaxClosedFlows, di.maxOpenFlows+di.maxClosedFlows)
 	log.Debugf("Setting max flows in driver to %v", maxFlows)
-	err := windows.DeviceIoControl(di.driverFlowHandle.Handle,
+	err := di.driverFlowHandle.DeviceIoControl(
 		driver.SetMaxFlowsIOCTL,
 		(*byte)(unsafe.Pointer(&maxFlows)),
 		uint32(unsafe.Sizeof(maxFlows)),

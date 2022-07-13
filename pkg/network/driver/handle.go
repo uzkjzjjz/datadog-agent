@@ -65,6 +65,8 @@ type Handle interface {
 	DeviceIoControl(ioControlCode uint32, inBuffer *byte, inBufferSize uint32, outBuffer *byte, outBufferSize uint32, bytesReturned *uint32, overlapped *windows.Overlapped) (err error)
 	CancelIoEx(ol *windows.Overlapped) error
 	Close() error
+	GetWindowsHandle() windows.Handle
+	GetStatsForHandle() (map[string]map[string]int64, error)
 }
 
 // Handle struct stores the windows handle for the driver as well as information about what type of filter is set
@@ -76,6 +78,9 @@ type RealDriverHandle struct {
 	lastNumFlowsMissed uint64
 }
 
+func (rdh *RealDriverHandle) GetWindowsHandle() windows.Handle {
+	return rdh.Handle
+}
 func (rdh *RealDriverHandle) ReadFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error {
 	return windows.ReadFile(rdh.Handle, p, bytesRead, ol)
 }
@@ -113,7 +118,7 @@ func (tdh *TestDriverHandle) readFile(p []byte, bytesRead *uint32, ol *windows.O
 */
 // NewHandle creates a new windows handle attached to the driver
 // RL: How do we tell this to return a "TestDriverHandle"? or do we need to define a seperate one i.e. NewTestDriverHandle?
-func NewHandle(flags uint32, handleType HandleType) (*RealDriverHandle, error) {
+func NewHandle(flags uint32, handleType HandleType) (Handle, error) {
 	pathext, ok := handleTypeToPathName[handleType]
 	if !ok {
 		return nil, fmt.Errorf("Unknown Handle type %v", handleType)
@@ -143,49 +148,8 @@ func (dh *RealDriverHandle) Close() error {
 	return windows.CloseHandle(dh.Handle)
 }
 
-// SetFlowFilters installs the provided filters for flows
-// RL: Does this need an implementation for TestDriverHandle?
-func (dh *RealDriverHandle) SetFlowFilters(filters []FilterDefinition) error {
-	var id int64
-	for _, filter := range filters {
-		err := dh.DeviceIoControl(
-			SetFlowFilterIOCTL,
-			(*byte)(unsafe.Pointer(&filter)),
-			uint32(unsafe.Sizeof(filter)),
-			(*byte)(unsafe.Pointer(&id)),
-			uint32(unsafe.Sizeof(id)), nil, nil)
-		if err != nil {
-			return fmt.Errorf("failed to set filter: %v", err)
-		}
-	}
-	return nil
-}
-
-// SetDataFilters installs the provided filters for data
-// RL: Does this need an implementation for TestDriverHandle?
-func (dh *RealDriverHandle) SetDataFilters(filters []FilterDefinition) error {
-	var id int64
-	for _, filter := range filters {
-		err := dh.DeviceIoControl(
-			SetDataFilterIOCTL,
-			(*byte)(unsafe.Pointer(&filter)),
-			uint32(unsafe.Sizeof(filter)),
-			(*byte)(unsafe.Pointer(&id)),
-			uint32(unsafe.Sizeof(id)), nil, nil)
-		if err != nil {
-			return fmt.Errorf("failed to set filter: %v", err)
-		}
-	}
-	return nil
-}
-
 // GetStatsForHandle gets the relevant stats depending on the handle type
-<<<<<<< Updated upstream
-func (dh *Handle) GetStatsForHandle() (map[string]map[string]int64, error) {
-=======
-// RL: Does this need an implementation for TestDriverHandle?
-func (dh *RealDriverHandle) GetStatsForHandle() (map[string]int64, error) {
->>>>>>> Stashed changes
+func (dh *RealDriverHandle) GetStatsForHandle() (map[string]map[string]int64, error) {
 	var (
 		bytesReturned uint32
 		statbuf       = make([]byte, DriverStatsSize)

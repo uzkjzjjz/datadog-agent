@@ -61,18 +61,38 @@ func (d *dnsDriver) setupDNSHandle() error {
 		return err
 	}
 
-	if err := dh.SetDataFilters(filters); err != nil {
+	// must assign handle value before calling SetDataFilters because SetDataFilters
+	// uses it.
+	d.h = dh
+	if err := d.SetDataFilters(filters); err != nil {
 		return err
 	}
 
-	iocp, buffers, err := prepareCompletionBuffers(dh.Handle, dnsReadBufferCount)
+	iocp, buffers, err := prepareCompletionBuffers(dh.GetWindowsHandle(), dnsReadBufferCount)
 	if err != nil {
 		return err
 	}
 
 	d.iocp = iocp
 	d.readBuffers = buffers
-	d.h = dh
+
+	return nil
+}
+
+// SetDataFilters installs the provided filters for data
+func (d *dnsDriver) SetDataFilters(filters []driver.FilterDefinition) error {
+	var id int64
+	for _, filter := range filters {
+		err := d.h.DeviceIoControl(
+			driver.SetDataFilterIOCTL,
+			(*byte)(unsafe.Pointer(&filter)),
+			uint32(unsafe.Sizeof(filter)),
+			(*byte)(unsafe.Pointer(&id)),
+			uint32(unsafe.Sizeof(id)), nil, nil)
+		if err != nil {
+			return fmt.Errorf("failed to set filter: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -179,7 +199,7 @@ func prepareCompletionBuffers(h windows.Handle, count int) (iocp windows.Handle,
 		C.memset(unsafe.Pointer(buf), 0, C.size_t(unsafe.Sizeof(readbuffer{})))
 		buffers[i] = buf
 
-		err = h.ReadFile(buf.data[:], nil, &(buf.ol))
+		err = windows.ReadFile(h, buf.data[:], nil, &(buf.ol))
 		if err != nil && err != windows.ERROR_IO_PENDING {
 			_ = windows.CloseHandle(iocp)
 			return windows.Handle(0), nil, errors.Wrap(err, "failed to initiate readfile")
