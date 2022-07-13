@@ -13,6 +13,7 @@ type telemetry interface {
 	incWait()
 	incNoWait()
 	incHighLimit()
+	incHighLimitFreeOS()
 	incLowLimit()
 	incLowLimitFreeOSMemory()
 	setMemoryUsageRate(rate float64)
@@ -22,6 +23,7 @@ type memBasedRateLimiterTelemetry struct {
 	wait              tlm.Counter
 	noWait            tlm.Counter
 	highLimit         tlm.Counter
+	highLimitFreeOS   tlm.Counter
 	lowLimit          tlm.Counter
 	lowLimitFreeOSMem tlm.Counter
 	memoryUsageRate   tlm.Gauge
@@ -32,6 +34,7 @@ func newMemBasedRateLimiterTelemetry() *memBasedRateLimiterTelemetry {
 		wait:              tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_wait", []string{}, "The number of times the rate limiter wait"),
 		noWait:            tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_no_wait", []string{}, "The number of times the rate limiter doesn't wait"),
 		highLimit:         tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_high_limit", []string{}, "The number of times the high limit is reached"),
+		highLimitFreeOS:   tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_high_limit_freeos", []string{}, "The number of times FreeOSMemory is called when the high limit is reached"),
 		lowLimit:          tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_low_limit", []string{}, "The number of times the soft limit is reached"),
 		lowLimitFreeOSMem: tlm.NewCounter("dogstatsd", "mem_based_rate_limiter_low_limit_freeos_mem", []string{}, "The number of times FreeOSMemory is called when the soft limit is reached"),
 		memoryUsageRate:   tlm.NewGauge("dogstatsd", "mem_based_rate_limiter_mem_rate", []string{}, "The memory usage rate based on cgroup memory limit if it exists, otherwise based on the memory available"),
@@ -48,6 +51,10 @@ func (t *memBasedRateLimiterTelemetry) incNoWait() {
 
 func (t *memBasedRateLimiterTelemetry) incHighLimit() {
 	t.highLimit.Inc()
+}
+
+func (t *memBasedRateLimiterTelemetry) incHighLimitFreeOS() {
+	t.highLimitFreeOS.Inc()
 }
 
 func (t *memBasedRateLimiterTelemetry) incLowLimit() {

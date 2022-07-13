@@ -7,6 +7,7 @@ package ratelimit
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -27,13 +28,14 @@ import (
 // `freeOSMemoryRateLimiter` provides a way to dynamically update the rate at which `FreeOSMemory` is
 // called when the soft limit is reached.
 type MemBasedRateLimiter struct {
-	telemetry               telemetry
-	memoryUsage             memoryUsage
-	lowSoftLimitRate        float64
-	highSoftLimitRate       float64
-	memoryRateLimiter       *geometricRateLimiter
-	freeOSMemoryRateLimiter *geometricRateLimiter
-	previousMemoryUsageRate float64
+	telemetry                 telemetry
+	memoryUsage               memoryUsage
+	lowSoftLimitRate          float64
+	highSoftLimitRate         float64
+	memoryRateLimiter         *geometricRateLimiter
+	freeOSMemoryRateLimiter   *geometricRateLimiter
+	previousMemoryUsageRate   float64
+	highLimitfreeOSMemoryRate int
 }
 
 type memoryUsage interface {
@@ -87,6 +89,7 @@ func BuildMemBasedRateLimiter() (*MemBasedRateLimiter, error) {
 			getConfigFloat("soft_limit_freeos_check.max"),
 			getConfigFloat("soft_limit_freeos_check.factor"),
 		},
+		getConfigFloat("high_limit_freeos_rate"),
 	)
 }
 
@@ -102,7 +105,8 @@ func NewMemBasedRateLimiter(
 	highSoftLimitRate float64,
 	goGC int,
 	memoryRateLimiter geometricRateLimiterConfig,
-	freeOSMemoryRateLimiter geometricRateLimiterConfig) (*MemBasedRateLimiter, error) {
+	freeOSMemoryRateLimiter geometricRateLimiterConfig,
+	highLimitfreeOSMemoryRate float64) (*MemBasedRateLimiter, error) {
 
 	// When `SetMemoryLimit` will be available (https://github.com/golang/go/issues/48409),
 	//  SetGCPercent, madvdontneed=1 and debug.FreeOSMemory() can be removed.
@@ -110,13 +114,18 @@ func NewMemBasedRateLimiter(
 		debug.SetGCPercent(goGC)
 	}
 
+	if highLimitfreeOSMemoryRate <= 0 {
+		return nil, fmt.Errorf("highLimitfreeOSMemoryRate value is invalid: %v", highLimitfreeOSMemoryRate)
+	}
+
 	return &MemBasedRateLimiter{
-		telemetry:               telemetry,
-		memoryUsage:             memoryUsage,
-		lowSoftLimitRate:        lowSoftLimitRate,
-		highSoftLimitRate:       highSoftLimitRate,
-		memoryRateLimiter:       newGeometricRateLimiter(memoryRateLimiter),
-		freeOSMemoryRateLimiter: newGeometricRateLimiter(freeOSMemoryRateLimiter),
+		telemetry:                 telemetry,
+		memoryUsage:               memoryUsage,
+		lowSoftLimitRate:          lowSoftLimitRate,
+		highSoftLimitRate:         highSoftLimitRate,
+		memoryRateLimiter:         newGeometricRateLimiter(memoryRateLimiter),
+		freeOSMemoryRateLimiter:   newGeometricRateLimiter(freeOSMemoryRateLimiter),
+		highLimitfreeOSMemoryRate: int(1 / highLimitfreeOSMemoryRate),
 	}, nil
 }
 
@@ -148,14 +157,17 @@ func (m *MemBasedRateLimiter) MayWait() error {
 }
 
 func (m *MemBasedRateLimiter) waitWhileHighLimit(rate float64) (float64, error) {
-	if rate > m.highSoftLimitRate {
+	for i := 0; rate > m.highSoftLimitRate; i++ {
 		m.memoryRateLimiter.increaseRate()
 		m.telemetry.incHighLimit()
-		runtime.GC()
-		debug.FreeOSMemory()
-	}
-	for rate > m.highSoftLimitRate {
-		time.Sleep(10 * time.Millisecond)
+		if i >= m.highLimitfreeOSMemoryRate {
+			runtime.GC()
+			debug.FreeOSMemory()
+			m.telemetry.incHighLimitFreeOS()
+			i = 0
+		} else {
+			time.Sleep(10 * time.Millisecond)
+		}
 		var err error
 		if rate, err = m.getMemoryUsageRate(); err != nil {
 			return 0, err
