@@ -58,7 +58,12 @@ type DriverInterface struct {
 	maxOpenFlows   uint64
 	maxClosedFlows uint64
 
+<<<<<<< Updated upstream
 	driverFlowHandle *driver.Handle
+=======
+	driverFlowHandle  driver.Handle
+	driverStatsHandle *driver.Handle
+>>>>>>> Stashed changes
 
 	enableMonotonicCounts bool
 
@@ -174,7 +179,7 @@ func (di *DriverInterface) GetConnectionStats(activeBuf *ConnectionBuffer, close
 	var totalBytesRead uint32
 	// keep reading while driver says there is more data available
 	for err := error(windows.ERROR_MORE_DATA); err == windows.ERROR_MORE_DATA; {
-		err = windows.ReadFile(di.driverFlowHandle.Handle, di.readBuffer, &bytesRead, nil)
+		err = di.driverFlowHandle.ReadFile(di.driverFlowHandle.Handle, di.readBuffer, &bytesRead, nil)
 		if err != nil {
 			if err == windows.ERROR_NO_MORE_ITEMS {
 				break

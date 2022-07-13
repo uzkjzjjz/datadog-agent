@@ -36,7 +36,7 @@ type readbuffer struct {
 }
 
 type dnsDriver struct {
-	h           *driver.Handle
+	h           driver.Handle
 	readBuffers []*readbuffer
 	iocp        windows.Handle
 }
@@ -107,7 +107,7 @@ func (d *dnsDriver) ReadDNSPacket(visit func([]byte, time.Time) error) (didRead 
 	}
 
 	// kick off another read
-	if err := windows.ReadFile(d.h.Handle, buf.data[:], nil, &(buf.ol)); err != nil && err != windows.ERROR_IO_PENDING {
+	if err := d.h.ReadFile(buf.data[:], nil, &(buf.ol)); err != nil && err != windows.ERROR_IO_PENDING {
 		return false, err
 	}
 
@@ -116,7 +116,7 @@ func (d *dnsDriver) ReadDNSPacket(visit func([]byte, time.Time) error) (didRead 
 
 func (d *dnsDriver) Close() error {
 	// destroy io completion port, and file
-	if err := windows.CancelIoEx(d.h.Handle, nil); err != nil {
+	if err := d.h.CancelIoEx(nil); err != nil {
 		return fmt.Errorf("error cancelling DNS io completion: %w", err)
 	}
 	if err := windows.CloseHandle(d.iocp); err != nil {
@@ -179,7 +179,7 @@ func prepareCompletionBuffers(h windows.Handle, count int) (iocp windows.Handle,
 		C.memset(unsafe.Pointer(buf), 0, C.size_t(unsafe.Sizeof(readbuffer{})))
 		buffers[i] = buf
 
-		err = windows.ReadFile(h, buf.data[:], nil, &(buf.ol))
+		err = h.ReadFile(buf.data[:], nil, &(buf.ol))
 		if err != nil && err != windows.ERROR_IO_PENDING {
 			_ = windows.CloseHandle(iocp)
 			return windows.Handle(0), nil, errors.Wrap(err, "failed to initiate readfile")

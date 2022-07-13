@@ -57,17 +57,63 @@ var handleTypeToPathName = map[HandleType]string{
 	StatsHandle: "driverstatshandle", // for now just use that; any path will do
 }
 
+// RL: a "Handle" is anything that can readFile or DeviceIoControl?
+// RL: go-ism - define in terms of what actions our types can execute
+// RL: any type that defines the readFile and DeviceIoControl method "satifies" the Handle interface
+type Handle interface {
+	ReadFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error
+	DeviceIoControl(ioControlCode uint32, inBuffer *byte, inBufferSize uint32, outBuffer *byte, outBufferSize uint32, bytesReturned *uint32, overlapped *windows.Overlapped) (err error)
+	CancelIoEx(ol *windows.Overlapped) error
+	Close() error
+}
+
 // Handle struct stores the windows handle for the driver as well as information about what type of filter is set
-type Handle struct {
-	windows.Handle
+type RealDriverHandle struct {
+	Handle     windows.Handle
 	handleType HandleType
 
 	// record the last value of number of flows missed due to max exceeded
 	lastNumFlowsMissed uint64
 }
 
+func (rdh *RealDriverHandle) ReadFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error {
+	return windows.ReadFile(rdh.Handle, p, bytesRead, ol)
+}
+
+func (rdh *RealDriverHandle) DeviceIoControl(ioControlCode uint32, inBuffer *byte, inBufferSize uint32, outBuffer *byte, outBufferSize uint32, bytesReturned *uint32, overlapped *windows.Overlapped) (err error) {
+	return windows.DeviceIoControl(rdh.Handle, ioControlCode, inBuffer, inBufferSize, outBuffer, outBufferSize, bytesReturned, overlapped)
+}
+
+func (rdh *RealDriverHandle) CancelIoEx(ol *windows.Overlapped) error {
+	return windows.CancelIoEx(rdh.Handle, ol)
+}
+
+/// for the test code
+type TestDriverHandle struct {
+	// store some state variables
+	hasCalled       bool
+	lastReturnBytes uint32
+	lastBufferSize  int
+	lastError       error
+}
+
+/*
+func (tdh *TestDriverHandle) readFile(p []byte, bytesRead *uint32, ol *windows.Overlapped) error {
+	// check state in struct to see if we've been called before
+	if tdh.hasCalled {
+		if tdh.lastReturnBytes == 0 && tdh.lastError == windows.ERROR_MORE_DATA {
+			// last time we returned empty but more...if caller does that twice in a row it's bad
+			if len(p) <= tdh.lastBufferSize {
+				os.panic()
+			}
+		}
+	}
+	return nil
+}
+*/
 // NewHandle creates a new windows handle attached to the driver
-func NewHandle(flags uint32, handleType HandleType) (*Handle, error) {
+// RL: How do we tell this to return a "TestDriverHandle"? or do we need to define a seperate one i.e. NewTestDriverHandle?
+func NewHandle(flags uint32, handleType HandleType) (*RealDriverHandle, error) {
 	pathext, ok := handleTypeToPathName[handleType]
 	if !ok {
 		return nil, fmt.Errorf("Unknown Handle type %v", handleType)
@@ -88,19 +134,21 @@ func NewHandle(flags uint32, handleType HandleType) (*Handle, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Handle{Handle: h, handleType: handleType}, nil
+	return &RealDriverHandle{Handle: h, handleType: handleType}, nil
 }
 
 // Close closes the underlying windows handle
-func (dh *Handle) Close() error {
+// RL: Does this need an implementation for TestDriverHandle?
+func (dh *RealDriverHandle) Close() error {
 	return windows.CloseHandle(dh.Handle)
 }
 
 // SetFlowFilters installs the provided filters for flows
-func (dh *Handle) SetFlowFilters(filters []FilterDefinition) error {
+// RL: Does this need an implementation for TestDriverHandle?
+func (dh *RealDriverHandle) SetFlowFilters(filters []FilterDefinition) error {
 	var id int64
 	for _, filter := range filters {
-		err := windows.DeviceIoControl(dh.Handle,
+		err := dh.DeviceIoControl(
 			SetFlowFilterIOCTL,
 			(*byte)(unsafe.Pointer(&filter)),
 			uint32(unsafe.Sizeof(filter)),
@@ -114,10 +162,11 @@ func (dh *Handle) SetFlowFilters(filters []FilterDefinition) error {
 }
 
 // SetDataFilters installs the provided filters for data
-func (dh *Handle) SetDataFilters(filters []FilterDefinition) error {
+// RL: Does this need an implementation for TestDriverHandle?
+func (dh *RealDriverHandle) SetDataFilters(filters []FilterDefinition) error {
 	var id int64
 	for _, filter := range filters {
-		err := windows.DeviceIoControl(dh.Handle,
+		err := dh.DeviceIoControl(
 			SetDataFilterIOCTL,
 			(*byte)(unsafe.Pointer(&filter)),
 			uint32(unsafe.Sizeof(filter)),
@@ -131,14 +180,19 @@ func (dh *Handle) SetDataFilters(filters []FilterDefinition) error {
 }
 
 // GetStatsForHandle gets the relevant stats depending on the handle type
+<<<<<<< Updated upstream
 func (dh *Handle) GetStatsForHandle() (map[string]map[string]int64, error) {
+=======
+// RL: Does this need an implementation for TestDriverHandle?
+func (dh *RealDriverHandle) GetStatsForHandle() (map[string]int64, error) {
+>>>>>>> Stashed changes
 	var (
 		bytesReturned uint32
 		statbuf       = make([]byte, DriverStatsSize)
 		returnmap     = make(map[string]map[string]int64)
 	)
 
-	err := windows.DeviceIoControl(dh.Handle, GetStatsIOCTL, &ddAPIVersionBuf[0], uint32(len(ddAPIVersionBuf)), &statbuf[0], uint32(len(statbuf)), &bytesReturned, nil)
+	err := dh.DeviceIoControl(GetStatsIOCTL, &ddAPIVersionBuf[0], uint32(len(ddAPIVersionBuf)), &statbuf[0], uint32(len(statbuf)), &bytesReturned, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read driver stats for filter type %v - returned error %v", dh.handleType, err)
 	}
