@@ -119,6 +119,7 @@ func (k *KubeletConfigProvider) addPod(entity workloadmeta.Entity) {
 	defer k.Unlock()
 	pod := entity.(*workloadmeta.KubernetesPod)
 	k.podCache[pod.GetID().ID] = pod
+	log.Debugf("adding pod with ID %s\n", pod.GetID().ID)
 	k.upToDate = false
 }
 
@@ -126,6 +127,7 @@ func (k *KubeletConfigProvider) deletePod(entity workloadmeta.Entity) {
 	k.Lock()
 	defer k.Unlock()
 	delete(k.podCache, entity.GetID().ID)
+	log.Debugf("deleting pod with ID %s\n", entity.GetID().ID)
 	k.upToDate = false
 }
 

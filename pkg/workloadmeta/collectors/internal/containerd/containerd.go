@@ -185,6 +185,7 @@ func (c *collector) generateEventsFromContainerList(ctx context.Context) error {
 	}
 
 	if len(events) > 0 {
+		log.Debugf("At start time, there were %d events, now invoking Notify\n", len(events))
 		c.store.Notify(events)
 	}
 
@@ -230,12 +231,14 @@ func (c *collector) handleEvent(ctx context.Context, containerdEvent *containerd
 	if err != nil {
 		return fmt.Errorf("cannot extract container from event: %w", err)
 	}
+	log.Debugf("Handling event for container %s\n", containerID)
 
 	if container != nil {
 		ignore, err := c.ignoreContainer(container)
 		if err != nil {
 			log.Debugf("Error while deciding to ignore event %s, keeping it: %s", container.ID(), err)
 		} else if ignore {
+			log.Debugf("Decided to ignore event for container %s", containerID)
 			return nil
 		}
 	}

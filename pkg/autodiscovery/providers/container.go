@@ -158,6 +158,7 @@ func (d *ContainerConfigProvider) IsUpToDate(ctx context.Context) (bool, error) 
 func (d *ContainerConfigProvider) addContainer(containerID string, container *workloadmeta.Container) {
 	d.Lock()
 	defer d.Unlock()
+	log.Debugf("adding container %s\n", containerID)
 	d.containerCache[containerID] = container
 	d.upToDate = false
 }
@@ -165,6 +166,7 @@ func (d *ContainerConfigProvider) addContainer(containerID string, container *wo
 func (d *ContainerConfigProvider) deleteContainer(containerID string) {
 	d.Lock()
 	defer d.Unlock()
+	log.Debugf("deleting container %s\n", containerID)
 	delete(d.containerCache, containerID)
 	d.upToDate = false
 }

@@ -177,7 +177,9 @@ func (s *store) Subscribe(name string, priority SubscriberPriority, filter *Filt
 	s.storeMut.RLock()
 	defer s.storeMut.RUnlock()
 
+	log.Debugf("New Subscriber to store - %s - looking through all stores to decide what to send\n", name)
 	for kind, entitiesOfKind := range s.store {
+		log.Debugf("Checking if kind %v matches the filter\n", kind)
 		if !sub.filter.MatchKind(kind) {
 			continue
 		}
@@ -207,6 +209,7 @@ func (s *store) Subscribe(name string, priority SubscriberPriority, filter *Filt
 
 	// notifyChannel should not wait when doing the first subscription, as
 	// the subscriber is not ready to receive events yet
+	log.Debugf("Notifying %s of %d events\n", sub.name, len(events))
 	notifyChannel(sub.name, sub.ch, events, false)
 
 	s.subscribersMut.Lock()
@@ -372,6 +375,8 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 		filteredEvents[sub] = make([]Event, 0, len(evs))
 	}
 
+	log.Debugf("Handling %d events\n", len(evs))
+
 	for _, ev := range evs {
 		entityID := ev.Entity.GetID()
 
@@ -392,6 +397,7 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 				cachedEntity = entitiesOfKind[entityID.ID]
 			}
 
+			log.Debugf("event EventTypeSet of kind %s from source %s\n", string(entityID.Kind), string(ev.Source))
 			if found := cachedEntity.set(ev.Source, ev.Entity); !found {
 				telemetry.StoredEntities.Inc(
 					string(entityID.Kind),
@@ -435,10 +441,12 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 		}
 
 		for _, sub := range s.subscribers {
+			log.Debugf("Checking events against subscriber %s", sub.name)
 			filter := sub.filter
 			if !filter.MatchKind(entityID.Kind) || !filter.MatchSource(ev.Source) || !filter.MatchEventType(ev.Type) {
 				// event should be filtered out because it
 				// doesn't match the filter
+				log.Debugf("sub %s - event is filtered out. Kind: %s, Source: %s, Type: %s ", sub.name, string(entityID.Kind), string(ev.Source), string(ev.Type))
 				continue
 			}
 
@@ -481,6 +489,7 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 	s.storeMut.Unlock()
 
 	for sub, evs := range filteredEvents {
+		log.Debugf("Notifying %s of %d new events", sub.name, len(evs))
 		notifyChannel(sub.name, sub.ch, evs, true)
 	}
 }
