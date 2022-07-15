@@ -16,8 +16,9 @@ import (
 
 // Event defines a probe version of an Event
 type Event struct {
-	ModelEvent   *model.Event
-	ProbeContext *ProbeContext
+	model.Event
+
+	Resolvers *Resolvers
 }
 
 // EventHandler represents an handler for the events sent by the probe
@@ -29,16 +30,6 @@ type EventHandler interface {
 // RuleHandler is called when there is a rule handler
 type RuleHandler interface {
 	OnRuleMatch(rule *rules.Rule, event *Event, service string, extTagsCb func() []string)
-}
-
-// GetTags implements the eval.Event interface
-func (e *Event) GetTags() []string {
-	return e.ModelEvent.GetTags()
-}
-
-// GetType implements the eval.Event interface
-func (e *Event) GetType() string {
-	return e.ModelEvent.GetType()
 }
 
 // String returns string representation of the event

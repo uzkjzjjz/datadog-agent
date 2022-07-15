@@ -13,25 +13,25 @@ import (
 )
 
 // ResolveFields resolves all the fields associate to the event type. Context fields are automatically resolved.
-func ResolveFields(ctx *ProbeContext, ev *model.Event) {
+func (ev *Event) ResolveFields() {
 	// resolve context fields that are not related to any event type
-	_ = ResolveContainerID(ctx, ev, &ev.ContainerContext)
-	_ = ResolveContainerTags(ctx, ev, &ev.ContainerContext)
-	_ = ResolveNetworkDeviceIfName(ctx, ev, &ev.NetworkContext.Device)
-	_ = ResolveProcessArgs(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessArgsTruncated(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessArgv(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessArgv0(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessCreatedAt(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessEnvp(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessEnvs(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveProcessEnvsTruncated(ctx, ev, &ev.ProcessContext.Process)
-	_ = ResolveFileFilesystem(ctx, ev, &ev.ProcessContext.Process.FileEvent)
-	_ = ResolveFileFieldsGroup(ctx, ev, &ev.ProcessContext.Process.FileEvent.FileFields)
-	_ = ResolveFileFieldsInUpperLayer(ctx, ev, &ev.ProcessContext.Process.FileEvent.FileFields)
-	_ = ResolveFileBasename(ctx, ev, &ev.ProcessContext.Process.FileEvent)
-	_ = ResolveFilePath(ctx, ev, &ev.ProcessContext.Process.FileEvent)
-	_ = ResolveFileFieldsUser(ctx, ev, &ev.ProcessContext.Process.FileEvent.FileFields)
+	_ = ev.ResolveContainerID(&ev.ContainerContext)
+	_ = ev.ResolveContainerTags(&ev.ContainerContext)
+	_ = ev.ResolveNetworkDeviceIfName(&ev.NetworkContext.Device)
+	_ = ev.ResolveProcessArgs(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessArgsTruncated(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessArgv(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessArgv0(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessCreatedAt(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessEnvp(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessEnvs(&ev.ProcessContext.Process)
+	_ = ev.ResolveProcessEnvsTruncated(&ev.ProcessContext.Process)
+	_ = ev.ResolveFileFilesystem(&ev.ProcessContext.Process.FileEvent)
+	_ = ev.ResolveFileFieldsGroup(&ev.ProcessContext.Process.FileEvent.FileFields)
+	_ = ev.ResolveFileFieldsInUpperLayer(&ev.ProcessContext.Process.FileEvent.FileFields)
+	_ = ev.ResolveFileBasename(&ev.ProcessContext.Process.FileEvent)
+	_ = ev.ResolveFilePath(&ev.ProcessContext.Process.FileEvent)
+	_ = ev.ResolveFileFieldsUser(&ev.ProcessContext.Process.FileEvent.FileFields)
 	// resolve event specific fields
 	switch ev.GetEventType().String() {
 	case "bind":

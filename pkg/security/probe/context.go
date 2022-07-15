@@ -7,7 +7,6 @@ package probe
 
 import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 )
 
 // ProbeContext defines a probe context
@@ -22,12 +21,7 @@ func NewProbeContext(resolvers *Resolvers) *ProbeContext {
 	}
 }
 
-// GetEvent return a model.Event from the eval.Context
-func GetEvent(ctx *eval.Context) *model.Event {
-	return ctx.Event.(*model.Event)
-}
-
-// GetProbeContext return the probe context
-func GetProbeContext(ctx *eval.Context) *ProbeContext {
-	return ctx.ProbeContext.(*ProbeContext)
+// GetEvent return a Event from the eval.Context
+func GetEvent(ctx *eval.Context) *Event {
+	return ctx.Event.(*Event)
 }

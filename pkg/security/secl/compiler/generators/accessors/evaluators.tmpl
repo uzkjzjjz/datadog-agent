@@ -55,10 +55,9 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 						{{$Return := $SubName | printf "element%s"}}
 						{{if and (ne $Field.Handler "") (not $Mock) }}
 							event := GetEvent(ctx)
-							probeContext := GetProbeContext(ctx)
 							{{$SubName = $Field.Iterator.Name | TrimPrefix $Field.Prefix}}
 							{{$Handler := $Field.Iterator.Name | TrimPrefix $Field.Handler}}
-							{{$Return = print $Handler "(probeContext, event, &element" $SubName ")"}}
+							{{$Return = print "event." $Handler "(&element" $SubName ")"}}
 						{{end}}
 
 						{{if eq $Field.ReturnType "int"}}
@@ -94,8 +93,7 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 							{{$Ptr = ""}}
 						{{end}}
 
-						probeContext := GetProbeContext(ctx)
-						{{$Return = print $Field.Handler "(probeContext, event, " $Ptr "event." $Field.Prefix ")"}}
+						{{$Return = print "event." $Field.Handler "(" $Ptr "event." $Field.Prefix ")"}}
 					{{end}}
 
 					{{- if eq $ReturnType "int"}}
@@ -138,94 +136,4 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 	}
 
 	return nil, &eval.ErrFieldNotFound{Field: field}
-}
-
-func GetFieldValue(ctx *eval.Context, field eval.Field) (interface{}, error) {
-	event := GetEvent(ctx)
-
-	switch field {
-		{{range $Name, $Field := .Fields}}
-		case "{{$Name}}":
-		{{if $Field.Iterator}}
-			var values []{{$Field.ReturnType}}
-
-			iterator := &{{$Field.Iterator.ReturnType}}{}
-			ptr := iterator.Front(ctx)
-
-			{{if and (ne $Field.Handler "") (not $Mock) }}
-			probeContext := GetProbeContext(ctx)
-			{{end}}
-			
-			for ptr != nil {
-				{{if $Field.Iterator.IsOrigTypePtr}}
-					element := (*{{$Field.Iterator.OrigType}})(ptr)
-				{{else}}
-					elementPtr := (*{{$Field.Iterator.OrigType}})(ptr)
-					element := *elementPtr
-				{{end}}
-
-				{{$SubName := $Field.Iterator.Name | TrimPrefix $Field.Name}}
-
-				{{$Return := $SubName | printf "element%s"}}
-				{{if and (ne $Field.Handler "") (not $Mock) }}
-					{{$SubName = $Field.Iterator.Name | TrimPrefix $Field.Prefix}}
-					{{$Handler := $Field.Iterator.Name | TrimPrefix $Field.Handler}}
-					{{$Return = print $Handler "(probeContext, event, &element" $SubName ")"}}
-				{{end}}
-
-				{{if and (eq $Field.ReturnType "int") (ne $Field.OrigType "int")}}
-					result := int({{$Return}})
-				{{else}}
-					result := {{$Return}}
-				{{end}}
-
-				{{if eq $Field.GetArrayPrefix ""}}
-				values = append(values, result)
-				{{else}}
-				values = append(values, result...)
-				{{end}}
-
-				ptr = iterator.Next()
-			}
-
-			return values, nil
-		{{else}}
-			{{$Return := $Field.Name | printf "event.%s"}}
-			{{if and (ne $Field.Handler "") (not $Mock)}}
-				probeContext := GetProbeContext(ctx)
-				{{$Ptr := "&"}}
-				{{$Parent := index $.AllFields $Field.Prefix}}
-				{{- if $Parent.IsOrigTypePtr}}
-					{{$Ptr = ""}}
-				{{end}}
-
-				{{$Return = print $Field.Handler "(probeContext, event, " $Ptr "event." $Field.Prefix ")"}}
-			{{end}}
-
-			{{if eq $Field.ReturnType "string"}}
-				return {{$Return}}, nil
-			{{else if eq $Field.ReturnType "int"}}
-				{{- if and ($Field.IsArray) (ne $Field.OrigType "int") }}
-					result := make([]int, len({{$Return}}))
-					for i, v := range {{$Return}} {
-						result[i] = int(v)
-					}
-					return result, nil
-				{{- else}}
-					{{- if ne $Field.OrigType "int"}}
-						return int({{$Return}}), nil
-					{{- else}}
-						return {{$Return}}, nil
-					{{end -}}
-				{{end -}}
-			{{else if eq $Field.ReturnType "bool"}}
-				return {{$Return}}, nil
-            {{else if eq $Field.ReturnType "net.IPNet"}}
-                return {{$Return}}, nil
-			{{end}}
-		{{end}}
-		{{end}}
-		}
-
-		return nil, &eval.ErrFieldNotFound{Field: field}
 }

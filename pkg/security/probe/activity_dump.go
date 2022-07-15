@@ -347,7 +347,7 @@ func (ad *ActivityDump) debug() {
 
 // Insert inserts the provided event in the active ActivityDump. This function returns true if a new entry was added,
 // false if the event was dropped.
-func (ad *ActivityDump) Insert(ctx *ProbeContext, event *model.Event) (newEntry bool) {
+func (ad *ActivityDump) Insert(event *Event) (newEntry bool) {
 	ad.Lock()
 	defer ad.Unlock()
 
@@ -370,7 +370,7 @@ func (ad *ActivityDump) Insert(ctx *ProbeContext, event *model.Event) (newEntry 
 	}()
 
 	// find the node where the event should be inserted
-	node := ad.findOrCreateProcessActivityNode(ResolveProcessCacheEntry(ctx, event), Runtime)
+	node := ad.findOrCreateProcessActivityNode(event.ResolveProcessCacheEntry(), Runtime)
 	if node == nil {
 		// a process node couldn't be found for the provided event as it doesn't match the ActivityDump query
 		return false
@@ -388,7 +388,7 @@ func (ad *ActivityDump) Insert(ctx *ProbeContext, event *model.Event) (newEntry 
 	}
 
 	// resolve fields
-	ResolveFields(ctx, event)
+	event.ResolveFields()
 
 	// the count of processed events is the count of events that matched the activity dump selector = the events for
 	// which we successfully found a process activity node
@@ -397,7 +397,7 @@ func (ad *ActivityDump) Insert(ctx *ProbeContext, event *model.Event) (newEntry 
 	// insert the event based on its type
 	switch event.GetEventType() {
 	case model.FileOpenEventType:
-		return node.InsertFileEvent(ctx, event, &event.Open.File, Runtime)
+		return node.InsertFileEvent(event, &event.Open.File, Runtime)
 	case model.DNSEventType:
 		return node.InsertDNSEvent(&event.DNS)
 	case model.BindEventType:
@@ -879,8 +879,8 @@ func extractFirstParent(path string) (string, int) {
 
 // InsertFileEvent inserts the provided file event in the current node. This function returns true if a new entry was
 // added, false if the event was dropped.
-func (pan *ProcessActivityNode) InsertFileEvent(ctx *ProbeContext, event *model.Event, fileEvent *model.FileEvent, generationType NodeGenerationType) bool {
-	parent, nextParentIndex := extractFirstParent(ResolveFilePath(ctx, event, fileEvent))
+func (pan *ProcessActivityNode) InsertFileEvent(event *Event, fileEvent *model.FileEvent, generationType NodeGenerationType) bool {
+	parent, nextParentIndex := extractFirstParent(event.ResolveFilePath(fileEvent))
 	if nextParentIndex == 0 {
 		return false
 	}
@@ -889,15 +889,15 @@ func (pan *ProcessActivityNode) InsertFileEvent(ctx *ProbeContext, event *model.
 
 	child, ok := pan.Files[parent]
 	if ok {
-		return child.InsertFileEvent(ctx, event, fileEvent, fileEvent.PathnameStr[nextParentIndex:], generationType)
+		return child.InsertFileEvent(event, fileEvent, fileEvent.PathnameStr[nextParentIndex:], generationType)
 	}
 
 	// create new child
 	if len(fileEvent.PathnameStr) <= nextParentIndex+1 {
-		pan.Files[parent] = NewFileActivityNode(ctx, event, fileEvent, parent, generationType)
+		pan.Files[parent] = NewFileActivityNode(event, fileEvent, parent, generationType)
 	} else {
-		child := NewFileActivityNode(ctx, nil, nil, parent, generationType)
-		child.InsertFileEvent(ctx, event, fileEvent, fileEvent.PathnameStr[nextParentIndex:], generationType)
+		child := NewFileActivityNode(nil, nil, parent, generationType)
+		child.InsertFileEvent(event, fileEvent, fileEvent.PathnameStr[nextParentIndex:], generationType)
 		pan.Files[parent] = child
 	}
 	return true
@@ -924,7 +924,7 @@ func (pan *ProcessActivityNode) snapshot(ctx *ProbeContext, ad *ActivityDump) er
 	for _, eventType := range ad.adm.cfg.ActivityDumpTracedEventTypes {
 		switch eventType {
 		case model.FileOpenEventType:
-			if err = pan.snapshotFiles(ctx, p, ad); err != nil {
+			if err = pan.snapshotFiles(p, ad); err != nil {
 				return err
 			}
 		case model.BindEventType:
@@ -1050,7 +1050,7 @@ func (pan *ProcessActivityNode) snapshotBoundSockets(p *process.Process, ad *Act
 	return nil
 }
 
-func (pan *ProcessActivityNode) snapshotFiles(ctx *ProbeContext, p *process.Process, ad *ActivityDump) error {
+func (pan *ProcessActivityNode) snapshotFiles(p *process.Process, ad *ActivityDump) error {
 	// list the files opened by the process
 	fileFDs, err := p.OpenFiles()
 	if err != nil {
@@ -1093,7 +1093,7 @@ func (pan *ProcessActivityNode) snapshotFiles(ctx *ProbeContext, p *process.Proc
 			continue
 		}
 
-		evt := &model.Event{}
+		evt := &Event{}
 		evt.Type = uint32(model.FileOpenEventType)
 
 		resolvedPath, err = filepath.EvalSymlinks(f)
@@ -1113,7 +1113,7 @@ func (pan *ProcessActivityNode) snapshotFiles(ctx *ProbeContext, p *process.Proc
 		evt.Open.File.Mode = evt.Open.File.FileFields.Mode
 		// TODO: add open flags by parsing `/proc/[pid]/fdinfo/fd` + O_RDONLY|O_CLOEXEC for the shared libs
 
-		if pan.InsertFileEvent(ctx, evt, &evt.Open.File, Snapshot) {
+		if pan.InsertFileEvent(evt, &evt.Open.File, Snapshot) {
 			// count this new entry
 			atomic.AddUint64(ad.addedSnapshotCount[model.FileOpenEventType], 1)
 		}
@@ -1178,7 +1178,7 @@ type OpenNode struct {
 }
 
 // NewFileActivityNode returns a new FileActivityNode instance
-func NewFileActivityNode(ctx *ProbeContext, event *model.Event, fileEvent *model.FileEvent, name string, generationType NodeGenerationType) *FileActivityNode {
+func NewFileActivityNode(event *Event, fileEvent *model.FileEvent, name string, generationType NodeGenerationType) *FileActivityNode {
 	fan := &FileActivityNode{
 		Name:           name,
 		GenerationType: generationType,
@@ -1189,7 +1189,7 @@ func NewFileActivityNode(ctx *ProbeContext, event *model.Event, fileEvent *model
 		fileEventTmp := *fileEvent
 		fan.File = &fileEventTmp
 	}
-	fan.enrichFromEvent(ctx, event)
+	fan.enrichFromEvent(event)
 	return fan
 }
 
@@ -1201,12 +1201,12 @@ func (fan *FileActivityNode) getNodeLabel() string {
 	return label
 }
 
-func (fan *FileActivityNode) enrichFromEvent(ctx *ProbeContext, event *model.Event) {
+func (fan *FileActivityNode) enrichFromEvent(event *Event) {
 	if event == nil {
 		return
 	}
 	if fan.FirstSeen.IsZero() {
-		fan.FirstSeen = ResolveEventTimestamp(ctx, event)
+		fan.FirstSeen = event.ResolveEventTimestamp()
 	}
 
 	switch event.GetEventType() {
@@ -1221,10 +1221,10 @@ func (fan *FileActivityNode) enrichFromEvent(ctx *ProbeContext, event *model.Eve
 
 // InsertFileEvent inserts an event in a FileActivityNode. This function returns true if a new entry was added, false if
 // the event was dropped.
-func (fan *FileActivityNode) InsertFileEvent(ctx *ProbeContext, event *model.Event, fileEvent *model.FileEvent, remainingPath string, generationType NodeGenerationType) bool {
+func (fan *FileActivityNode) InsertFileEvent(event *Event, fileEvent *model.FileEvent, remainingPath string, generationType NodeGenerationType) bool {
 	parent, nextParentIndex := extractFirstParent(remainingPath)
 	if nextParentIndex == 0 {
-		fan.enrichFromEvent(ctx, event)
+		fan.enrichFromEvent(event)
 		return false
 	}
 
@@ -1232,15 +1232,15 @@ func (fan *FileActivityNode) InsertFileEvent(ctx *ProbeContext, event *model.Eve
 
 	child, ok := fan.Children[parent]
 	if ok {
-		return child.InsertFileEvent(ctx, event, fileEvent, remainingPath[nextParentIndex:], generationType)
+		return child.InsertFileEvent(event, fileEvent, remainingPath[nextParentIndex:], generationType)
 	}
 
 	// create new child
 	if len(remainingPath) <= nextParentIndex+1 {
-		fan.Children[parent] = NewFileActivityNode(ctx, event, fileEvent, parent, generationType)
+		fan.Children[parent] = NewFileActivityNode(event, fileEvent, parent, generationType)
 	} else {
-		child := NewFileActivityNode(ctx, nil, nil, parent, generationType)
-		child.InsertFileEvent(ctx, event, fileEvent, remainingPath[nextParentIndex:], generationType)
+		child := NewFileActivityNode(nil, nil, parent, generationType)
+		child.InsertFileEvent(event, fileEvent, remainingPath[nextParentIndex:], generationType)
 		fan.Children[parent] = child
 	}
 	return true

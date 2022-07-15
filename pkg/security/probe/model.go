@@ -52,9 +52,9 @@ func ValidateField(probe *Probe) func(field eval.Field, fieldValue eval.FieldVal
 }
 
 // ResolveFilePath resolves the inode to a full path
-func ResolveFilePath(ctx *ProbeContext, ev *model.Event, f *model.FileEvent) string {
+func (ev *Event) ResolveFilePath(f *model.FileEvent) string {
 	if !f.IsPathnameStrResolved && len(f.PathnameStr) == 0 {
-		path, err := ctx.Resolvers.resolveFileFieldsPath(&f.FileFields)
+		path, err := ev.Resolvers.resolveFileFieldsPath(&f.FileFields)
 		if err != nil {
 			switch err.(type) {
 			case ErrDentryPathKeyNotFound:
@@ -70,29 +70,29 @@ func ResolveFilePath(ctx *ProbeContext, ev *model.Event, f *model.FileEvent) str
 }
 
 // ResolveFileBasename resolves the inode to a full path
-func ResolveFileBasename(ctx *ProbeContext, ev *model.Event, f *model.FileEvent) string {
+func (ev *Event) ResolveFileBasename(f *model.FileEvent) string {
 	if !f.IsBasenameStrResolved && len(f.BasenameStr) == 0 {
 		if f.PathnameStr != "" {
 			f.SetBasenameStr(path.Base(f.PathnameStr))
 		} else {
-			f.SetBasenameStr(ctx.Resolvers.resolveBasename(&f.FileFields))
+			f.SetBasenameStr(ev.Resolvers.resolveBasename(&f.FileFields))
 		}
 	}
 	return f.BasenameStr
 }
 
 // ResolveFileFilesystem resolves the filesystem a file resides in
-func ResolveFileFilesystem(ctx *ProbeContext, ev *model.Event, f *model.FileEvent) string {
-	return ctx.Resolvers.MountResolver.GetFilesystem(f.FileFields.MountID)
+func (ev *Event) ResolveFileFilesystem(f *model.FileEvent) string {
+	return ev.Resolvers.MountResolver.GetFilesystem(f.FileFields.MountID)
 }
 
 // ResolveFileFieldsInUpperLayer resolves whether the file is in an upper layer
-func ResolveFileFieldsInUpperLayer(ctx *ProbeContext, ev *model.Event, f *model.FileFields) bool {
+func (ev *Event) ResolveFileFieldsInUpperLayer(f *model.FileFields) bool {
 	return f.GetInUpperLayer()
 }
 
 // ResolveXAttrName returns the string representation of the extended attribute name
-func ResolveXAttrName(ctx *ProbeContext, ev *model.Event, e *model.SetXAttrEvent) string {
+func (ev *Event) ResolveXAttrName(e *model.SetXAttrEvent) string {
 	if len(e.Name) == 0 {
 		e.Name, _ = model.UnmarshalString(e.NameRaw[:], 200)
 	}
@@ -100,14 +100,14 @@ func ResolveXAttrName(ctx *ProbeContext, ev *model.Event, e *model.SetXAttrEvent
 }
 
 // ResolveHelpers returns the list of eBPF helpers used by the current program
-func ResolveHelpers(ctx *ProbeContext, ev *model.Event, e *model.BPFProgram) []uint32 {
+func (ev *Event) ResolveHelpers(e *model.BPFProgram) []uint32 {
 	return e.Helpers
 }
 
 // ResolveXAttrNamespace returns the string representation of the extended attribute namespace
-func ResolveXAttrNamespace(ctx *ProbeContext, ev *model.Event, e *model.SetXAttrEvent) string {
+func (ev *Event) ResolveXAttrNamespace(e *model.SetXAttrEvent) string {
 	if len(e.Namespace) == 0 {
-		fragments := strings.Split(ResolveXAttrName(ctx, ev, e), ".")
+		fragments := strings.Split(ev.ResolveXAttrName(e), ".")
 		if len(fragments) > 0 {
 			e.Namespace = fragments[0]
 		}
@@ -116,35 +116,35 @@ func ResolveXAttrNamespace(ctx *ProbeContext, ev *model.Event, e *model.SetXAttr
 }
 
 // SetMountPoint set the mount point information
-func SetMountPoint(ctx *ProbeContext, ev *model.Event, e *model.MountEvent) {
-	e.MountPointStr, e.MountPointPathResolutionError = ctx.Resolvers.DentryResolver.Resolve(e.ParentMountID, e.ParentInode, 0, true)
+func (ev *Event) SetMountPoint(e *model.MountEvent) {
+	e.MountPointStr, e.MountPointPathResolutionError = ev.Resolvers.DentryResolver.Resolve(e.ParentMountID, e.ParentInode, 0, true)
 }
 
 // ResolveMountPoint resolves the mountpoint to a full path
-func ResolveMountPoint(ctx *ProbeContext, ev *model.Event, e *model.MountEvent) string {
+func (ev *Event) ResolveMountPoint(e *model.MountEvent) string {
 	if len(e.MountPointStr) == 0 {
-		SetMountPoint(ctx, ev, e)
+		ev.SetMountPoint(e)
 	}
 	return e.MountPointStr
 }
 
 // SetMountRoot set the mount point information
-func SetMountRoot(ctx *ProbeContext, ev *model.Event, e *model.MountEvent) {
-	e.RootStr, e.RootPathResolutionError = ctx.Resolvers.DentryResolver.Resolve(e.RootMountID, e.RootInode, 0, true)
+func (ev *Event) SetMountRoot(e *model.MountEvent) {
+	e.RootStr, e.RootPathResolutionError = ev.Resolvers.DentryResolver.Resolve(e.RootMountID, e.RootInode, 0, true)
 }
 
 // ResolveMountRoot resolves the mountpoint to a full path
-func ResolveMountRoot(ctx *ProbeContext, ev *model.Event, e *model.MountEvent) string {
+func (ev *Event) ResolveMountRoot(e *model.MountEvent) string {
 	if len(e.RootStr) == 0 {
-		SetMountRoot(ctx, ev, e)
+		ev.SetMountRoot(e)
 	}
 	return e.RootStr
 }
 
 // ResolveContainerID resolves the container ID of the event
-func ResolveContainerID(ctx *ProbeContext, ev *model.Event, e *model.ContainerContext) string {
+func (ev *Event) ResolveContainerID(e *model.ContainerContext) string {
 	if len(e.ID) == 0 {
-		if entry := ResolveProcessCacheEntry(ctx, ev); entry != nil {
+		if entry := ev.ResolveProcessCacheEntry(); entry != nil {
 			e.ID = entry.ContainerID
 		}
 	}
@@ -152,16 +152,16 @@ func ResolveContainerID(ctx *ProbeContext, ev *model.Event, e *model.ContainerCo
 }
 
 // ResolveContainerTags resolves the container tags of the event
-func ResolveContainerTags(ctx *ProbeContext, ev *model.Event, e *model.ContainerContext) []string {
+func (ev *Event) ResolveContainerTags(e *model.ContainerContext) []string {
 	if len(e.Tags) == 0 && e.ID != "" {
-		e.Tags = ctx.Resolvers.TagsResolver.Resolve(e.ID)
+		e.Tags = ev.Resolvers.TagsResolver.Resolve(e.ID)
 	}
 	return e.Tags
 }
 
 // UnmarshalProcessCacheEntry unmarshal a Process
-func UnmarshalProcessCacheEntry(ctx *ProbeContext, ev *model.Event, data []byte) (int, error) {
-	entry := ctx.Resolvers.ProcessResolver.NewProcessCacheEntry(ev.PIDContext)
+func (ev *Event) UnmarshalProcessCacheEntry(data []byte) (int, error) {
+	entry := ev.Resolvers.ProcessResolver.NewProcessCacheEntry(ev.PIDContext)
 
 	n, err := entry.Process.UnmarshalBinary(data)
 	if err != nil {
@@ -175,79 +175,79 @@ func UnmarshalProcessCacheEntry(ctx *ProbeContext, ev *model.Event, data []byte)
 }
 
 // ResolveFileFieldsUser resolves the user id of the file to a username
-func ResolveFileFieldsUser(ctx *ProbeContext, ev *model.Event, e *model.FileFields) string {
+func (ev *Event) ResolveFileFieldsUser(e *model.FileFields) string {
 	if len(e.User) == 0 {
-		e.User, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
+		e.User, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
 	}
 	return e.User
 }
 
 // ResolveFileFieldsGroup resolves the group id of the file to a group name
-func ResolveFileFieldsGroup(ctx *ProbeContext, ev *model.Event, e *model.FileFields) string {
+func (ev *Event) ResolveFileFieldsGroup(e *model.FileFields) string {
 	if len(e.Group) == 0 {
-		e.Group, _ = ctx.Resolvers.UserGroupResolver.ResolveGroup(int(e.GID))
+		e.Group, _ = ev.Resolvers.UserGroupResolver.ResolveGroup(int(e.GID))
 	}
 	return e.Group
 }
 
 // ResolveRights resolves the rights of a file
-func ResolveRights(ctx *ProbeContext, ev *model.Event, e *model.FileFields) int {
+func (ev *Event) ResolveRights(e *model.FileFields) int {
 	return int(e.Mode) & (syscall.S_ISUID | syscall.S_ISGID | syscall.S_ISVTX | syscall.S_IRWXU | syscall.S_IRWXG | syscall.S_IRWXO)
 }
 
 // ResolveChownUID resolves the user id of a chown event to a username
-func ResolveChownUID(ctx *ProbeContext, ev *model.Event, e *model.ChownEvent) string {
+func (ev *Event) ResolveChownUID(e *model.ChownEvent) string {
 	if len(e.User) == 0 {
-		e.User, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
+		e.User, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
 	}
 	return e.User
 }
 
 // ResolveChownGID resolves the group id of a chown event to a group name
-func ResolveChownGID(ctx *ProbeContext, ev *model.Event, e *model.ChownEvent) string {
+func (ev *Event) ResolveChownGID(e *model.ChownEvent) string {
 	if len(e.Group) == 0 {
-		e.Group, _ = ctx.Resolvers.UserGroupResolver.ResolveGroup(int(e.GID))
+		e.Group, _ = ev.Resolvers.UserGroupResolver.ResolveGroup(int(e.GID))
 	}
 	return e.Group
 }
 
 // ResolveProcessCreatedAt resolves process creation time
-func ResolveProcessCreatedAt(ctx *ProbeContext, ev *model.Event, e *model.Process) uint64 {
+func (ev *Event) ResolveProcessCreatedAt(e *model.Process) uint64 {
 	return uint64(e.ExecTime.UnixNano())
 }
 
 // ResolveProcessArgv0 resolves the first arg of the event
-func ResolveProcessArgv0(ctx *ProbeContext, ev *model.Event, process *model.Process) string {
-	arg0, _ := ctx.Resolvers.ProcessResolver.GetProcessArgv0(process)
+func (ev *Event) ResolveProcessArgv0(process *model.Process) string {
+	arg0, _ := ev.Resolvers.ProcessResolver.GetProcessArgv0(process)
 	return arg0
 }
 
 // ResolveProcessArgs resolves the args of the event
-func ResolveProcessArgs(ctx *ProbeContext, ev *model.Event, process *model.Process) string {
-	return strings.Join(ResolveProcessArgv(ctx, ev, process), " ")
+func (ev *Event) ResolveProcessArgs(process *model.Process) string {
+	return strings.Join(ev.ResolveProcessArgv(process), " ")
 }
 
 // ResolveProcessArgv resolves the args of the event as an array
-func ResolveProcessArgv(ctx *ProbeContext, ev *model.Event, process *model.Process) []string {
-	argv, _ := ctx.Resolvers.ProcessResolver.GetProcessArgv(process)
+func (ev *Event) ResolveProcessArgv(process *model.Process) []string {
+	argv, _ := ev.Resolvers.ProcessResolver.GetProcessArgv(process)
 	return argv
 }
 
 // ResolveProcessEnvp resolves the envp of the event as an array
-func ResolveProcessEnvp(ctx *ProbeContext, ev *model.Event, process *model.Process) []string {
-	envp, _ := ctx.Resolvers.ProcessResolver.GetProcessEnvp(process)
+func (ev *Event) ResolveProcessEnvp(process *model.Process) []string {
+	envp, _ := ev.Resolvers.ProcessResolver.GetProcessEnvp(process)
 	return envp
 }
 
 // ResolveProcessArgsTruncated returns whether the args are truncated
-func ResolveProcessArgsTruncated(ctx *ProbeContext, ev *model.Event, process *model.Process) bool {
-	_, truncated := ctx.Resolvers.ProcessResolver.GetProcessArgv(process)
+func (ev *Event) ResolveProcessArgsTruncated(process *model.Process) bool {
+	_, truncated := ev.Resolvers.ProcessResolver.GetProcessArgv(process)
 	return truncated
 }
 
 // ResolveProcessArgsFlags resolves the arguments flags of the event
-func ResolveProcessArgsFlags(ctx *ProbeContext, ev *model.Event, process *model.Process) (flags []string) {
-	for _, arg := range ResolveProcessArgv(ctx, ev, process) {
+func (ev *Event) ResolveProcessArgsFlags(process *model.Process) (flags []string) {
+	for _, arg := range ev.ResolveProcessArgv(process) {
 		if len(arg) > 1 && arg[0] == '-' {
 			isFlag := true
 			name := arg[1:]
@@ -278,8 +278,8 @@ func ResolveProcessArgsFlags(ctx *ProbeContext, ev *model.Event, process *model.
 }
 
 // ResolveProcessArgsOptions resolves the arguments options of the event
-func ResolveProcessArgsOptions(ctx *ProbeContext, ev *model.Event, process *model.Process) (options []string) {
-	args := ResolveProcessArgv(ctx, ev, process)
+func (ev *Event) ResolveProcessArgsOptions(process *model.Process) (options []string) {
+	args := ev.ResolveProcessArgv(process)
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if len(arg) > 1 && arg[0] == '-' {
@@ -303,79 +303,79 @@ func ResolveProcessArgsOptions(ctx *ProbeContext, ev *model.Event, process *mode
 }
 
 // ResolveProcessEnvsTruncated returns whether the envs are truncated
-func ResolveProcessEnvsTruncated(ctx *ProbeContext, ev *model.Event, process *model.Process) bool {
-	_, truncated := ctx.Resolvers.ProcessResolver.GetProcessEnvs(process)
+func (ev *Event) ResolveProcessEnvsTruncated(process *model.Process) bool {
+	_, truncated := ev.Resolvers.ProcessResolver.GetProcessEnvs(process)
 	return truncated
 }
 
 // ResolveProcessEnvs resolves the envs of the event
-func ResolveProcessEnvs(ctx *ProbeContext, ev *model.Event, process *model.Process) []string {
-	envs, _ := ctx.Resolvers.ProcessResolver.GetProcessEnvs(process)
+func (ev *Event) ResolveProcessEnvs(process *model.Process) []string {
+	envs, _ := ev.Resolvers.ProcessResolver.GetProcessEnvs(process)
 	return envs
 }
 
 // ResolveSetuidUser resolves the user of the Setuid event
-func ResolveSetuidUser(ctx *ProbeContext, ev *model.Event, e *model.SetuidEvent) string {
+func (ev *Event) ResolveSetuidUser(e *model.SetuidEvent) string {
 	if len(e.User) == 0 && ev != nil {
-		e.User, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
+		e.User, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.UID))
 	}
 	return e.User
 }
 
 // ResolveSetuidEUser resolves the effective user of the Setuid event
-func ResolveSetuidEUser(ctx *ProbeContext, ev *model.Event, e *model.SetuidEvent) string {
+func (ev *Event) ResolveSetuidEUser(e *model.SetuidEvent) string {
 	if len(e.EUser) == 0 && ev != nil {
-		e.EUser, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.EUID))
+		e.EUser, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.EUID))
 	}
 	return e.EUser
 }
 
 // ResolveSetuidFSUser resolves the file-system user of the Setuid event
-func ResolveSetuidFSUser(ctx *ProbeContext, ev *model.Event, e *model.SetuidEvent) string {
+func (ev *Event) ResolveSetuidFSUser(e *model.SetuidEvent) string {
 	if len(e.FSUser) == 0 && ev != nil {
-		e.FSUser, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.FSUID))
+		e.FSUser, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.FSUID))
 	}
 	return e.FSUser
 }
 
 // ResolveSetgidGroup resolves the group of the Setgid event
-func ResolveSetgidGroup(ctx *ProbeContext, ev *model.Event, e *model.SetgidEvent) string {
+func (ev *Event) ResolveSetgidGroup(e *model.SetgidEvent) string {
 	if len(e.Group) == 0 && ev != nil {
-		e.Group, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.GID))
+		e.Group, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.GID))
 	}
 	return e.Group
 }
 
 // ResolveSetgidEGroup resolves the effective group of the Setgid event
-func ResolveSetgidEGroup(ctx *ProbeContext, ev *model.Event, e *model.SetgidEvent) string {
+func (ev *Event) ResolveSetgidEGroup(e *model.SetgidEvent) string {
 	if len(e.EGroup) == 0 && ev != nil {
-		e.EGroup, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.EGID))
+		e.EGroup, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.EGID))
 	}
 	return e.EGroup
 }
 
 // ResolveSetgidFSGroup resolves the file-system group of the Setgid event
-func ResolveSetgidFSGroup(ctx *ProbeContext, ev *model.Event, e *model.SetgidEvent) string {
+func (ev *Event) ResolveSetgidFSGroup(e *model.SetgidEvent) string {
 	if len(e.FSGroup) == 0 && ev != nil {
-		e.FSGroup, _ = ctx.Resolvers.UserGroupResolver.ResolveUser(int(e.FSGID))
+		e.FSGroup, _ = ev.Resolvers.UserGroupResolver.ResolveUser(int(e.FSGID))
 	}
 	return e.FSGroup
 }
 
 // ResolveSELinuxBoolName resolves the boolean name of the SELinux event
-func ResolveSELinuxBoolName(ctx *ProbeContext, ev *model.Event, e *model.SELinuxEvent) string {
+func (ev *Event) ResolveSELinuxBoolName(e *model.SELinuxEvent) string {
 	if e.EventKind != model.SELinuxBoolChangeEventKind {
 		return ""
 	}
 
 	if len(ev.SELinux.BoolName) == 0 {
-		ev.SELinux.BoolName = ctx.Resolvers.resolveBasename(&e.File.FileFields)
+		ev.SELinux.BoolName = ev.Resolvers.resolveBasename(&e.File.FileFields)
 	}
 	return ev.SELinux.BoolName
 }
 
 // ExtractEventInfo extracts cpu and timestamp from the raw data event
-func ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
+func (ev *Event) ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
 	if len(record.RawSample) < 16 {
 		return 0, 0, model.ErrNotEnoughData
 	}
@@ -384,9 +384,9 @@ func ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
 }
 
 // ResolveEventTimestamp resolves the monolitic kernel event timestamp to an absolute time
-func ResolveEventTimestamp(ctx *ProbeContext, ev *model.Event) time.Time {
+func (ev *Event) ResolveEventTimestamp() time.Time {
 	if ev.Timestamp.IsZero() {
-		ev.Timestamp = ctx.Resolvers.TimeResolver.ResolveMonotonicTimestamp(ev.TimestampRaw)
+		ev.Timestamp = ev.Resolvers.TimeResolver.ResolveMonotonicTimestamp(ev.TimestampRaw)
 		if ev.Timestamp.IsZero() {
 			ev.Timestamp = time.Now()
 		}
@@ -395,9 +395,9 @@ func ResolveEventTimestamp(ctx *ProbeContext, ev *model.Event) time.Time {
 }
 
 // ResolveProcessCacheEntry queries the ProcessResolver to retrieve the ProcessContext of the event
-func ResolveProcessCacheEntry(ctx *ProbeContext, ev *model.Event) *model.ProcessCacheEntry {
+func (ev *Event) ResolveProcessCacheEntry() *model.ProcessCacheEntry {
 	if ev.ProcessCacheEntry == nil {
-		ev.ProcessCacheEntry = ctx.Resolvers.ProcessResolver.Resolve(ev.PIDContext.Pid, ev.PIDContext.Tid)
+		ev.ProcessCacheEntry = ev.Resolvers.ProcessResolver.Resolve(ev.PIDContext.Pid, ev.PIDContext.Tid)
 	}
 
 	if ev.ProcessCacheEntry == nil {
@@ -413,8 +413,8 @@ func ResolveProcessCacheEntry(ctx *ProbeContext, ev *model.Event) *model.Process
 }
 
 // GetProcessServiceTag returns the service tag based on the process context
-func GetProcessServiceTag(ctx *ProbeContext, ev *model.Event) string {
-	entry := ResolveProcessCacheEntry(ctx, ev)
+func (ev *Event) GetProcessServiceTag() string {
+	entry := ev.ResolveProcessCacheEntry()
 	if entry == nil {
 		return ""
 	}
@@ -445,9 +445,9 @@ func GetProcessServiceTag(ctx *ProbeContext, ev *model.Event) string {
 }
 
 // ResolveNetworkDeviceIfName returns the network iterface name from the network context
-func ResolveNetworkDeviceIfName(ctx *ProbeContext, ev *model.Event, device *model.NetworkDeviceContext) string {
+func (ev *Event) ResolveNetworkDeviceIfName(device *model.NetworkDeviceContext) string {
 	if len(device.IfName) == 0 {
-		device.IfName = ctx.Resolvers.NetworkResovler.ResolveIfName(device)
+		device.IfName = ev.Resolvers.NetworkResovler.ResolveIfName(device)
 	}
 
 	return device.IfName

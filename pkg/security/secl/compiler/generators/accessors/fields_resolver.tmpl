@@ -14,12 +14,12 @@ import (
 )
 
 // ResolveFields resolves all the fields associate to the event type. Context fields are automatically resolved.
-func ResolveFields(ctx *ProbeContext, ev *model.Event) {
+func (ev *Event) ResolveFields() {
     // resolve context fields that are not related to any event type
 {{- range $Key, $Field := .Fields}}
     {{- if and (eq $Field.Event "*") (ne $Field.Handler "") (not $Field.Iterator) (eq $Field.CachelessResolution false) }}
         {{- if (eq $Field.Prefix "") }}
-            _ = {{ print $Field.Handler "(ctx, ev)"}}
+            _ = {{ print "ev." $Field.Handler "()"}}
         {{- else}}
             {{$Ptr := "&"}}
             {{$Parent := index $.AllFields $Field.Prefix}}
@@ -27,7 +27,7 @@ func ResolveFields(ctx *ProbeContext, ev *model.Event) {
                 {{$Ptr = ""}}
             {{end}}
 
-            _ = {{ print $Field.Handler "(ctx, ev, " $Ptr "ev." $Field.Prefix ")"}}
+            _ = {{ print "ev." $Field.Handler "(" $Ptr "ev." $Field.Prefix ")"}}
         {{- end}}
     {{- end -}}
 {{end}}

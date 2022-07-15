@@ -58,14 +58,16 @@ func TestSetFieldValue(t *testing.T) {
 }
 
 func TestProcessArgsFlags(t *testing.T) {
-	e := &model.Event{
-		Exec: model.ExecEvent{
-			Process: &model.Process{
-				ArgsEntry: &model.ArgsEntry{
-					Values: []string{
-						"cmd", "-abc", "--verbose", "test",
-						"-v=1", "--host=myhost",
-						"-9", "-", "--",
+	e := &Event{
+		Event: model.Event{
+			Exec: model.ExecEvent{
+				Process: &model.Process{
+					ArgsEntry: &model.ArgsEntry{
+						Values: []string{
+							"cmd", "-abc", "--verbose", "test",
+							"-v=1", "--host=myhost",
+							"-9", "-", "--",
+						},
 					},
 				},
 			},
@@ -73,13 +75,11 @@ func TestProcessArgsFlags(t *testing.T) {
 	}
 
 	resolver, _ := NewProcessResolver(&Probe{}, nil, NewProcessResolverOpts(10000))
-	ctx := &ProbeContext{
-		Resolvers: &Resolvers{
-			ProcessResolver: resolver,
-		},
+	e.Resolvers = &Resolvers{
+		ProcessResolver: resolver,
 	}
 
-	flags := ResolveProcessArgsFlags(ctx, e, e.Exec.Process)
+	flags := e.ResolveProcessArgsFlags(e.Exec.Process)
 	sort.Strings(flags)
 
 	hasFlag := func(flags []string, flag string) bool {
@@ -117,14 +117,16 @@ func TestProcessArgsFlags(t *testing.T) {
 }
 
 func TestProcessArgsOptions(t *testing.T) {
-	e := &model.Event{
-		Exec: model.ExecEvent{
-			Process: &model.Process{
-				ArgsEntry: &model.ArgsEntry{
-					Values: []string{
-						"cmd", "--config", "/etc/myfile", "--host=myhost", "--verbose",
-						"-c", "/etc/myfile", "-e", "", "-h=myhost", "-v",
-						"--", "---", "-9",
+	e := &Event{
+		Event: model.Event{
+			Exec: model.ExecEvent{
+				Process: &model.Process{
+					ArgsEntry: &model.ArgsEntry{
+						Values: []string{
+							"cmd", "--config", "/etc/myfile", "--host=myhost", "--verbose",
+							"-c", "/etc/myfile", "-e", "", "-h=myhost", "-v",
+							"--", "---", "-9",
+						},
 					},
 				},
 			},
@@ -132,13 +134,11 @@ func TestProcessArgsOptions(t *testing.T) {
 	}
 
 	resolver, _ := NewProcessResolver(&Probe{}, nil, NewProcessResolverOpts(10000))
-	ctx := &ProbeContext{
-		Resolvers: &Resolvers{
-			ProcessResolver: resolver,
-		},
+	e.Resolvers = &Resolvers{
+		ProcessResolver: resolver,
 	}
 
-	options := ResolveProcessArgsOptions(ctx, e, e.Exec.Process)
+	options := e.ResolveProcessArgsOptions(e.Exec.Process)
 	sort.Strings(options)
 
 	hasOption := func(options []string, option string) bool {
