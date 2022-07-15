@@ -316,9 +316,9 @@ func (c *collector) ignoreContainer(container containerd.Container) (bool, error
 	}
 
 	// Only the image name is relevant to exclude paused containers
-	shouldIgnore := c.filterPausedContainers.IsExcluded("", info.Image, ""), nil
+	shouldIgnore := c.filterPausedContainers.IsExcluded("", info.Image, "")
 	log.Debugf("For container with image %s, shouldIgnore=%v\n", info.Image, shouldIgnore)
-	return shouldIgnore
+	return shouldIgnore, nil
 }
 
 func subscribeFilters() []string {
