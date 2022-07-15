@@ -177,16 +177,24 @@ func (s *store) Subscribe(name string, priority SubscriberPriority, filter *Filt
 	s.storeMut.RLock()
 	defer s.storeMut.RUnlock()
 
-	log.Debugf("New Subscriber to store - %s - looking through all stores to decide what to send\n", name)
+	numEntities := 0
+	for _, entitiesOfKind := range s.store {
+		numEntities += len(entitiesOfKind)
+	}
+	log.Debugf("New Subscriber '%s' attached! Checking through all %d entities to see which to send.\n", name, numEntities)
+	log.Debugf("Subscriber filter: %v\n", sub.filter)
+
 	for kind, entitiesOfKind := range s.store {
-		log.Debugf("Checking if kind %v matches the filter\n", kind)
-		if !sub.filter.MatchKind(kind) {
+		doesMatch := sub.filter.MatchKind(kind)
+		log.Debugf("Current Kind: %s. Matches filter? %v\n", kind, doesMatch)
+		if !doesMatch {
 			continue
 		}
 
 		for _, cachedEntity := range entitiesOfKind {
 			entity := cachedEntity.get(sub.filter.Source())
 			if entity != nil {
+				log.Debugf("Entity '%s' matches filters! Adding EventTypeSet event for entity.", entity.GetID().ID)
 				events = append(events, Event{
 					Type:   EventTypeSet,
 					Entity: entity,
