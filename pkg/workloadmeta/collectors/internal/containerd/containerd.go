@@ -169,6 +169,7 @@ func (c *collector) generateEventsFromContainerList(ctx context.Context) error {
 	var events []workloadmeta.CollectorEvent
 
 	namespaces, err := cutil.NamespacesToWatch(ctx, c.containerdClient)
+	log.Debugf("containerd collector watching %d namespaces: %v\n", len(namespaces), namespaces)
 	if err != nil {
 		return err
 	}
@@ -181,6 +182,7 @@ func (c *collector) generateEventsFromContainerList(ctx context.Context) error {
 			return err
 		}
 
+		log.Debugf("Found %d events in namespace %s\n", len(nsEvents), namespace)
 		events = append(events, nsEvents...)
 	}
 
@@ -196,6 +198,7 @@ func (c *collector) generateInitialEvents(ctx context.Context, namespace string)
 	var events []workloadmeta.CollectorEvent
 
 	existingContainers, err := c.containerdClient.Containers()
+	log.Debugf("In namespace %s, there are %d existingContainers, checking which are relevant...\n", namespace, len(existingContainers)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +316,9 @@ func (c *collector) ignoreContainer(container containerd.Container) (bool, error
 	}
 
 	// Only the image name is relevant to exclude paused containers
-	return c.filterPausedContainers.IsExcluded("", info.Image, ""), nil
+	shouldIgnore := c.filterPausedContainers.IsExcluded("", info.Image, ""), nil
+	log.Debugf("For container with image %s, shouldIgnore=%v\n", info.Image, shouldIgnore)
+	return shouldIgnore
 }
 
 func subscribeFilters() []string {

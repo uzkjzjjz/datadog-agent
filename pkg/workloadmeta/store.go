@@ -413,7 +413,7 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 				cachedEntity = entitiesOfKind[entityID.ID]
 			}
 
-			log.Debugf("event EventTypeSet of kind %s from source %s\n", string(entityID.Kind), string(ev.Source))
+			log.Debugf("Event EventTypeSet - ID: %s, kind: %s, source: %s\n", string(entityID.ID), string(entityID.Kind), string(ev.Source))
 			if found := cachedEntity.set(ev.Source, ev.Entity); !found {
 				telemetry.StoredEntities.Inc(
 					string(entityID.Kind),
@@ -462,7 +462,7 @@ func (s *store) handleEvents(evs []CollectorEvent) {
 			if !filter.MatchKind(entityID.Kind) || !filter.MatchSource(ev.Source) || !filter.MatchEventType(ev.Type) {
 				// event should be filtered out because it
 				// doesn't match the filter
-				log.Debugf("sub %s - event is filtered out. Kind: %s, Source: %s, Type: %s ", sub.name, string(entityID.Kind), string(ev.Source), string(ev.Type))
+				log.Debugf("sub %s - event is filtered out. Kind: %s, Source: %s, Type: %d ", sub.name, string(entityID.Kind), string(ev.Source), ev.Type)
 				continue
 			}
 
