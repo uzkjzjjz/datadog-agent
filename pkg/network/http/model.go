@@ -20,9 +20,10 @@ import (
 import "C"
 
 const (
-	HTTPBatchSize  = int(C.HTTP_BATCH_SIZE)
-	HTTPBatchPages = int(C.HTTP_BATCH_PAGES)
-	HTTPBufferSize = int(C.HTTP_BUFFER_SIZE)
+	httpIoctlEnqueue = int(C.HTTP_ENQUEUE)
+	HTTPBatchSize    = int(C.HTTP_BATCH_SIZE)
+	HTTPBatchPages   = int(C.HTTP_BATCH_PAGES)
+	HTTPBufferSize   = int(C.HTTP_BUFFER_SIZE)
 )
 
 type httpTX C.http_transaction_t
