@@ -181,20 +181,28 @@ func (s *store) Subscribe(name string, priority SubscriberPriority, filter *Filt
 	for _, entitiesOfKind := range s.store {
 		numEntities += len(entitiesOfKind)
 	}
-	log.Debugf("New Subscriber '%s' attached! Checking through all %d entities to see which to send.\n", name, numEntities)
-	log.Debugf("Subscriber filter: %v\n", sub.filter)
+	log.Debugf("sub %s - New subscriber attached! Checking through all %d entities to see which to send.\n", name, numEntities)
+
+	for kind, entitiesOfKind := range s.store {
+		log.Debugf("sub %s - In store for kind '%s', there are %d entities to look through\n", sub.name, kind, len(entitiesOfKind))
+	}
+
+	log.Debugf("sub %s - Subscriber filter: %v\n", sub.name, sub.filter)
 
 	for kind, entitiesOfKind := range s.store {
 		doesMatch := sub.filter.MatchKind(kind)
-		log.Debugf("Current Kind: %s. Matches filter? %v\n", kind, doesMatch)
+		log.Debugf("sub %s - Current Kind: %s. Matches filter? %v\n", sub.name, kind, doesMatch)
 		if !doesMatch {
 			continue
 		}
 
+		log.Debugf("sub %s - Checking all entities of kind %s\n", sub.name, kind)
 		for _, cachedEntity := range entitiesOfKind {
+
 			entity := cachedEntity.get(sub.filter.Source())
+			log.Debugf("sub %s - Getting cachedEntity with source %s\n", sub.name, string(sub.filter.Source()))
 			if entity != nil {
-				log.Debugf("Entity '%s' matches filters! Adding EventTypeSet event for entity.", entity.GetID().ID)
+				log.Debugf("sub %s - Entity '%s' was not nil, will send this event\n", sub.name, entity.GetID().ID)
 				events = append(events, Event{
 					Type:   EventTypeSet,
 					Entity: entity,
