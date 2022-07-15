@@ -198,7 +198,7 @@ func (c *collector) generateInitialEvents(ctx context.Context, namespace string)
 	var events []workloadmeta.CollectorEvent
 
 	existingContainers, err := c.containerdClient.Containers()
-	log.Debugf("In namespace %s, there are %d existingContainers, checking which are relevant...\n", namespace, len(existingContainers)
+	log.Debugf("In namespace %s, there are %d existingContainers, checking which are relevant...\n", namespace, len(existingContainers))
 	if err != nil {
 		return nil, err
 	}
