@@ -29,10 +29,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTPMonitorIntegration(t *testing.T) {
+func httpSupported(t *testing.T) bool {
 	currKernelVersion, err := kernel.HostVersion()
 	require.NoError(t, err)
-	if currKernelVersion < kernel.VersionCode(4, 1, 0) {
+	return currKernelVersion >= kernel.VersionCode(4, 1, 0)
+}
+
+func TestHTTPMonitorIntegration(t *testing.T) {
+	if !httpSupported(t) {
 		t.Skip("HTTP feature not available on pre 4.1.0 kernels")
 	}
 
@@ -52,9 +56,7 @@ func TestHTTPMonitorIntegration(t *testing.T) {
 }
 
 func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
-	currKernelVersion, err := kernel.HostVersion()
-	require.NoError(t, err)
-	if currKernelVersion < kernel.VersionCode(4, 1, 0) {
+	if !httpSupported(t) {
 		t.Skip("HTTP feature not available on pre 4.1.0 kernels")
 	}
 
@@ -76,9 +78,7 @@ func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
 }
 
 func TestUnknownMethodRegression(t *testing.T) {
-	currKernelVersion, err := kernel.HostVersion()
-	require.NoError(t, err)
-	if currKernelVersion < kernel.VersionCode(4, 1, 0) {
+	if !httpSupported(t) {
 		t.Skip("HTTP feature not available on pre 4.1.0 kernels")
 	}
 
@@ -122,9 +122,7 @@ func TestUnknownMethodRegression(t *testing.T) {
 }
 
 func TestRSTPacketRegression(t *testing.T) {
-	currKernelVersion, err := kernel.HostVersion()
-	require.NoError(t, err)
-	if currKernelVersion < kernel.VersionCode(4, 1, 0) {
+	if !httpSupported(t) {
 		t.Skip("HTTP feature not available on pre 4.1.0 kernels")
 	}
 
@@ -245,6 +243,10 @@ type ioctlHttpTX struct {
 }
 
 func TestHTTPTransactionUserspace(t *testing.T) {
+	if !httpSupported(t) {
+		t.Skip("HTTP feature not available on pre 4.1.0 kernels")
+	}
+
 	monitor, err := NewMonitor(config.New(), nil, nil)
 	require.NoError(t, err)
 	err = monitor.Start()
