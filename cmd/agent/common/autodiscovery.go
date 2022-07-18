@@ -19,15 +19,70 @@ import (
 	"go.uber.org/atomic"
 )
 
-// This is due to an AD limitation that does not allow several listeners to work in parallel
-// if they can provide for the same objects.
+// This is due to an AD limitation that does not allow several listeners/providers to
+// work in parallel if they can provide for the same objects.
 // When this is solved, we can remove this check and simplify code below
 var (
-	incompatibleListeners = map[string]map[string]struct{}{
+	incompatibleListenerProviders = map[string]map[string]struct{}{
 		"kubelet":   {"container": struct{}{}},
 		"container": {"kubelet": struct{}{}},
 	}
 )
+
+func resolveProviders(extraConfigProviders, extraEnvProviders, explicitConfigProviders []config.ConfigurationProviders, explicitExtraConfigProviders []string) map[string]config.ConfigurationProviders {
+	uniqueConfigProviders := make(map[string]config.ConfigurationProviders, len(explicitConfigProviders)+len(extraEnvProviders)+len(explicitConfigProviders))
+	for _, provider := range explicitConfigProviders {
+		uniqueConfigProviders[provider.Name] = provider
+	}
+
+	// Add extra config providers
+	for _, name := range explicitExtraConfigProviders {
+		if _, found := uniqueConfigProviders[name]; !found {
+			uniqueConfigProviders[name] = config.ConfigurationProviders{Name: name, Polling: true}
+		} else {
+			log.Infof("Duplicate AD provider from extra_config_providers discarded as already present in config_providers: %s", name)
+		}
+	}
+
+	// The "docker" config provider was replaced with the "container" one
+	// that supports Docker, but also other runtimes. We need this
+	// conversion to avoid breaking configs that included "docker".
+	if options, found := uniqueConfigProviders["docker"]; found {
+		delete(uniqueConfigProviders, "docker")
+		options.Name = names.Container
+		uniqueConfigProviders["container"] = options
+	}
+
+	for _, provider := range extraConfigProviders {
+		if _, found := uniqueConfigProviders[provider.Name]; !found {
+			uniqueConfigProviders[provider.Name] = provider
+		}
+	}
+
+	for _, provider := range extraEnvProviders {
+		incomp := incompatibleListenerProviders[provider.Name]
+		skipProvider := false
+
+		for _, existingProvider := range uniqueConfigProviders {
+			if provider.Name == existingProvider.Name {
+				skipProvider = true
+				break
+			}
+
+			if _, found := incomp[existingProvider.Name]; found {
+				log.Debugf("Discarding discovered provider: %s as incompatible with listener from config: %s\n", provider.Name, existingProvider.Name)
+				skipProvider = true
+				break
+			}
+		}
+
+		if _, found := uniqueConfigProviders[provider.Name]; !found && !skipProvider {
+			uniqueConfigProviders[provider.Name] = provider
+		}
+	}
+
+	return uniqueConfigProviders
+}
 
 func setupAutoDiscovery(confSearchPaths []string, metaScheduler *scheduler.MetaScheduler) *autodiscovery.AutoConfig {
 	ad := autodiscovery.NewAutoConfig(metaScheduler)
@@ -44,46 +99,14 @@ func setupAutoDiscovery(confSearchPaths []string, metaScheduler *scheduler.MetaS
 	}
 
 	// Register additional configuration providers
-	var configProviders []config.ConfigurationProviders
+	var explicitConfigProviders []config.ConfigurationProviders
 	var uniqueConfigProviders map[string]config.ConfigurationProviders
-	err := config.Datadog.UnmarshalKey("config_providers", &configProviders)
+	err := config.Datadog.UnmarshalKey("config_providers", &explicitConfigProviders)
 
 	if err == nil {
-		uniqueConfigProviders = make(map[string]config.ConfigurationProviders, len(configProviders)+len(extraEnvProviders)+len(configProviders))
-		for _, provider := range configProviders {
-			uniqueConfigProviders[provider.Name] = provider
-		}
+		explicitExtraConfigProviders := config.Datadog.GetStringSlice("extra_config_providers")
 
-		// Add extra config providers
-		for _, name := range config.Datadog.GetStringSlice("extra_config_providers") {
-			if _, found := uniqueConfigProviders[name]; !found {
-				uniqueConfigProviders[name] = config.ConfigurationProviders{Name: name, Polling: true}
-			} else {
-				log.Infof("Duplicate AD provider from extra_config_providers discarded as already present in config_providers: %s", name)
-			}
-		}
-
-		// The "docker" config provider was replaced with the "container" one
-		// that supports Docker, but also other runtimes. We need this
-		// conversion to avoid breaking configs that included "docker".
-		if options, found := uniqueConfigProviders["docker"]; found {
-			delete(uniqueConfigProviders, "docker")
-			options.Name = names.Container
-			uniqueConfigProviders["container"] = options
-		}
-
-		for _, provider := range extraConfigProviders {
-			if _, found := uniqueConfigProviders[provider.Name]; !found {
-				uniqueConfigProviders[provider.Name] = provider
-			}
-		}
-
-		for _, provider := range extraEnvProviders {
-			if _, found := uniqueConfigProviders[provider.Name]; !found {
-				uniqueConfigProviders[provider.Name] = provider
-			}
-		}
-
+		uniqueConfigProviders = resolveProviders(extraConfigProviders, extraEnvProviders, explicitConfigProviders, explicitExtraConfigProviders)
 	} else {
 		log.Errorf("Error while reading 'config_providers' settings: %v", err)
 	}
@@ -142,10 +165,10 @@ func setupAutoDiscovery(confSearchPaths []string, metaScheduler *scheduler.MetaS
 			}
 		}
 
-		// For extraEnvListeners, we need to check incompatibleListeners to avoid generation of duplicate checks
+		// For extraEnvListeners, we need to check incompatibleListenerProviders to avoid generation of duplicate checks
 		for _, listener := range extraEnvListeners {
 			skipListener := false
-			incomp := incompatibleListeners[listener.Name]
+			incomp := incompatibleListenerProviders[listener.Name]
 
 			for _, existingListener := range listeners {
 				if listener.Name == existingListener.Name {
