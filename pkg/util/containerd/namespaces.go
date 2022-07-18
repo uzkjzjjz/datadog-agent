@@ -13,6 +13,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 // NamespacesToWatch returns the namespaces to watch. If the
@@ -20,15 +21,19 @@ import (
 // Otherwise, it returns all of them.
 func NamespacesToWatch(ctx context.Context, containerdClient ContainerdItf) ([]string, error) {
 	if namespaces := config.Datadog.GetStringSlice("containerd_namespaces"); len(namespaces) > 0 {
+		log.Debugf("cfg 'containerd_namespaces': %v\n", namespaces)
 		return namespaces, nil
 	}
 
 	namespaces, err := containerdClient.Namespaces(ctx)
+	log.Debugf("containerd client returned %d namespaces: %v\n", len(namespaces), namespaces)
 	if err != nil {
+		log.Warnf("containerd client returned an error when fetching Namespaces: %v\n", err)
 		return nil, err
 	}
 
 	excludeNamespaces := config.Datadog.GetStringSlice("containerd_exclude_namespaces")
+	log.Debugf("cfg 'containerd_exclude_namespaces': %v\n", excludeNamespaces)
 	if len(excludeNamespaces) == 0 {
 		return namespaces, nil
 	}

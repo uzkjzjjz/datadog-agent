@@ -112,6 +112,7 @@ func (c *collector) Start(ctx context.Context, store workloadmeta.Store) error {
 
 	err = c.generateEventsFromContainerList(ctx)
 	if err != nil {
+		log.Warnf("Cancelling subscription, got error when requesting namespaces from containerd: %v\n", err)
 		cancelEvents()
 		return err
 	}
@@ -171,6 +172,7 @@ func (c *collector) generateEventsFromContainerList(ctx context.Context) error {
 	namespaces, err := cutil.NamespacesToWatch(ctx, c.containerdClient)
 	log.Debugf("containerd collector watching %d namespaces: %v\n", len(namespaces), namespaces)
 	if err != nil {
+		log.Warnf("Got error when watching namespaces: %v\n", err)
 		return err
 	}
 
