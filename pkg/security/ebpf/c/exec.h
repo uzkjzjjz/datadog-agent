@@ -11,6 +11,7 @@
 #define MAX_PERF_STR_BUFF_LEN 256
 #define MAX_STR_BUFF_LEN (1 << 15)
 #define MAX_ARRAY_ELEMENT_PER_TAIL 23
+#define MAX_ARRAY_ELEMENT_PER_TAIL_SEQ 22
 #define MAX_ARRAY_ELEMENT_SIZE 4096
 #define MAX_ARGS_ELEMENTS 140
 
@@ -30,6 +31,13 @@ struct bpf_map_def SEC("maps/args_envs_progs") args_envs_progs = {
     .key_size = sizeof(u32),
     .value_size = sizeof(u32),
     .max_entries = 10,
+};
+
+struct bpf_map_def SEC("maps/args_envs_seq_progs") args_envs_seq_progs = {
+    .type = BPF_MAP_TYPE_PROG_ARRAY,
+    .key_size = sizeof(u32),
+    .value_size = sizeof(u32),
+    .max_entries = 1,
 };
 
 struct bpf_map_def SEC("maps/str_array_buffers") str_array_buffers = {
@@ -574,6 +582,147 @@ int kprobe_exit_itimers(struct pt_regs *ctx) {
     return 0;
 }
 
+void __attribute__((always_inline)) parse_args_envs_seq(struct pt_regs *ctx, struct args_envs_seq_t *args_envs, struct str_array_ref_t *args_envs_info, u64 event_type) {
+    const char *args_start = args_envs->args_start;
+    int offset = args_envs->offset;
+    int str_count = args_envs->str_count;
+    if (str_count >= 255) {
+        return;
+    }
+    int str_total = args_envs->argc + args_envs->envc;
+
+    args_envs_info->truncated = 0;
+
+    u32 key = 0;
+    struct str_array_buffer_t *buff = bpf_map_lookup_elem(&str_array_buffers, &key);
+    if (!buff) {
+        return;
+    }
+
+    struct args_envs_event_t event = {
+        .id = args_envs_info->id,
+    };
+
+    int i = 0;
+    int n = 0;
+
+    void *perf_ptr = &buff->value[0];
+
+#pragma unroll
+    for (i = 0; i < MAX_ARRAY_ELEMENT_PER_TAIL_SEQ; i++) {
+        void *ptr = &(buff->value[(event.size + sizeof(n)) & (MAX_STR_BUFF_LEN - MAX_ARRAY_ELEMENT_SIZE - 1)]);
+
+        n = bpf_probe_read_str(ptr, MAX_ARRAY_ELEMENT_SIZE, (void *)(args_start + offset));
+        if (n > 0) {
+            n--; // remove trailing 0
+
+            // insert size before the string
+            bpf_probe_read(&(buff->value[event.size&(MAX_STR_BUFF_LEN - MAX_ARRAY_ELEMENT_SIZE - 1)]), sizeof(n), &n);
+
+            int len = n + sizeof(n);
+            if (event.size + len >= MAX_PERF_STR_BUFF_LEN) {
+                // copy value to the event
+                bpf_probe_read(&event.value, MAX_PERF_STR_BUFF_LEN, perf_ptr);
+
+                // only one argument overflows the limit
+                if (event.size == 0) {
+                    event.size = MAX_PERF_STR_BUFF_LEN;
+                    str_count++;
+                    offset += n + 1; // count trailing 0
+                }
+
+                send_event(ctx, event_type, event);
+                event.size = 0;
+            } else {
+                event.size += len;
+                str_count++;
+                offset += n + 1;
+            }
+
+            if (str_count == args_envs->argc || str_count == str_total) {
+                break;
+            }
+        } else {
+            str_count = 255; // stop here
+            break;
+        }
+    }
+    args_envs->offset = offset;
+    args_envs->str_count = str_count;
+    args_envs_info->truncated = i == MAX_ARRAY_ELEMENT_PER_TAIL_SEQ;
+
+    // flush remaining values
+    if (event.size > 0) {
+        bpf_probe_read(&event.value, MAX_PERF_STR_BUFF_LEN, perf_ptr);
+
+        send_event(ctx, event_type, event);
+    }
+}
+
+
+SEC("kprobe/parse_args_envs_seq")
+int kprobe_parse_args_envs_seq(struct pt_regs *ctx) {
+    struct syscall_cache_t *syscall = peek_syscall(EVENT_EXEC);
+    if (!syscall) {
+        return 0;
+    }
+
+    struct str_array_ref_t *args_envs_info;
+
+    if (syscall->exec.args_envs.str_count < syscall->exec.args_envs.argc) {
+        args_envs_info = &syscall->exec.args;
+    } else if (syscall->exec.args_envs.str_count < syscall->exec.args_envs.argc + syscall->exec.args_envs.envc) {
+        args_envs_info = &syscall->exec.envs;
+    } else {
+        return 0;
+    }
+
+    parse_args_envs_seq(ctx, &syscall->exec.args_envs, args_envs_info, EVENT_ARGS_ENVS);
+
+    bpf_tail_call_compat(ctx, &args_envs_seq_progs, 0);
+
+    return 0;
+}
+
+SEC("kprobe/security_bprm_committed_creds")
+int kprobe_security_bprm_committed_creds(struct pt_regs *ctx) {
+    struct syscall_cache_t *syscall = peek_syscall(EVENT_EXEC);
+    if (!syscall) {
+        return 0;
+    }
+
+    void *bprm = (void *)PT_REGS_PARM1(ctx);
+
+    int argc = 0;
+    u64 argc_offset;
+    LOAD_CONSTANT("linux_binprm_argc_offset", argc_offset);
+    bpf_probe_read(&argc, sizeof(argc), (char *)bprm + argc_offset);
+
+    int envc = 0;
+    u64 envc_offset;
+    LOAD_CONSTANT("linux_binprm_envc_offset", envc_offset);
+    bpf_probe_read(&envc, sizeof(envc), (char *)bprm + envc_offset);
+
+    unsigned long p = 0;
+    u64 p_offset;
+    LOAD_CONSTANT("linux_binprm_p_offset", p_offset);
+    bpf_probe_read(&p, sizeof(p), (char *)bprm + p_offset);
+    if (p == 0) {
+        return 0;
+    }
+
+    syscall->exec.args_envs.args_start = (char *)p;
+    syscall->exec.args_envs.argc = argc;
+    syscall->exec.args_envs.envc = envc;
+    syscall->exec.args_envs.offset = 0;
+    syscall->exec.args_envs.str_count = 0;
+
+    bpf_tail_call_compat(ctx, &args_envs_seq_progs, 0);
+
+    return 0;
+}
+
+
 int __attribute__((always_inline)) parse_args_and_env(struct pt_regs *ctx) {
     struct syscall_cache_t *syscall = peek_syscall(EVENT_EXEC);
     if (!syscall) {
@@ -583,7 +732,7 @@ int __attribute__((always_inline)) parse_args_and_env(struct pt_regs *ctx) {
     // call it here before the memory get replaced
     fill_span_context(&syscall->exec.span_context);
 
-    bpf_tail_call_compat(ctx, &args_envs_progs, syscall->exec.next_tail);
+    //bpf_tail_call_compat(ctx, &args_envs_progs, syscall->exec.next_tail);
     return 0;
 }
 
@@ -609,8 +758,8 @@ void __attribute__((always_inline)) fill_args_envs(struct exec_event_t *event, s
     event->envs_truncated = syscall->exec.envs.truncated;
 }
 
-SEC("kprobe/security_bprm_committed_creds")
-int kprobe_security_bprm_committed_creds(struct pt_regs *ctx) {
+SEC("kprobe/setup_arg_pages")
+int kprobe_setup_arg_pages(struct pt_regs *ctx) {
     struct syscall_cache_t *syscall = pop_syscall(EVENT_EXEC);
     if (!syscall) {
         return 0;

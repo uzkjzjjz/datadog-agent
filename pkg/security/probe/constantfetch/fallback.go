@@ -98,6 +98,12 @@ func (f *FallbackConstantFetcher) appendRequest(id string) {
 		value = getFlowi4ULIOffset(f.kernelVersion)
 	case "flowi6_uli_offset":
 		value = getFlowi6ULIOffset(f.kernelVersion)
+	case "linux_binprm_p_offset":
+		value = getLinuxBinPrmPOffset(f.kernelVersion)
+	case "linux_binprm_argc_offset":
+		value = getLinuxBinPrmArgcOffset(f.kernelVersion)
+	case "linux_binprm_envc_offset":
+		value = getLinuxBinPrmEnvcOffset(f.kernelVersion)
 	}
 	f.res[id] = value
 }
@@ -675,4 +681,61 @@ func ubuntuAbiVersionCheck(kv *kernel.Version, minAbiPerFlavor map[string]int) b
 	}
 
 	return ukv.Abi >= minAbi
+}
+
+func getLinuxBinPrmPOffset(kv *kernel.Version) uint64 {
+	offset := uint64(152)
+
+	switch {
+	case kv.Code >= kernel.Kernel5_2:
+		offset = 24
+	case kv.IsAmazonLinuxKernel() && kv.Code == kernel.Kernel4_14 &&
+		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
+			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
+		offset = 280
+	}
+
+	return offset
+}
+
+func getLinuxBinPrmArgcOffset(kv *kernel.Version) uint64 {
+	offset := uint64(192)
+
+	switch {
+	case kv.IsInRangeCloseOpen(kernel.Kernel4_19, kernel.Kernel5_0):
+		offset = 192
+	case kv.IsInRangeCloseOpen(kernel.Kernel5_0, kernel.Kernel5_2):
+		offset = 200
+	case kv.IsInRangeCloseOpen(kernel.Kernel5_2, kernel.Kernel5_8):
+		offset = 72
+	case kv.Code >= kernel.Kernel5_8:
+		offset = 88
+	case kv.IsAmazonLinuxKernel() && kv.Code == kernel.Kernel4_14 &&
+		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
+			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
+		offset = 320
+	}
+
+	return offset
+}
+
+func getLinuxBinPrmEnvcOffset(kv *kernel.Version) uint64 {
+	offset := uint64(196)
+
+	switch {
+	case kv.IsInRangeCloseOpen(kernel.Kernel4_19, kernel.Kernel5_0):
+		offset = 196
+	case kv.IsInRangeCloseOpen(kernel.Kernel5_0, kernel.Kernel5_2):
+		offset = 204
+	case kv.IsInRangeCloseOpen(kernel.Kernel5_2, kernel.Kernel5_8):
+		offset = 76
+	case kv.Code >= kernel.Kernel5_8:
+		offset = 92
+	case kv.IsAmazonLinuxKernel() && kv.Code == kernel.Kernel4_14 &&
+		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
+			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
+		offset = 324
+	}
+
+	return offset
 }

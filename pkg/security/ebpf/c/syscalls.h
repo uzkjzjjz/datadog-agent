@@ -19,6 +19,14 @@ struct str_array_ref_t {
     const char **array;
 };
 
+struct args_envs_seq_t {
+    const char *args_start;
+    u32 offset;
+    u32 str_count;
+    int argc;
+    int envc;
+};
+
 struct dentry_resolver_input_t {
     struct path_key_t key;
     struct dentry *dentry;
@@ -129,6 +137,7 @@ struct syscall_cache_t {
             struct file_t file;
             struct str_array_ref_t args;
             struct str_array_ref_t envs;
+            struct args_envs_seq_t args_envs;
             struct span_context_t span_context;
             u32 next_tail;
             u8 is_parsed;
