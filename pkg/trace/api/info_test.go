@@ -49,10 +49,11 @@ func TestInfoHandler(t *testing.T) {
 		Memcached:         config.Enablable{Enabled: false},
 	}
 	conf := &config.AgentConfig{
-		Enabled:    true,
-		Hostname:   "test.host.name",
-		DefaultEnv: "prod",
-		ConfigPath: "/path/to/config",
+		Enabled:      true,
+		AgentVersion: "0.99.0",
+		Hostname:     "test.host.name",
+		DefaultEnv:   "prod",
+		ConfigPath:   "/path/to/config",
 		Endpoints: []*config.Endpoint{{
 			APIKey:  "123",
 			Host:    "https://target-intake.datadoghq.com",

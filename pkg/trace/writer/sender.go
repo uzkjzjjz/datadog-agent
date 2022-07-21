@@ -320,7 +320,7 @@ func (s *sender) recordEvent(t eventType, data *eventData) {
 }
 
 // userAgent is the computed user agent we'll use when communicating with Datadog
-var userAgent = fmt.Sprintf("Datadog Trace Agent/%s/%s", info.Version, info.GitCommit)
+var userAgent = fmt.Sprintf("Datadog Trace Agent/%s/%s", info.Version, info.GitCommit) // TODO: how to change this?
 
 // retriableError is an error returned by the server which may be retried at a later time.
 type retriableError struct{ err error }

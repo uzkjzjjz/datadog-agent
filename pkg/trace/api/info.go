@@ -74,8 +74,8 @@ func (r *HTTPReceiver) makeInfoHandler() (hash string, handler http.HandlerFunc)
 		LongRunningSpans bool          `json:"long_running_spans"`
 		Config           reducedConfig `json:"config"`
 	}{
-		Version:          info.Version,
-		GitCommit:        info.GitCommit,
+		Version:          r.conf.AgentVersion,
+		GitCommit:        info.GitCommit, // TODO: should these be removed or dealt with elsewhere?
 		BuildDate:        info.BuildDate,
 		Endpoints:        all,
 		FeatureFlags:     features.All(),
