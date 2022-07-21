@@ -404,6 +404,8 @@ require (
 	github.com/libp2p/go-reuseport v0.1.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.5 // indirect
+	go.uber.org/dig v1.14.0 // indirect
+	go.uber.org/fx v1.17.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	k8s.io/apiextensions-apiserver v0.23.5 // indirect
 )
