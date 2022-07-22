@@ -54,7 +54,9 @@ const (
 
 	// We use the following two probes for UDP sends
 	IPMakeSkb        ProbeName = "kprobe/ip_make_skb"
+	IPMakeSkbReturn  ProbeName = "kretprobe/ip_make_skb"
 	IP6MakeSkb       ProbeName = "kprobe/ip6_make_skb"
+	IP6MakeSkbReturn ProbeName = "kretprobe/ip6_make_skb"
 	IP6MakeSkbPre470 ProbeName = "kprobe/ip6_make_skb/pre_4_7_0"
 
 	// UDPRecvMsg traces the udp_recvmsg() system call
@@ -71,9 +73,16 @@ const (
 	// UDPv6RecvMsgReturn traces the return value for the udpv6_recvmsg() system call
 	UDPv6RecvMsgReturn ProbeName = "kretprobe/udpv6_recvmsg"
 
+	// SKBConsumeUDP traces skb_consume_udp()
+	SKBConsumeUDP ProbeName = "kprobe/skb_consume_udp"
+	// SKBFreeDatagramLocked traces skb_free_datagram_locked()
+	SKBFreeDatagramLocked ProbeName = "kprobe/skb_free_datagram_locked"
+	// SKB__FreeDatagramLocked traces __skb_free_datagram_locked()
+	SKB__FreeDatagramLocked ProbeName = "kprobe/__skb_free_datagram_locked"
+
 	// UDPDestroySock traces the udp_destroy_sock() function
 	UDPDestroySock ProbeName = "kprobe/udp_destroy_sock"
-	// UDPDestroySockrReturn traces the return of the udp_destroy_sock() system call
+	// UDPDestroySockReturn traces the return of the udp_destroy_sock() system call
 	UDPDestroySockReturn ProbeName = "kretprobe/udp_destroy_sock"
 
 	// TCPRetransmit traces the return value for the tcp_retransmit_skb() system call
@@ -96,11 +105,11 @@ const (
 	// SocketDnsFilter is the socket probe for dns
 	SocketDnsFilter ProbeName = "socket/dns_filter"
 
-	// SockMapFdReturn maps a file descriptor to a kernel sock
-	SockMapFdReturn ProbeName = "kretprobe/sockfd_lookup_light"
-
 	// ConntrackHashInsert is the probe for new conntrack entries
 	ConntrackHashInsert ProbeName = "kprobe/__nf_conntrack_hash_insert"
+
+	// ConntrackFillInfo is the probe for for dumping existing conntrack entries
+	ConntrackFillInfo ProbeName = "kprobe/ctnetlink_fill_info"
 
 	// SockFDLookup is the kprobe used for mapping socket FDs to kernel sock structs
 	SockFDLookup ProbeName = "kprobe/sockfd_lookup_light"
@@ -135,6 +144,7 @@ const (
 	PidFDBySockMap        BPFMapName = "pid_fd_by_sock"
 	TagsMap               BPFMapName = "conn_tags"
 	TcpSendMsgArgsMap     BPFMapName = "tcp_sendmsg_args"
+	IpMakeSkbArgsMap      BPFMapName = "ip_make_skb_args"
 )
 
 // SectionName returns the SectionName for the given BPF map

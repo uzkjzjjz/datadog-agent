@@ -96,9 +96,11 @@ const minClosedCapacity = 1024
 type client struct {
 	lastFetch time.Time
 
+	// generated via `ByteKeyNAT` and used exclusively to roll up closed connections
 	closedConnectionsKeys map[string]int
-	closedConnections     []ConnectionStats
-	stats                 map[string]*StatCounters
+
+	closedConnections []ConnectionStats
+	stats             map[string]*StatCounters
 	// maps by dns key the domain (string) to stats structure
 	dnsStats        dns.StatsByKeyByNameByType
 	httpStatsDelta  map[http.Key]*http.RequestStats
@@ -132,8 +134,9 @@ type networkState struct {
 	sync.Mutex
 
 	// clients is a map of the connection id string to the client structure
-	clients   map[string]*client
-	telemetry telemetry
+	clients       map[string]*client
+	telemetry     telemetry // Monotonic state telemetry
+	lastTelemetry telemetry // Old telemetry state; used for logging
 
 	buf             []byte // Shared buffer
 	latestTimeEpoch uint64
@@ -244,6 +247,8 @@ func (ns *networkState) saveTelemetry(telemetry map[ConnTelemetryType]int64) {
 }
 
 func (ns *networkState) getTelemetryDelta(id string, telemetry map[ConnTelemetryType]int64) map[ConnTelemetryType]int64 {
+	ns.logTelemetry()
+
 	var res = make(map[ConnTelemetryType]int64)
 	client := ns.getClient(id)
 	ns.saveTelemetry(telemetry)
@@ -268,6 +273,41 @@ func (ns *networkState) getTelemetryDelta(id string, telemetry map[ConnTelemetry
 	return res
 }
 
+func (ns *networkState) logTelemetry() {
+	delta := telemetry{
+		closedConnDropped:  ns.telemetry.closedConnDropped - ns.lastTelemetry.closedConnDropped,
+		connDropped:        ns.telemetry.connDropped - ns.lastTelemetry.connDropped,
+		statsResets:        ns.telemetry.statsResets - ns.lastTelemetry.statsResets,
+		timeSyncCollisions: ns.telemetry.timeSyncCollisions - ns.lastTelemetry.timeSyncCollisions,
+		dnsStatsDropped:    ns.telemetry.dnsStatsDropped - ns.lastTelemetry.dnsStatsDropped,
+		httpStatsDropped:   ns.telemetry.httpStatsDropped - ns.lastTelemetry.httpStatsDropped,
+		dnsPidCollisions:   ns.telemetry.dnsPidCollisions - ns.lastTelemetry.dnsPidCollisions,
+	}
+
+	// Flush log line if any metric is non zero
+	if delta.statsResets > 0 || delta.closedConnDropped > 0 || delta.connDropped > 0 || delta.timeSyncCollisions > 0 ||
+		delta.dnsStatsDropped > 0 || delta.httpStatsDropped > 0 || delta.dnsPidCollisions > 0 {
+		s := "state telemetry: "
+		s += " [%d stats stats_resets]"
+		s += " [%d connections dropped due to stats]"
+		s += " [%d closed connections dropped]"
+		s += " [%d dns stats dropped]"
+		s += " [%d HTTP stats dropped]"
+		s += " [%d DNS pid collisions]"
+		s += " [%d time sync collisions]"
+		log.Warnf(s,
+			delta.statsResets,
+			delta.connDropped,
+			delta.closedConnDropped,
+			delta.dnsStatsDropped,
+			delta.httpStatsDropped,
+			delta.dnsPidCollisions,
+			delta.timeSyncCollisions)
+	}
+
+	ns.lastTelemetry = ns.telemetry
+}
+
 // RegisterClient registers a client before it first gets stream of data.
 // This call is not strictly mandatory, although it is useful when users
 // want to first register and then start getting data at regular intervals.
@@ -285,11 +325,7 @@ func (ns *networkState) RegisterClient(id string) {
 func getConnsByKey(conns []ConnectionStats, buf []byte) map[string]*ConnectionStats {
 	connsByKey := make(map[string]*ConnectionStats, len(conns))
 	for i, c := range conns {
-		key, err := c.ByteKey(buf)
-		if err != nil {
-			log.Warnf("failed to create byte key: %s", err)
-			continue
-		}
+		key := c.ByteKey(buf)
 		connsByKey[string(key)] = &conns[i]
 	}
 	return connsByKey
@@ -306,10 +342,7 @@ func (ns *networkState) StoreClosedConnections(closed []ConnectionStats) {
 func (ns *networkState) storeClosedConnections(conns []ConnectionStats) {
 	for _, client := range ns.clients {
 		for _, c := range conns {
-			key, err := c.ByteKey(ns.buf)
-			if err != nil {
-				continue
-			}
+			key := c.ByteKeyNAT(ns.buf)
 
 			i, ok := client.closedConnectionsKeys[string(key)]
 			if ok {
@@ -451,13 +484,11 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 	client.lastFetch = now
 
 	closed := client.closedConnections
+	closedKeys := make(map[string]struct{}, len(closed))
 	for i := range closed {
 		closedConn := &closed[i]
-		byteKey, err := closedConn.ByteKey(ns.buf)
-		if err != nil {
-			continue
-		}
-		key := string(byteKey)
+		key := string(closedConn.ByteKey(ns.buf))
+		closedKeys[key] = struct{}{}
 
 		// If the connection is also active, check the epochs to understand what's going on
 		if activeConn, ok := active[key]; ok {
@@ -488,7 +519,7 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 	// Active connections
 	for key, c := range active {
 		// If the connection was closed, it has already been processed so skip it
-		if _, ok := client.closedConnectionsKeys[key]; ok {
+		if _, ok := closedKeys[key]; ok {
 			continue
 		}
 
@@ -593,28 +624,6 @@ func (ns *networkState) RemoveConnections(keys []string) {
 			delete(c.stats, key)
 		}
 	}
-
-	// Flush log line if any metric is non zero
-	if ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
-		s := "state telemetry: "
-		s += " [%d stats stats_resets]"
-		s += " [%d connections dropped due to stats]"
-		s += " [%d closed connections dropped]"
-		s += " [%d dns stats dropped]"
-		s += " [%d HTTP stats dropped]"
-		s += " [%d DNS pid collisions]"
-		s += " [%d time sync collisions]"
-		log.Warnf(s,
-			ns.telemetry.statsResets,
-			ns.telemetry.connDropped,
-			ns.telemetry.closedConnDropped,
-			ns.telemetry.dnsStatsDropped,
-			ns.telemetry.httpStatsDropped,
-			ns.telemetry.dnsPidCollisions,
-			ns.telemetry.timeSyncCollisions)
-	}
-
-	ns.telemetry = telemetry{}
 }
 
 // GetStats returns a map of statistics about the current network state

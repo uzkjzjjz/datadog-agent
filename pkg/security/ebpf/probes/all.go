@@ -10,9 +10,13 @@ package probes
 
 import (
 	"math"
+	"os"
 
 	manager "github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
 	"golang.org/x/sys/unix"
+
+	"github.com/DataDog/datadog-agent/pkg/security/utils"
 )
 
 const (
@@ -23,8 +27,30 @@ const (
 	maxProcEntries = 131072
 )
 
-// allProbes contain the list of all the probes of the runtime security module
-var allProbes []*manager.Probe
+var (
+	// allProbes contain the list of all the probes of the runtime security module
+	allProbes []*manager.Probe
+	// EventsPerfRingBufferSize is the buffer size of the perf buffers used for events.
+	// PLEASE NOTE: for the perf ring buffer usage metrics to be accurate, the provided value must have the
+	// following form: (1 + 2^n) * pages. Checkout https://github.com/DataDog/ebpf for more.
+	EventsPerfRingBufferSize = 257 * os.Getpagesize()
+	// defaultEventsRingBufferSize is the default buffer size of the ring buffers for events.
+	// Must be a power of 2 and a multiple of the page size
+	defaultEventsRingBufferSize uint32
+)
+
+func init() {
+	numCPU, err := utils.NumCPU()
+	if err != nil {
+		numCPU = 1
+	}
+
+	if numCPU < 64 {
+		defaultEventsRingBufferSize = uint32(64 * 256 * os.Getpagesize())
+	} else {
+		defaultEventsRingBufferSize = uint32(128 * 256 * os.Getpagesize())
+	}
+}
 
 // AllProbes returns the list of all the probes of the runtime security module
 func AllProbes() []*manager.Probe {
@@ -56,28 +82,14 @@ func AllProbes() []*manager.Probe {
 	allProbes = append(allProbes, getNetDeviceProbes()...)
 	allProbes = append(allProbes, GetTCProbes()...)
 	allProbes = append(allProbes, getBindProbes()...)
+	allProbes = append(allProbes, getSyscallMonitorProbes()...)
 
 	allProbes = append(allProbes,
-		// Syscall monitor
-		&manager.Probe{
-			ProbeIdentificationPair: manager.ProbeIdentificationPair{
-				UID:          SecurityAgentUID,
-				EBPFSection:  "tracepoint/raw_syscalls/sys_enter",
-				EBPFFuncName: "sys_enter",
-			},
-		},
 		&manager.Probe{
 			ProbeIdentificationPair: manager.ProbeIdentificationPair{
 				UID:          SecurityAgentUID,
 				EBPFSection:  "tracepoint/raw_syscalls/sys_exit",
 				EBPFFuncName: "sys_exit",
-			},
-		},
-		&manager.Probe{
-			ProbeIdentificationPair: manager.ProbeIdentificationPair{
-				UID:          SecurityAgentUID,
-				EBPFSection:  "tracepoint/sched/sched_process_exec",
-				EBPFFuncName: "sched_process_exec",
 			},
 		},
 		// Snapshot probe
@@ -96,6 +108,8 @@ func AllProbes() []*manager.Probe {
 // AllMaps returns the list of maps of the runtime security module
 func AllMaps() []*manager.Map {
 	return []*manager.Map{
+		// Syscall table map
+		getSyscallTableMap(),
 		// Filters
 		{Name: "filter_policy"},
 		{Name: "inode_discarders"},
@@ -116,10 +130,6 @@ func AllMaps() []*manager.Map {
 		// SELinux tables
 		{Name: "selinux_write_buffer"},
 		{Name: "selinux_enforce_status"},
-		// Syscall monitor tables
-		{Name: "buffer_selector"},
-		{Name: "noisy_processes_fb"},
-		{Name: "noisy_processes_bb"},
 		// Flushing discarders boolean
 		{Name: "flushing_discarders"},
 		// Enabled event mask
@@ -142,7 +152,7 @@ func getMaxEntries(numCPU int, min int, max int) uint32 {
 }
 
 // AllMapSpecEditors returns the list of map editors
-func AllMapSpecEditors(numCPU int, tracedCgroupsCount int, cgroupWaitListSize int, supportMmapableMaps bool) map[string]manager.MapSpecEditor {
+func AllMapSpecEditors(numCPU int, tracedCgroupsCount int, cgroupWaitListSize int, supportMmapableMaps, useRingBuffers bool, ringBufferSize uint32) map[string]manager.MapSpecEditor {
 	if tracedCgroupsCount <= 0 || tracedCgroupsCount > MaxTracedCgroupsCount {
 		tracedCgroupsCount = MaxTracedCgroupsCount
 	}
@@ -177,12 +187,31 @@ func AllMapSpecEditors(numCPU int, tracedCgroupsCount int, cgroupWaitListSize in
 			EditorFlag: manager.EditFlags,
 		}
 	}
+	if useRingBuffers {
+		if ringBufferSize == 0 {
+			ringBufferSize = defaultEventsRingBufferSize
+		}
+		editors["events"] = manager.MapSpecEditor{
+			MaxEntries: ringBufferSize,
+			Type:       ebpf.RingBuf,
+			EditorFlag: manager.EditType | manager.EditMaxEntries,
+		}
+	}
 	return editors
 }
 
 // AllPerfMaps returns the list of perf maps of the runtime security module
 func AllPerfMaps() []*manager.PerfMap {
 	return []*manager.PerfMap{
+		{
+			Map: manager.Map{Name: "events"},
+		},
+	}
+}
+
+// AllRingBuffers returns the list of ring buffers of the runtime security module
+func AllRingBuffers() []*manager.RingBuffer {
+	return []*manager.RingBuffer{
 		{
 			Map: manager.Map{Name: "events"},
 		},

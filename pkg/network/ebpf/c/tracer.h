@@ -90,6 +90,7 @@ typedef struct {
 // tcp_flag_byte(th) (((u_int8_t *)th)[13])
 #define TCP_FLAGS_OFFSET 13
 #define TCPHDR_FIN 0x01
+#define TCPHDR_RST 0x04
 
 // skb_info_t embeds a conn_tuple_t extracted from the skb object as well as
 // some ancillary data such as the data offset (the byte offset pointing to
@@ -129,9 +130,6 @@ typedef struct {
     __u64 conn_stats_max_entries_hit;
 } telemetry_t;
 
-#define PORT_LISTENING 1
-#define PORT_CLOSED 0
-
 typedef struct {
     __u16 port;
 } bind_syscall_args_t;
@@ -150,5 +148,14 @@ typedef struct {
     __u32 pid;
     __u32 fd;
 } pid_fd_t;
+
+typedef struct {
+    struct sock *sk;
+    size_t len;
+    union {
+        struct flowi4 *fl4;
+        struct flowi6 *fl6;
+    };
+} ip_make_skb_args_t;
 
 #endif

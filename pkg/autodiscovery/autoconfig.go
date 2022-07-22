@@ -14,6 +14,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/listeners"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/scheduler"
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
@@ -113,7 +114,7 @@ func (ac *AutoConfig) serviceListening() {
 		case svc := <-ac.newService:
 			ac.processNewService(ctx, svc)
 		case svc := <-ac.delService:
-			ac.processDelService(svc)
+			ac.processDelService(ctx, svc)
 		case <-tagFreshnessTicker.C:
 			ac.checkTagFreshness(ctx)
 		}
@@ -136,7 +137,7 @@ func (ac *AutoConfig) checkTagFreshness(ctx context.Context) {
 	}
 	for _, service := range servicesToRefresh {
 		log.Debugf("Tags changed for service %s, rescheduling associated checks if any", service.GetTaggerEntity())
-		ac.processDelService(service)
+		ac.processDelService(ctx, service)
 		ac.processNewService(ctx, service)
 	}
 }
@@ -374,9 +375,11 @@ func (ac *AutoConfig) retryListenerCandidates() {
 	}
 }
 
-// AddScheduler allows to register a new scheduler to receive configurations.
+// AddScheduler a new scheduler to receive configurations.
+//
 // Previously scheduled configurations that have not subsequently been
-// unscheduled can be replayed with the replayConfigs flag.
+// unscheduled can be replayed with the replayConfigs flag.  This replay occurs
+// immediately, before the AddScheduler call returns.
 func (ac *AutoConfig) AddScheduler(name string, s scheduler.Scheduler, replayConfigs bool) {
 	ac.m.Lock()
 	defer ac.m.Unlock()
@@ -450,32 +453,36 @@ func (ac *AutoConfig) processNewService(ctx context.Context, svc listeners.Servi
 
 	changes := ac.cfgMgr.processNewService(ADIdentifiers, svc)
 
-	// FIXME: schedule new services as well
-	changes.scheduleConfig(integration.Config{
-		LogsConfig:      integration.Data{},
-		ServiceID:       svc.GetServiceID(),
-		TaggerEntity:    svc.GetTaggerEntity(),
-		MetricsExcluded: svc.HasFilter(containers.MetricsFilter),
-		LogsExcluded:    svc.HasFilter(containers.LogsFilter),
-	})
+	if !util.CcaInAD() {
+		// schedule a "service config" for logs-agent's benefit
+		changes.scheduleConfig(integration.Config{
+			LogsConfig:      integration.Data{},
+			ServiceID:       svc.GetServiceID(),
+			TaggerEntity:    svc.GetTaggerEntity(),
+			MetricsExcluded: svc.HasFilter(containers.MetricsFilter),
+			LogsExcluded:    svc.HasFilter(containers.LogsFilter),
+		})
+	}
 
 	ac.applyChanges(changes)
 }
 
 // processDelService takes a service, stops its associated checks, and updates the cache
-func (ac *AutoConfig) processDelService(svc listeners.Service) {
+func (ac *AutoConfig) processDelService(ctx context.Context, svc listeners.Service) {
 	ac.store.removeServiceForEntity(svc.GetServiceID())
-	changes := ac.cfgMgr.processDelService(svc)
+	changes := ac.cfgMgr.processDelService(ctx, svc)
 	ac.store.removeTagsHashForService(svc.GetTaggerEntity())
 
-	// FIXME: unschedule remove services as well
-	changes.unscheduleConfig(integration.Config{
-		LogsConfig:      integration.Data{},
-		ServiceID:       svc.GetServiceID(),
-		TaggerEntity:    svc.GetTaggerEntity(),
-		MetricsExcluded: svc.HasFilter(containers.MetricsFilter),
-		LogsExcluded:    svc.HasFilter(containers.LogsFilter),
-	})
+	if !util.CcaInAD() {
+		// unschedule the "service config"
+		changes.unscheduleConfig(integration.Config{
+			LogsConfig:      integration.Data{},
+			ServiceID:       svc.GetServiceID(),
+			TaggerEntity:    svc.GetTaggerEntity(),
+			MetricsExcluded: svc.HasFilter(containers.MetricsFilter),
+			LogsExcluded:    svc.HasFilter(containers.LogsFilter),
+		})
+	}
 
 	ac.applyChanges(changes)
 }
@@ -498,9 +505,34 @@ func (ac *AutoConfig) GetAutodiscoveryErrors() map[string]map[string]providers.E
 // applyChanges applies a configChanges object. This always unschedules first.
 func (ac *AutoConfig) applyChanges(changes configChanges) {
 	if len(changes.unschedule) > 0 {
+		for _, conf := range changes.unschedule {
+			telemetry.ScheduledConfigs.Dec(conf.Provider, configType(conf))
+		}
+
 		ac.scheduler.Unschedule(changes.unschedule)
 	}
+
 	if len(changes.schedule) > 0 {
+		for _, conf := range changes.schedule {
+			telemetry.ScheduledConfigs.Inc(conf.Provider, configType(conf))
+		}
+
 		ac.scheduler.Schedule(changes.schedule)
 	}
+}
+
+func configType(c integration.Config) string {
+	if c.IsLogConfig() {
+		return "logs"
+	}
+
+	if c.IsCheckConfig() {
+		return "check"
+	}
+
+	if c.ClusterCheck {
+		return "clustercheck"
+	}
+
+	return "unknown"
 }

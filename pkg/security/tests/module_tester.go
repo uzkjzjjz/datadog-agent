@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -34,12 +35,12 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
 	"github.com/oliveagle/jsonpath"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 
 	sysconfig "github.com/DataDog/datadog-agent/cmd/system-probe/config"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/DataDog/datadog-agent/pkg/security/api"
 	"github.com/DataDog/datadog-agent/pkg/security/config"
 	"github.com/DataDog/datadog-agent/pkg/security/ebpf/kernel"
 	"github.com/DataDog/datadog-agent/pkg/security/module"
@@ -80,8 +81,12 @@ runtime_security_config:
     - "*custom*"
   socket: /tmp/test-security-probe.sock
   flush_discarder_window: 0
-{{if .EnableNetwork}}
   network:
+    enabled: true
+{{if .EnableActivityDump}}
+  activity_dump:
+    syscall_monitor:
+      enabled: true
     enabled: true
 {{end}}
   load_controller:
@@ -149,7 +154,9 @@ var (
 )
 
 const (
-	HostEnvironment   = "host"
+	// HostEnvironment for the Host environment
+	HostEnvironment = "host"
+	// DockerEnvironment for the docker container environment
 	DockerEnvironment = "docker"
 )
 
@@ -157,7 +164,7 @@ type testOpts struct {
 	testDir                     string
 	disableFilters              bool
 	disableApprovers            bool
-	enableNetwork               bool
+	enableActivityDump          bool
 	disableDiscarders           bool
 	eventsCountThreshold        int
 	reuseProbeHandler           bool
@@ -177,7 +184,7 @@ func (s *stringSlice) Set(value string) error {
 func (to testOpts) Equal(opts testOpts) bool {
 	return to.testDir == opts.testDir &&
 		to.disableApprovers == opts.disableApprovers &&
-		to.enableNetwork == opts.enableNetwork &&
+		to.enableActivityDump == opts.enableActivityDump &&
 		to.disableDiscarders == opts.disableDiscarders &&
 		to.disableFilters == opts.disableFilters &&
 		to.eventsCountThreshold == opts.eventsCountThreshold &&
@@ -554,7 +561,7 @@ func genTestConfig(dir string, opts testOpts) (*config.Config, error) {
 	if err := tmpl.Execute(buffer, map[string]interface{}{
 		"TestPoliciesDir":             dir,
 		"DisableApprovers":            opts.disableApprovers,
-		"EnableNetwork":               opts.enableNetwork,
+		"EnableActivityDump":          opts.enableActivityDump,
 		"EventsCountThreshold":        opts.eventsCountThreshold,
 		"ErpcDentryResolutionEnabled": erpcDentryResolutionEnabled,
 		"MapDentryResolutionEnabled":  mapDentryResolutionEnabled,
@@ -577,11 +584,11 @@ func genTestConfig(dir string, opts testOpts) (*config.Config, error) {
 
 	agentConfig, err := sysconfig.New(sysprobeConfig.Name())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load config")
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 	config, err := config.NewConfig(agentConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load config")
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	config.ERPCDentryResolutionEnabled = !opts.disableERPCDentryResolution
@@ -595,7 +602,7 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 		return nil, err
 	}
 
-	st, err := newSimpleTest(macroDefs, ruleDefs, opts.testDir)
+	st, err := newSimpleTest(t, macroDefs, ruleDefs, opts.testDir)
 	if err != nil {
 		return nil, err
 	}
@@ -652,7 +659,7 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 
 	mod, err := module.NewModule(config, module.Opts{StatsdClient: statsdClient})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create module")
+		return nil, fmt.Errorf("failed to create module: %w", err)
 	}
 
 	if opts.disableApprovers {
@@ -679,13 +686,13 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 	})
 
 	if err := testMod.module.Init(); err != nil {
-		return nil, errors.Wrap(err, "failed to init module")
+		return nil, fmt.Errorf("failed to init module: %w", err)
 	}
 
 	testMod.probe.AddEventHandler(model.UnknownEventType, testMod.probeHandler)
 
 	if err := testMod.module.Start(); err != nil {
-		return nil, errors.Wrap(err, "failed to start module")
+		return nil, fmt.Errorf("failed to start module: %w", err)
 	}
 
 	if loadErr.ErrorOrNil() != nil {
@@ -714,7 +721,7 @@ func (tm *testModule) reloadConfiguration() error {
 	}
 
 	if err := tm.module.LoadPolicies([]rules.PolicyProvider{provider}, true); err != nil {
-		return errors.Wrap(err, "failed to reload test module")
+		return fmt.Errorf("failed to reload test module: %w", err)
 	}
 
 	return nil
@@ -817,10 +824,10 @@ func GetStatusMetrics(probe *sprobe.Probe) string {
 
 	for i := model.UnknownEventType + 1; i < model.MaxKernelEventType; i++ {
 		stats, kernelStats := perfBufferMonitor.GetEventStats(i, "events", -1)
-		if stats.Count == 0 && kernelStats.Count == 0 && kernelStats.Lost == 0 {
+		if stats.Count.Load() == 0 && kernelStats.Count.Load() == 0 && kernelStats.Lost.Load() == 0 {
 			continue
 		}
-		status.WriteString(fmt.Sprintf(", %s user:%d kernel:%d lost:%d", i, stats.Count, kernelStats.Count, kernelStats.Lost))
+		status.WriteString(fmt.Sprintf(", %s user:%d kernel:%d lost:%d", i, stats.Count.Load(), kernelStats.Count.Load(), kernelStats.Lost.Load()))
 	}
 
 	return status.String()
@@ -1157,7 +1164,6 @@ func (tm *testModule) startTracing() (*tracePipeLogger, error) {
 }
 
 func (tm *testModule) cleanup() {
-	tm.st.Close()
 	tm.module.Close()
 }
 
@@ -1212,14 +1218,7 @@ func swapLogLevel(logLevel seelog.LogLevel) (seelog.LogLevel, error) {
 }
 
 type simpleTest struct {
-	root     string
-	toRemove bool
-}
-
-func (t *simpleTest) Close() {
-	if t.toRemove {
-		os.RemoveAll(t.root)
-	}
+	root string
 }
 
 func (t *simpleTest) Root() string {
@@ -1272,20 +1271,21 @@ func (t *simpleTest) load(macros []*rules.MacroDefinition, rules []*rules.RuleDe
 	return nil
 }
 
-func newSimpleTest(macros []*rules.MacroDefinition, rules []*rules.RuleDefinition, testDir string) (*simpleTest, error) {
-	var err error
-
+func newSimpleTest(tb testing.TB, macros []*rules.MacroDefinition, rules []*rules.RuleDefinition, testDir string) (*simpleTest, error) {
 	t := &simpleTest{
 		root: testDir,
 	}
 
 	if testDir == "" {
-		t.root, err = os.MkdirTemp("", "test-secagent-root")
-		if err != nil {
+		t.root = tb.TempDir()
+
+		targetFileMode := fs.FileMode(0o711)
+
+		// chmod the root and its parent since TempDir returns a 2-layers directory `/tmp/TestNameXXXX/NNN/`
+		if err := os.Chmod(t.root, targetFileMode); err != nil {
 			return nil, err
 		}
-		t.toRemove = true
-		if err := os.Chmod(t.root, 0o711); err != nil {
+		if err := os.Chmod(filepath.Dir(t.root), targetFileMode); err != nil {
 			return nil, err
 		}
 	}
@@ -1343,13 +1343,7 @@ func waitForOpenProbeEvent(test *testModule, action func() error, filename strin
 	return waitForProbeEvent(test, action, "open.file.path", filename, model.FileOpenEventType)
 }
 
-func TestEnv(t *testing.T) {
-	if testEnvironment != "" && testEnvironment != HostEnvironment && testEnvironment != DockerEnvironment {
-		t.Error("invalid environment")
-		return
-	}
-}
-
+// TestMain is the entry points for functional tests
 func TestMain(m *testing.M) {
 	flag.Parse()
 	retCode := m.Run()
@@ -1372,17 +1366,6 @@ func init() {
 	testSuitePid = uint32(utils.Getpid())
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-// randStringRunes returns a random string of the requested size
-func randStringRunes(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
-
 //nolint:deadcode,unused
 func checkKernelCompatibility(t *testing.T, why string, skipCheck func(kv *kernel.Version) bool) {
 	t.Helper()
@@ -1395,4 +1378,70 @@ func checkKernelCompatibility(t *testing.T, why string, skipCheck func(kv *kerne
 	if skipCheck(kv) {
 		t.Skipf("kernel version not supported: %s", why)
 	}
+}
+
+func (tm *testModule) StartActivityDumpComm(t *testing.T, comm string, outputDir string, formats []string) ([]string, error) {
+	monitor := tm.probe.GetMonitor()
+	if monitor == nil {
+		return nil, errors.New("No monitor")
+	}
+	p := &api.ActivityDumpParams{
+		Comm:              comm,
+		Timeout:           1,
+		DifferentiateArgs: true,
+		Storage: &api.StorageRequestParams{
+			LocalStorageDirectory:    outputDir,
+			LocalStorageFormats:      formats,
+			LocalStorageCompression:  false,
+			RemoteStorageFormats:     []string{},
+			RemoteStorageCompression: false,
+		},
+	}
+	mess, err := monitor.DumpActivity(p)
+	if err != nil || mess == nil || len(mess.Storage) < 1 {
+		t.Errorf("failed to start activity dump: %s", err)
+		return nil, err
+	}
+
+	var files []string
+	for _, s := range mess.Storage {
+		files = append(files, s.File)
+	}
+	return files, nil
+}
+
+func (tm *testModule) StopActivityDumpComm(t *testing.T, comm string) error {
+	monitor := tm.probe.GetMonitor()
+	if monitor == nil {
+		return errors.New("No monitor")
+	}
+	p := &api.ActivityDumpStopParams{
+		Comm: comm,
+	}
+	_, err := monitor.StopActivityDump(p)
+	if err != nil {
+		t.Errorf("failed to start activity dump: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (tm *testModule) DecodeMSPActivityDump(t *testing.T, path string) (*sprobe.ActivityDump, error) {
+	monitor := tm.probe.GetMonitor()
+	if monitor == nil {
+		return nil, errors.New("No monitor")
+	}
+	adm := monitor.GetActivityDumpManager()
+	if adm == nil {
+		return nil, errors.New("No activity dump manager")
+	}
+	ad := sprobe.NewActivityDump(adm)
+	if ad == nil {
+		return nil, errors.New("Creatioln of new activity dump fails")
+	}
+	err := ad.Decode(path)
+	if err != nil {
+		return nil, err
+	}
+	return ad, nil
 }

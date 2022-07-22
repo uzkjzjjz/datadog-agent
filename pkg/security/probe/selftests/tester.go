@@ -9,8 +9,9 @@
 package selftests
 
 import (
+	"errors"
+	"fmt"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/security/api"
@@ -19,7 +20,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 )
 
 const (
@@ -32,7 +33,7 @@ const (
 // EventPredicate defines a self test event validation predicate
 type EventPredicate func(event selfTestEvent) bool
 
-// SelfTestFunction represent one self test, with its ID and func
+// FileSelfTest represent one self test, with its ID and func
 type FileSelfTest interface {
 	GetRuleDefinition(filename string) *rules.RuleDefinition
 	GenerateEvent(filename string) (EventPredicate, error)
@@ -47,7 +48,7 @@ var FileSelfTests = []FileSelfTest{
 
 // SelfTester represents all the state needed to conduct rule injection test at startup
 type SelfTester struct {
-	waitingForEvent uint32 // atomic bool
+	waitingForEvent *atomic.Bool
 	eventChan       chan selfTestEvent
 	success         []string
 	fails           []string
@@ -58,10 +59,13 @@ type SelfTester struct {
 	targetTempDir  string
 }
 
+var _ rules.PolicyProvider = (*SelfTester)(nil)
+
 // NewSelfTester returns a new SelfTester, enabled or not
 func NewSelfTester() (*SelfTester, error) {
 	s := &SelfTester{
-		eventChan: make(chan selfTestEvent, 10),
+		waitingForEvent: atomic.NewBool(false),
+		eventChan:       make(chan selfTestEvent, 10),
 	}
 
 	if err := s.createTargetFile(); err != nil {
@@ -80,8 +84,8 @@ func (t *SelfTester) GetStatus() *api.SelfTestsStatus {
 	}
 }
 
-// LoadPolicy implements the PolicyProvider interface
-func (t *SelfTester) LoadPolicies() ([]*rules.Policy, *multierror.Error) {
+// LoadPolicies implements the PolicyProvider interface
+func (t *SelfTester) LoadPolicies(filters []rules.RuleFilter) ([]*rules.Policy, *multierror.Error) {
 	p := &rules.Policy{
 		Name:    policyName,
 		Source:  policySource,
@@ -95,7 +99,7 @@ func (t *SelfTester) LoadPolicies() ([]*rules.Policy, *multierror.Error) {
 	return []*rules.Policy{p}, nil
 }
 
-// SetOnPolicyChangedCb implements the PolicyProvider interface
+// SetOnNewPoliciesReadyCb implements the PolicyProvider interface
 func (t *SelfTester) SetOnNewPoliciesReadyCb(cb func()) {
 }
 
@@ -120,7 +124,7 @@ func (t *SelfTester) createTargetFile() error {
 // RunSelfTest runs the self test and return the result
 func (t *SelfTester) RunSelfTest() ([]string, []string, error) {
 	if err := t.BeginWaitingForEvent(); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to run self test")
+		return nil, nil, fmt.Errorf("failed to run self test: %w", err)
 	}
 	defer t.EndWaitingForEvent()
 
@@ -154,17 +158,22 @@ func (t *SelfTester) RunSelfTest() ([]string, []string, error) {
 	return success, fails, nil
 }
 
-// Cleanup removes temp directories and files used by the self tester
-func (t *SelfTester) Cleanup() error {
+// Start starts the self tester policy provider
+func (t *SelfTester) Start() {}
+
+// Close removes temp directories and files used by the self tester
+func (t *SelfTester) Close() error {
 	if t.targetTempDir != "" {
-		return os.RemoveAll(t.targetTempDir)
+		err := os.RemoveAll(t.targetTempDir)
+		t.targetTempDir = ""
+		return err
 	}
 	return nil
 }
 
 // BeginWaitingForEvent passes the tester in the waiting for event state
 func (t *SelfTester) BeginWaitingForEvent() error {
-	if atomic.SwapUint32(&t.waitingForEvent, 1) != 0 {
+	if t.waitingForEvent.Swap(true) {
 		return errors.New("a self test is already running")
 	}
 	return nil
@@ -172,7 +181,7 @@ func (t *SelfTester) BeginWaitingForEvent() error {
 
 // EndWaitingForEvent exits the waiting for event state
 func (t *SelfTester) EndWaitingForEvent() {
-	atomic.StoreUint32(&t.waitingForEvent, 0)
+	t.waitingForEvent.Store(false)
 }
 
 type selfTestEvent struct {
@@ -182,7 +191,7 @@ type selfTestEvent struct {
 
 // IsExpectedEvent sends an event to the tester
 func (t *SelfTester) IsExpectedEvent(rule *rules.Rule, event eval.Event) bool {
-	if atomic.LoadUint32(&t.waitingForEvent) != 0 && rule.Definition.Policy.Source == policySource {
+	if t.waitingForEvent.Load() && rule.Definition.Policy.Source == policySource {
 		ev, ok := event.(*probe.Event)
 		if !ok {
 			return true

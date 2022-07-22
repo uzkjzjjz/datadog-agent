@@ -60,6 +60,9 @@ func (c *ContainerCheck) Name() string { return config.ContainerCheckName }
 // RealTime indicates if this check only runs in real-time mode.
 func (c *ContainerCheck) RealTime() bool { return false }
 
+// ShouldSaveLastRun indicates if the output from the last run should be saved for use in flares
+func (c *ContainerCheck) ShouldSaveLastRun() bool { return true }
+
 // Run runs the ContainerCheck to collect a list of running ctrList and the
 // stats for each container.
 func (c *ContainerCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageBody, error) {
@@ -109,6 +112,9 @@ func (c *ContainerCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.Me
 	log.Debugf("collected %d containers in %s", int(numContainers), time.Now().Sub(startTime))
 	return messages, nil
 }
+
+// Cleanup frees any resource held by the ContainerCheck before the agent exits
+func (c *ContainerCheck) Cleanup() {}
 
 // chunkContainers formats and chunks the ctrList into a slice of chunks using a specific number of chunks.
 func chunkContainers(containers []*model.Container, chunks int) [][]*model.Container {

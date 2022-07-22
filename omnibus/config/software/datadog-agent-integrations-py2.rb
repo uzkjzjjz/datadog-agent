@@ -133,7 +133,7 @@ build do
     # Prepare the build env, these dependencies are only needed to build and
     # install the core integrations.
     #
-    command "#{pip} download --dest #{build_deps_dir} hatchling==0.25.0"
+    command "#{pip} download --dest #{build_deps_dir} hatchling==0.25.1"
     command "#{pip} download --dest #{build_deps_dir} setuptools==40.9.0" # Version from ./setuptools2.rb
     command "#{pip} install wheel==0.34.1"
     command "#{pip} install setuptools-scm==5.0.2" # Pin to the last version that supports Python 2
@@ -264,7 +264,17 @@ build do
       File.exist?(manifest_file_path) || next
 
       manifest = JSON.parse(File.read(manifest_file_path))
-      manifest['supported_os'].include?(os) || next
+      if manifest.key?("supported_os")
+        manifest["supported_os"].include?(os) || next
+      else
+        if os == "mac_os"
+          tag = "Supported OS::macOS"
+        else
+          tag = "Supported OS::#{os.capitalize}"
+        end
+
+        manifest["tile"]["classifier_tags"].include?(tag) || next
+      end
 
       File.file?("#{check_dir}/setup.py") || File.file?("#{check_dir}/pyproject.toml") || next
       # Check if it supports Python 2.

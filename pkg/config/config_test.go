@@ -118,6 +118,70 @@ api_key: fakeapikey
 	assert.Equal(t, "https://external-agent.datadoghq.eu", externalAgentURL)
 }
 
+func TestUnexpectedUnicode(t *testing.T) {
+	keyYaml := "api_\u202akey: fakeapikey\n"
+	valueYaml := "api_key: fa\u202akeapikey\n"
+
+	testConfig := setupConfFromYAML(keyYaml)
+
+	warnings := findUnexpectedUnicode(testConfig)
+	require.Len(t, warnings, 1)
+
+	assert.Contains(t, warnings[0], "Configuration key string")
+	assert.Contains(t, warnings[0], "U+202A")
+
+	testConfig = setupConfFromYAML(valueYaml)
+
+	warnings = findUnexpectedUnicode(testConfig)
+
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "For key 'api_key'")
+	assert.Contains(t, warnings[0], "U+202A")
+}
+
+func TestUnexpectedNestedUnicode(t *testing.T) {
+	yaml := "runtime_security_config:\n  activity_dump:\n    remote_storage:\n      endpoints:\n        logs_dd_url: \"http://\u202adatadawg.com\""
+	testConfig := setupConfFromYAML(yaml)
+
+	warnings := findUnexpectedUnicode(testConfig)
+	require.Len(t, warnings, 1)
+
+	assert.Contains(t, warnings[0], "U+202A")
+	assert.Contains(t, warnings[0], "For key 'runtime_security_config.activity_dump.remote_storage.endpoints.logs_dd_url'")
+}
+
+func TestUnexpectedWhitespace(t *testing.T) {
+	tests := []struct {
+		yaml                string
+		expectedWarningText string
+		expectedPosition    string
+	}{
+		{
+			yaml:                "root_element:\n  nestedKey: \"hiddenI\u200bnvalidWhitespaceEmbedded\n\"",
+			expectedWarningText: "U+200B",
+			expectedPosition:    fmt.Sprintf("position %d", 7),
+		},
+		{
+			yaml:                "root_element:\n  nestedKey: \u202fhiddenInvalidWhitespaceToLeft\n",
+			expectedWarningText: "U+202F",
+			expectedPosition:    fmt.Sprintf("position %d", 0),
+		},
+		{
+			yaml:                "root_element:\n  nestedKey: [validValue, \u202fhiddenInvalidWhitespaceToLeft]\n",
+			expectedWarningText: "U+202F",
+			expectedPosition:    fmt.Sprintf("position %d", 0),
+		},
+	}
+	for _, tc := range tests {
+		testConfig := setupConfFromYAML(tc.yaml)
+		warnings := findUnexpectedUnicode(testConfig)
+		require.Len(t, warnings, 1)
+
+		assert.Contains(t, warnings[0], tc.expectedPosition)
+		assert.Contains(t, warnings[0], tc.expectedPosition)
+	}
+}
+
 func TestUnknownKeysWarning(t *testing.T) {
 	yamlBase := `
 site: datadoghq.eu
@@ -144,7 +208,7 @@ func TestUnknownVarsWarning(t *testing.T) {
 			if unknown {
 				exp = append(exp, v)
 			}
-			assert.Equal(t, exp, findUnknownEnvVars(Mock(), env))
+			assert.Equal(t, exp, findUnknownEnvVars(Mock(t), env))
 		}
 	}
 	t.Run("DD_API_KEY", test("DD_API_KEY", false))
@@ -1094,23 +1158,23 @@ network_devices:
 }
 
 func TestGetInventoriesMinInterval(t *testing.T) {
-	Mock().Set("inventories_min_interval", 6)
+	Mock(t).Set("inventories_min_interval", 6)
 	assert.EqualValues(t, 6*time.Second, GetInventoriesMinInterval())
 }
 
 func TestGetInventoriesMinIntervalInvalid(t *testing.T) {
 	// an invalid integer results in a value of 0 from Viper (with a logged warning)
-	Mock().Set("inventories_min_interval", 0)
+	Mock(t).Set("inventories_min_interval", 0)
 	assert.EqualValues(t, DefaultInventoriesMinInterval*time.Second, GetInventoriesMinInterval())
 }
 
 func TestGetInventoriesMaxInterval(t *testing.T) {
-	Mock().Set("inventories_max_interval", 6)
+	Mock(t).Set("inventories_max_interval", 6)
 	assert.EqualValues(t, 6*time.Second, GetInventoriesMaxInterval())
 }
 
 func TestGetInventoriesMaxIntervalInvalid(t *testing.T) {
 	// an invalid integer results in a value of 0 from Viper (with a logged warning)
-	Mock().Set("inventories_max_interval", 0)
+	Mock(t).Set("inventories_max_interval", 0)
 	assert.EqualValues(t, DefaultInventoriesMaxInterval*time.Second, GetInventoriesMaxInterval())
 }

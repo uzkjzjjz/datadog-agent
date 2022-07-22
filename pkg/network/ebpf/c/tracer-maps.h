@@ -102,7 +102,7 @@ struct bpf_map_def SEC("maps/udpv6_recv_sock") udpv6_recv_sock = {
 struct bpf_map_def SEC("maps/port_bindings") port_bindings = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(port_binding_t),
-    .value_size = sizeof(__u8),
+    .value_size = sizeof(__u32),
     .max_entries = 0, // This will get overridden at runtime using max_tracked_connections
     .pinning = 0,
     .namespace = "",
@@ -115,7 +115,7 @@ struct bpf_map_def SEC("maps/port_bindings") port_bindings = {
 struct bpf_map_def SEC("maps/udp_port_bindings") udp_port_bindings = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(port_binding_t),
-    .value_size = sizeof(__u8),
+    .value_size = sizeof(__u32),
     .max_entries = 0, // This will get overridden at runtime using max_tracked_connections
     .pinning = 0,
     .namespace = "",
@@ -157,6 +157,17 @@ struct bpf_map_def SEC("maps/do_sendfile_args") do_sendfile_args = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(__u64),
     .value_size = sizeof(struct sock*),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
+// Used to store ip(6)_make_skb args to be used in the
+// corresponding kretprobes
+struct bpf_map_def SEC("maps/ip_make_skb_args") ip_make_skb_args = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(__u64),
+    .value_size = sizeof(ip_make_skb_args_t),
     .max_entries = 1024,
     .pinning = 0,
     .namespace = "",

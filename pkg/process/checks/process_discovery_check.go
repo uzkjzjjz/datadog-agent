@@ -43,6 +43,9 @@ func (d *ProcessDiscoveryCheck) Name() string { return config.DiscoveryCheckName
 // RealTime returns a value that says whether this check should be run in real time.
 func (d *ProcessDiscoveryCheck) RealTime() bool { return false }
 
+// ShouldSaveLastRun indicates if the output from the last run should be saved for use in flares
+func (d *ProcessDiscoveryCheck) ShouldSaveLastRun() bool { return true }
+
 // Run collects process metadata, and packages it into a CollectorProcessDiscovery payload to be sent.
 // It is a runtime error to call Run without first having called Init.
 func (d *ProcessDiscoveryCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageBody, error) {
@@ -75,6 +78,9 @@ func (d *ProcessDiscoveryCheck) Run(cfg *config.AgentConfig, groupID int32) ([]m
 
 	return payload, nil
 }
+
+// Cleanup frees any resource held by the ProcessDiscoveryCheck before the agent exits
+func (d *ProcessDiscoveryCheck) Cleanup() {}
 
 func pidMapToProcDiscoveries(pidMap map[int32]*procutil.Process) []*model.ProcessDiscovery {
 	pd := make([]*model.ProcessDiscovery, 0, len(pidMap))

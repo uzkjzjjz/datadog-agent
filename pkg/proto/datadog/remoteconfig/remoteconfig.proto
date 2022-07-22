@@ -50,6 +50,8 @@ message LatestConfigsRequest {
   repeated string new_products = 5;
   repeated Client active_clients = 6;
   bytes backend_client_state = 10;
+  bool has_error = 11;
+  string error = 12;
 }
 
 message LatestConfigsResponse {
@@ -106,7 +108,8 @@ message ClientState {
 
 message TargetFileHash {
   string algorithm = 1;
-  bytes hash = 2;
+  reserved 2; // old hash format
+  string hash = 3;
 }
 
 message TargetFileMeta {

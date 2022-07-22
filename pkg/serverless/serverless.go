@@ -121,6 +121,7 @@ func ReportInitError(id registration.ID, errorEnum ErrorEnum) error {
 		return fmt.Errorf("ReportInitError: while POST init error route: %s", err)
 	}
 
+	defer response.Body.Close()
 	if response.StatusCode >= 300 {
 		return fmt.Errorf("ReportInitError: received an HTTP %s", response.Status)
 	}
@@ -184,6 +185,7 @@ func callInvocationHandler(daemon *daemon.Daemon, arn string, deadlineMs int64, 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	doneChannel := make(chan bool)
+	daemon.TellDaemonRuntimeStarted()
 	go invocationHandler(doneChannel, daemon, arn, requestID)
 	select {
 	case <-ctx.Done():
@@ -201,7 +203,6 @@ func callInvocationHandler(daemon *daemon.Daemon, arn string, deadlineMs int64, 
 }
 
 func handleInvocation(doneChannel chan bool, daemon *daemon.Daemon, arn string, requestID string) {
-	daemon.TellDaemonRuntimeStarted()
 	log.Debug("Received invocation event...")
 	daemon.ExecutionContext.SetFromInvocation(arn, requestID)
 	daemon.ComputeGlobalTags(config.GetConfiguredTags(true))

@@ -6,15 +6,15 @@
 package rules
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
-// Policy represents a policy file definition
+// PolicyDef represents a policy file definition
 type PolicyDef struct {
 	Version string             `yaml:"version"`
 	Rules   []*RuleDefinition  `yaml:"rules"`
@@ -41,7 +41,7 @@ func (p *Policy) AddRule(def *RuleDefinition) {
 	p.Rules = append(p.Rules, def)
 }
 
-func parsePolicyDef(name string, source string, def *PolicyDef) (*Policy, *multierror.Error) {
+func parsePolicyDef(name string, source string, def *PolicyDef, filters []RuleFilter) (*Policy, *multierror.Error) {
 	var errs *multierror.Error
 
 	policy := &Policy{
@@ -63,7 +63,14 @@ func parsePolicyDef(name string, source string, def *PolicyDef) (*Policy, *multi
 		policy.AddMacro(macroDef)
 	}
 
+LOOP:
 	for _, ruleDef := range def.Rules {
+		for _, filter := range filters {
+			if !filter.IsAccepted(ruleDef) {
+				continue LOOP
+			}
+		}
+
 		if ruleDef.ID == "" {
 			errs = multierror.Append(errs, &ErrRuleLoad{Definition: ruleDef, Err: fmt.Errorf("no ID defined for rule with expression `%s`", ruleDef.Expression)})
 			continue
@@ -85,7 +92,7 @@ func parsePolicyDef(name string, source string, def *PolicyDef) (*Policy, *multi
 }
 
 // LoadPolicy load a policy
-func LoadPolicy(name string, source string, reader io.Reader) (*Policy, error) {
+func LoadPolicy(name string, source string, reader io.Reader, filters []RuleFilter) (*Policy, error) {
 	var def PolicyDef
 
 	decoder := yaml.NewDecoder(reader)
@@ -93,7 +100,7 @@ func LoadPolicy(name string, source string, reader io.Reader) (*Policy, error) {
 		return nil, &ErrPolicyLoad{Name: name, Err: err}
 	}
 
-	policy, errs := parsePolicyDef(name, source, &def)
+	policy, errs := parsePolicyDef(name, source, &def, filters)
 	if errs.ErrorOrNil() != nil {
 		return nil, errs.ErrorOrNil()
 	}

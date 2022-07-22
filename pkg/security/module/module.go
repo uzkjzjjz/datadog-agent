@@ -11,6 +11,7 @@ package module
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/DataDog/datadog-go/v5/statsd"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
@@ -37,6 +37,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
+	"github.com/DataDog/datadog-agent/pkg/security/utils"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/version"
 )
@@ -70,8 +71,9 @@ type Module struct {
 	policiesVersions []string
 	policyProviders  []rules.PolicyProvider
 	policyLoader     *rules.PolicyLoader
-	rcPolicyProvider *rconfig.RCPolicyProvider
+	policyOpts       rules.PolicyLoaderOpts
 	selfTester       *selftests.SelfTester
+	policyMonitor    *PolicyMonitor
 }
 
 // Register the runtime security agent module
@@ -90,10 +92,10 @@ func (m *Module) Init() error {
 
 	ln, err := net.Listen("unix", m.config.SocketPath)
 	if err != nil {
-		return errors.Wrap(err, "unable to register security runtime module")
+		return fmt.Errorf("unable to register security runtime module: %w", err)
 	}
 	if err := os.Chmod(m.config.SocketPath, 0700); err != nil {
-		return errors.Wrap(err, "unable to register security runtime module")
+		return fmt.Errorf("unable to register security runtime module: %w", err)
 	}
 
 	m.listener = ln
@@ -110,7 +112,11 @@ func (m *Module) Init() error {
 	// start api server
 	m.apiServer.Start(m.ctx)
 
+	// monitor policies
+	m.policyMonitor.Start(m.ctx)
+
 	m.probe.AddEventHandler(model.UnknownEventType, m)
+	m.probe.AddActivityDumpHandler(m)
 
 	// initialize extra event monitors
 	if m.config.EventMonitoring {
@@ -120,7 +126,7 @@ func (m *Module) Init() error {
 	// initialize the eBPF manager and load the programs and maps in the kernel. At this stage, the probes are not
 	// running yet.
 	if err := m.probe.Init(); err != nil {
-		return errors.Wrap(err, "failed to init probe")
+		return fmt.Errorf("failed to init probe: %w", err)
 	}
 
 	// policy loader
@@ -133,7 +139,7 @@ func (m *Module) Init() error {
 func (m *Module) Start() error {
 	// setup the manager and its probes / perf maps
 	if err := m.probe.Setup(); err != nil {
-		return errors.Wrap(err, "failed to setup probe")
+		return fmt.Errorf("failed to setup probe: %w", err)
 	}
 
 	// fetch the current state of the system (example: mount points, running processes, ...) so that our user space
@@ -142,7 +148,9 @@ func (m *Module) Start() error {
 		return err
 	}
 
-	m.probe.Start()
+	if err := m.probe.Start(); err != nil {
+		return err
+	}
 
 	// runtime security is disabled but might be used by other component like process
 	if !m.config.IsEnabled() {
@@ -155,6 +163,19 @@ func (m *Module) Start() error {
 
 	var policyProviders []rules.PolicyProvider
 
+	agentVersion, err := utils.GetAgentSemverVersion()
+	if err != nil {
+		log.Errorf("failed to parse agent version: %v", err)
+	}
+
+	m.policyOpts = rules.PolicyLoaderOpts{
+		RuleFilters: []rules.RuleFilter{
+			&rules.AgentVersionFilter{
+				Version: agentVersion,
+			},
+		},
+	}
+
 	// directory policy provider
 	if provider, err := rules.NewPoliciesDirProvider(m.config.PoliciesDir, m.config.WatchPoliciesDir); err != nil {
 		log.Errorf("failed to load policies: %s", err)
@@ -163,13 +184,12 @@ func (m *Module) Start() error {
 	}
 
 	// add remote config as config provider if enabled
-	var err error
 	if m.config.RemoteConfigurationEnabled {
-		m.rcPolicyProvider, err = rconfig.NewRCPolicyProvider("security-agent")
+		rcPolicyProvider, err := rconfig.NewRCPolicyProvider("security-agent", agentVersion)
 		if err != nil {
 			log.Errorf("will be unable to load remote policy: %s", err)
 		} else {
-			policyProviders = append(policyProviders, m.rcPolicyProvider)
+			policyProviders = append(policyProviders, rcPolicyProvider)
 		}
 	}
 
@@ -204,9 +224,8 @@ func (m *Module) Start() error {
 		}
 	}()
 
-	// start remote config if needed
-	if m.rcPolicyProvider != nil {
-		m.rcPolicyProvider.Start()
+	for _, provider := range m.policyProviders {
+		provider.Start()
 	}
 
 	return nil
@@ -297,14 +316,17 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 		probeVariables[name] = value
 	}
 
-	var opts rules.Opts
-	opts.
+	var evalOpts eval.Opts
+	evalOpts.
 		WithConstants(model.SECLConstants).
 		WithVariables(probeVariables).
+		WithLegacyFields(model.SECLLegacyFields)
+
+	var opts rules.Opts
+	opts.
 		WithSupportedDiscarders(sprobe.SupportedDiscarders).
 		WithEventTypeEnabled(m.getEventTypeEnabled()).
 		WithReservedRuleIDs(sprobe.AllCustomRuleIDs()).
-		WithLegacyFields(model.SECLLegacyFields).
 		WithStateScopes(map[rules.Scope]rules.VariableProviderFactory{
 			"process": func() rules.VariableProvider {
 				return eval.NewScopedVariables(func(ctx *eval.Context) unsafe.Pointer {
@@ -316,22 +338,22 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 
 	// approver ruleset
 	model := &model.Model{}
-	approverRuleSet := rules.NewRuleSet(model, model.NewEvent, &opts)
+	approverRuleSet := rules.NewRuleSet(model, model.NewEvent, &opts, &evalOpts, &eval.MacroStore{})
 
 	// switch SECLVariables to use the real Event structure and not the mock model.Event one
-	opts.WithVariables(sprobe.SECLVariables)
+	evalOpts.WithVariables(sprobe.SECLVariables)
 	opts.WithStateScopes(map[rules.Scope]rules.VariableProviderFactory{
 		"process": m.probe.GetResolvers().ProcessResolver.NewProcessVariables,
 	})
 
 	// standard ruleset
-	ruleSet := m.probe.NewRuleSet(&opts)
+	ruleSet := m.probe.NewRuleSet(&opts, &evalOpts, &eval.MacroStore{})
 
 	// load policies
 	m.policyLoader.SetProviders(policyProviders)
 
-	loadErrs := approverRuleSet.LoadPolicies(m.policyLoader)
-	loadApproversErrs := ruleSet.LoadPolicies(m.policyLoader)
+	loadErrs := approverRuleSet.LoadPolicies(m.policyLoader, m.policyOpts)
+	loadApproversErrs := ruleSet.LoadPolicies(m.policyLoader, m.policyOpts)
 
 	// non fatal error, just log
 	if loadErrs.ErrorOrNil() != nil {
@@ -379,6 +401,8 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 		monitor := m.probe.GetMonitor()
 		ruleSetLoadedReport := monitor.PrepareRuleSetLoadedReport(ruleSet, loadErrs)
 		monitor.ReportRuleSetLoaded(ruleSetLoadedReport)
+
+		m.policyMonitor.AddPolicies(ruleSet.GetPolicies())
 	}
 
 	return nil
@@ -388,9 +412,8 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 func (m *Module) Close() {
 	close(m.sigupChan)
 
-	// stop remote config provider
-	if m.rcPolicyProvider != nil {
-		m.rcPolicyProvider.Stop()
+	for _, provider := range m.policyProviders {
+		_ = provider.Close()
 	}
 
 	// close the policy loader and all the related providers
@@ -408,7 +431,7 @@ func (m *Module) Close() {
 	}
 
 	if m.selfTester != nil {
-		_ = m.selfTester.Cleanup()
+		_ = m.selfTester.Close()
 	}
 
 	m.probe.Close()
@@ -478,6 +501,11 @@ func (m *Module) SendEvent(rule *rules.Rule, event Event, extTagsCb func() []str
 	} else {
 		seclog.Tracef("Event on rule %s was dropped due to rate limiting", rule.ID)
 	}
+}
+
+// HandleActivityDump sends an activity dump to the backend
+func (m *Module) HandleActivityDump(dump *sapi.ActivityDumpStreamMessage) {
+	m.apiServer.SendActivityDump(dump)
 }
 
 func (m *Module) metricsSender() {
@@ -609,6 +637,7 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 		ctx:            ctx,
 		cancelFnc:      cancelFnc,
 		selfTester:     selfTester,
+		policyMonitor:  NewPolicyMonitor(statsdClient),
 	}
 	m.apiServer.module = m
 
@@ -623,14 +652,16 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 // RunSelfTest runs the self tests
 func (m *Module) RunSelfTest(sendLoadedReport bool) error {
 	prevProviders, providers := m.policyProviders, m.policyProviders
+	if len(prevProviders) > 0 {
+		defer func() {
+			if err := m.LoadPolicies(prevProviders, false); err != nil {
+				log.Errorf("failed to load policies: %s", err)
+			}
+		}()
+	}
 
 	// add selftests as provider
 	providers = append(providers, m.selfTester)
-	defer func() {
-		if err := m.LoadPolicies(prevProviders, false); err != nil {
-			log.Errorf("failed to load policies: %s", err)
-		}
-	}()
 
 	if err := m.LoadPolicies(providers, false); err != nil {
 		return err
