@@ -33,10 +33,10 @@ func TestLocalProviderShouldReturnEmptyList(t *testing.T) {
 
 func TestLocalProviderExpectedTags(t *testing.T) {
 	mockConfig := coreConfig.Mock(t)
-	clock := clock.NewMock()
+	mockClock := clock.NewMock()
 
 	oldStartTime := coreConfig.StartTime
-	coreConfig.StartTime = clock.Now()
+	coreConfig.StartTime = mockClock.Now()
 	defer func() {
 		coreConfig.StartTime = oldStartTime
 	}()
@@ -50,7 +50,7 @@ func TestLocalProviderExpectedTags(t *testing.T) {
 	mockConfig.Set("logs_config.expected_tags_duration", "5s")
 	defer mockConfig.Set("logs_config.expected_tags_duration", "0")
 
-	p := newLocalProviderWithClock([]string{}, clock)
+	p := newLocalProviderWithClock([]string{}, mockClock)
 	pp := p.(*localProvider)
 
 	tt := pp.GetTags()
@@ -59,7 +59,7 @@ func TestLocalProviderExpectedTags(t *testing.T) {
 	assert.Equal(t, tags, tt)
 
 	// Wait until expected expiration time
-	clock.Add(expectedTagsDuration)
+	mockClock.Add(expectedTagsDuration)
 
 	// tags should now be empty (the tags passed to newLocalProviderWithClock)
 	assert.Empty(t, pp.GetTags())
