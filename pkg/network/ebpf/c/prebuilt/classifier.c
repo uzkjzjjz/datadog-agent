@@ -34,6 +34,7 @@ static __always_inline void do_tail_call(void* ctx, int protocol) {
 
 SEC("socket/classifier_filter")
 int socket__classifier_filter(struct __sk_buff* skb) {
+    return 0;
     proto_args_t args;
     session_t new_session;
     __builtin_memset(&args, 0, sizeof(proto_args_t));
