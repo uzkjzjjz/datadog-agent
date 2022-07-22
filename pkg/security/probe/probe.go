@@ -662,7 +662,10 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		}
 
 		event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
+		log.Infof("[PID: %d] exit time before ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
+		p.resolvers.ProcessResolver.ApplyBootTime(event.ProcessCacheEntry)
 		event.Exit.Process = &event.ProcessCacheEntry.Process
+		log.Infof("[PID: %d] exit time after  ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
 	case model.SetuidEventType:
 		if _, err = event.SetUID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setuid event: %s (offset %d, len %d)", err, offset, len(data))
