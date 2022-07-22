@@ -401,14 +401,21 @@ require (
 	github.com/DataDog/aptly v1.5.0 // indirect
 	github.com/agnivade/levenshtein v1.0.1 // indirect
 	github.com/cavaliergopher/grab/v3 v3.0.1 // indirect
+	github.com/fogleman/gg v1.3.0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/libp2p/go-reuseport v0.1.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.0 // indirect
+	github.com/robfig/cron v1.2.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.5 // indirect
+	golang.org/x/image v0.0.0-20200119044424-58c23975cae1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	k8s.io/apiextensions-apiserver v0.23.5 // indirect
 )
 
-require github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.38.0-rc.3
+require (
+	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.38.0-rc.3
+	github.com/goccy/go-graphviz v0.0.9
+)
 
 // Fixing a CVE on a transitive dep of k8s/etcd, should be cleaned-up once k8s.io/apiserver dep is removed (but double-check with `go mod why` that no other dep pulls it)
 replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt v3.2.1+incompatible
