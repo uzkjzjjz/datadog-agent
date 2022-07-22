@@ -693,7 +693,7 @@ func getLinuxBinPrmPOffset(kv *kernel.Version) uint64 {
 		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
 			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
 		fallthrough
-	case kv.IsRH8Kernel() && kv.Code == kernel.Kernel4_18:
+	case kv.IsRH8Kernel():
 		offset = 280
 	}
 
@@ -716,7 +716,7 @@ func getLinuxBinPrmArgcOffset(kv *kernel.Version) uint64 {
 		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
 			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
 		fallthrough
-	case kv.IsRH8Kernel() && kv.Code == kernel.Kernel4_18:
+	case kv.IsRH8Kernel():
 		offset = 320
 	}
 
@@ -739,7 +739,7 @@ func getLinuxBinPrmEnvcOffset(kv *kernel.Version) uint64 {
 		(kv.Code.Patch() == uint8(146) || kv.Code.Patch() == uint8(152) || kv.Code.Patch() == uint8(154) ||
 			kv.Code.Patch() == uint8(158) || kv.Code.Patch() == uint8(200) || kv.Code.Patch() == uint8(203)):
 		fallthrough
-	case kv.IsRH8Kernel() && kv.Code == kernel.Kernel4_18:
+	case kv.IsRH8Kernel():
 		offset = 324
 	}
 
