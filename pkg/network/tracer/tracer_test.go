@@ -527,6 +527,7 @@ func TestTCPConnsReported(t *testing.T) {
 	c, err := net.DialTimeout("tcp", server.address, 50*time.Millisecond)
 	require.NoError(t, err)
 	defer c.Close()
+	<-processedChan
 
 	// Test
 	initTracerState(t, tr)
