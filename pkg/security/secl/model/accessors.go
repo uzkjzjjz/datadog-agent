@@ -10311,508 +10311,554 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.Open.SyscallEvent.Retval), nil
 	case "process.ancestors.args":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Args
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.args_flags":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.args_options":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.args_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ArgsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.argv":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.argv0":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv0
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.cap_effective":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapEffective)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.cap_permitted":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapPermitted)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.comm":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Comm
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.container.id":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ContainerID
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.cookie":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Cookie)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.created_at":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.CreatedAt)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.egid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.egroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.envp":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envp
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.envs":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envs
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.envs_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.EnvsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.euid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.euser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.change_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.CTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.filesystem":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.Filesystem
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.in_upper_layer":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.InUpperLayer
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.inode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Inode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.mode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.modification_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.mount_id":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MountID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.BasenameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.path":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.PathnameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.rights":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.file.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.fsgid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.fsgroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.fsuid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.fsuser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.is_thread":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.IsThread
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.pid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Pid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.ppid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PPid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.tid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Tid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.tty_name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.TTYName
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.ancestors.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "process.args":
@@ -10913,508 +10959,554 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.PTrace.SyscallEvent.Retval), nil
 	case "ptrace.tracee.ancestors.args":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Args
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.args_flags":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.args_options":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.args_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ArgsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.argv":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.argv0":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv0
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.cap_effective":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapEffective)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.cap_permitted":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapPermitted)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.comm":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Comm
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.container.id":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ContainerID
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.cookie":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Cookie)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.created_at":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.CreatedAt)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.egid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.egroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.envp":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envp
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.envs":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envs
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.envs_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.EnvsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.euid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.euser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.change_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.CTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.filesystem":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.Filesystem
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.in_upper_layer":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.InUpperLayer
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.inode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Inode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.mode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.modification_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.mount_id":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MountID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.BasenameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.path":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.PathnameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.rights":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.file.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.fsgid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.fsgroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.fsuid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.fsuser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.is_thread":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.IsThread
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.pid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Pid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.ppid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PPid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.tid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Tid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.tty_name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.TTYName
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.ancestors.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "ptrace.tracee.args":
@@ -11703,508 +11795,554 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(e.Signal.SyscallEvent.Retval), nil
 	case "signal.target.ancestors.args":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Args
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.args_flags":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.args_options":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.args_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ArgsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.argv":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.argv0":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Argv0
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.cap_effective":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapEffective)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.cap_permitted":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.CapPermitted)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.comm":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Comm
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.container.id":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.ContainerID
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.cookie":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Cookie)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.created_at":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.CreatedAt)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.egid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.egroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.envp":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envp
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.envs":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Envs
 			values = append(values, result...)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.envs_truncated":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.EnvsTruncated
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.euid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.EUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.euser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.EUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.change_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.CTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.filesystem":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.Filesystem
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.in_upper_layer":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.InUpperLayer
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.inode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Inode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.mode":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.modification_time":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MTime)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.mount_id":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.MountID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.BasenameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.path":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.PathnameStr
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.rights":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.Mode)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.FileEvent.FileFields.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.file.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.FileEvent.FileFields.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.fsgid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSGID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.fsgroup":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSGroup
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.fsuid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.FSUID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.fsuser":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.FSUser
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.gid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.GID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.group":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.Group
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.is_thread":
 		var values []bool
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.IsThread
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.pid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Pid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.ppid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PPid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.tid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.PIDContext.Tid)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.tty_name":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.TTYName
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.uid":
 		var values []int
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := int(element.ProcessContext.Process.Credentials.UID)
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.ancestors.user":
 		var values []string
+		event := GetEvent(&eval.Context{Event: e})
 		iterator := &ProcessAncestorsIterator{}
-		ptr := iterator.Front(ctx)
-		for ptr != nil {
-			element := (*ProcessCacheEntry)(ptr)
+		value := iterator.Front(event)
+		for value != nil {
+			element := value.(*ProcessCacheEntry)
 			result := element.ProcessContext.Process.Credentials.User
 			values = append(values, result)
-			ptr = iterator.Next()
+			value = iterator.Next()
 		}
 		return values, nil
 	case "signal.target.args":

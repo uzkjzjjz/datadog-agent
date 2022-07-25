@@ -40,21 +40,20 @@ func GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Evaluator, erro
 					var results []{{$Field.ReturnType}}
 
 					iterator := &{{$Field.Iterator.ReturnType}}{}
+					event := GetEvent(ctx)
 
-					value := iterator.Front(ctx)
+					value := iterator.Front(event)
 					for value != nil {
 						{{if $Field.Iterator.IsOrigTypePtr}}
-							element := (*{{$Field.Iterator.OrigType}})(value)
+							element := value.(*{{$Field.Iterator.OrigType}})
 						{{else}}
-							elementPtr := (*{{$Field.Iterator.OrigType}})(value)
-							element := *elementPtr
+							element := *value.(*{{$Field.Iterator.OrigType}})
 						{{end}}
 
 						{{$SubName := $Field.Iterator.Name | TrimPrefix $Field.Name}}
 
 						{{$Return := $SubName | printf "element%s"}}
 						{{if and (ne $Field.Handler "") (not $Mock) }}
-							event := GetEvent(ctx)
 							{{$SubName = $Field.Iterator.Name | TrimPrefix $Field.Prefix}}
 							{{$Handler := $Field.Iterator.Name | TrimPrefix $Field.Handler}}
 							{{$Return = print "event." $Handler "(&element" $SubName ")"}}

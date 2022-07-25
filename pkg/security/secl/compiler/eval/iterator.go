@@ -5,10 +5,8 @@
 
 package eval
 
-import "unsafe"
-
 // Iterator interface of a field iterator
 type Iterator interface {
-	Front(ctx *Context) unsafe.Pointer
-	Next() unsafe.Pointer
+	Front(event Event) interface{}
+	Next() interface{}
 }

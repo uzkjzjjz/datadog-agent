@@ -47,7 +47,7 @@ func getCgroupDumpTimeout(p *Probe) uint64 {
 type ActivityDumpManager struct {
 	sync.RWMutex
 	cfg                 *config.Config
-	probeContext        *ProbeContext
+	resolvers           *Resolvers
 	tracedPIDsMap       *ebpf.Map
 	tracedCommsMap      *ebpf.Map
 	tracedEventTypesMap *ebpf.Map
@@ -85,7 +85,7 @@ func (adm *ActivityDumpManager) Start(ctx context.Context, wg *sync.WaitGroup) {
 		case <-tagsTicker.C:
 			adm.resolveTags()
 		case ad := <-adm.snapshotQueue:
-			if err := ad.Snapshot(adm.probeContext); err != nil {
+			if err := ad.Snapshot(); err != nil {
 				seclog.Errorf("couldn't snapshot [%s]: %v", ad.GetSelectorStr(), err)
 			}
 		}
@@ -255,7 +255,7 @@ func (adm *ActivityDumpManager) insertActivityDump(newDump *ActivityDump) error 
 		containerIDB := make([]byte, model.ContainerIDLen)
 		copy(containerIDB, newDump.DumpMetadata.ContainerID)
 		waitListTimeout := time.Now().Add(time.Duration(adm.cfg.ActivityDumpCgroupWaitListSize) * adm.cfg.ActivityDumpCgroupDumpTimeout)
-		waitListTimeoutRaw := adm.probeContext.Resolvers.TimeResolver.ComputeMonotonicTimestamp(waitListTimeout)
+		waitListTimeoutRaw := adm.resolvers.TimeResolver.ComputeMonotonicTimestamp(waitListTimeout)
 		err := adm.cgroupWaitListMap.Put(containerIDB, waitListTimeoutRaw)
 		if err != nil {
 			seclog.Debugf("couldn't insert container ID %s to cgroup_wait_list: %v", newDump.DumpMetadata.ContainerID, err)
@@ -273,7 +273,7 @@ func (adm *ActivityDumpManager) insertActivityDump(newDump *ActivityDump) error 
 	}
 
 	// loop through the process cache entry tree and push traced pids if necessary
-	adm.probeContext.Resolvers.ProcessResolver.Walk(adm.SearchTracedProcessCacheEntryCallback(newDump))
+	adm.resolvers.ProcessResolver.Walk(adm.SearchTracedProcessCacheEntryCallback(newDump))
 
 	// Delay the activity dump snapshot to reduce the overhead on the main goroutine
 	select {
@@ -298,7 +298,7 @@ func (adm *ActivityDumpManager) HandleCgroupTracingEvent(event *model.CgroupTrac
 	}
 	newDump := NewActivityDump(adm, adm.kernelVersion, func(ad *ActivityDump) {
 		ad.DumpMetadata.ContainerID = event.ContainerContext.ID
-		ad.DumpMetadata.Timeout = adm.probeContext.Resolvers.TimeResolver.ResolveMonotonicTimestamp(event.TimeoutRaw).Sub(time.Now())
+		ad.DumpMetadata.Timeout = adm.resolvers.TimeResolver.ResolveMonotonicTimestamp(event.TimeoutRaw).Sub(time.Now())
 		ad.DumpMetadata.DifferentiateArgs = adm.cfg.ActivityDumpCgroupDifferentiateGraphs
 	})
 
@@ -401,12 +401,12 @@ func (adm *ActivityDumpManager) StopActivityDump(params *api.ActivityDumpStopPar
 }
 
 // ProcessEvent processes a new event and insert it in an activity dump if applicable
-func (adm *ActivityDumpManager) ProcessEvent(event *model.Event) {
+func (adm *ActivityDumpManager) ProcessEvent(event *Event) {
 	adm.Lock()
 	defer adm.Unlock()
 
 	for _, d := range adm.activeDumps {
-		d.Insert(adm.probeContext, event)
+		d.Insert(event)
 	}
 }
 

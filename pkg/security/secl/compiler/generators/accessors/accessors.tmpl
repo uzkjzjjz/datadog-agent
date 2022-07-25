@@ -134,15 +134,16 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		{{if $Field.Iterator}}
 			var values []{{$Field.ReturnType}}
 
+			event := GetEvent(&eval.Context{Event: e})
+
 			iterator := &{{$Field.Iterator.ReturnType}}{}
-			ptr := iterator.Front(ctx)
 			
-			for ptr != nil {
+			value := iterator.Front(event)
+			for value != nil {
 				{{if $Field.Iterator.IsOrigTypePtr}}
-					element := (*{{$Field.Iterator.OrigType}})(ptr)
+					element := value.(*{{$Field.Iterator.OrigType}})
 				{{else}}
-					elementPtr := (*{{$Field.Iterator.OrigType}})(ptr)
-					element := *elementPtr
+					element := *value.(*{{$Field.Iterator.OrigType}})
 				{{end}}
 
 				{{$SubName := $Field.Iterator.Name | TrimPrefix $Field.Name}}
@@ -166,7 +167,7 @@ func (e *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 				values = append(values, result...)
 				{{end}}
 
-				ptr = iterator.Next()
+				value = iterator.Next()
 			}
 
 			return values, nil

@@ -14,6 +14,10 @@ import (
 	jwriter "github.com/mailru/easyjson/jwriter"
 )
 
+var (
+	eventZero Event
+)
+
 // Event defines a probe version of an Event
 type Event struct {
 	model.Event
@@ -23,7 +27,7 @@ type Event struct {
 
 // EventHandler represents an handler for the events sent by the probe
 type EventHandler interface {
-	HandleEvent(probeContext *ProbeContext, event *model.Event)
+	HandleEvent(event *Event)
 	HandleCustomEvent(rule *rules.Rule, event *CustomEvent)
 }
 
@@ -43,7 +47,7 @@ func (e *Event) String() string {
 
 // MarshalJSON returns the JSON encoding of the event
 func (e *Event) MarshalJSON() ([]byte, error) {
-	s := NewEventSerializer(e.ProbeContext, e.ModelEvent)
+	s := NewEventSerializer(e)
 	w := &jwriter.Writer{
 		Flags: jwriter.NilSliceAsEmpty | jwriter.NilMapAsEmpty,
 	}

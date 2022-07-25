@@ -82,7 +82,7 @@ type Probe struct {
 	handlers     [model.MaxAllEventType][]EventHandler
 	monitor      *Monitor
 	resolvers    *Resolvers
-	event        *model.Event
+	event        *Event
 	eventStream  EventStream
 	scrubber     *pconfig.DataScrubber
 	ruleSet      *atomic.Value
@@ -349,15 +349,14 @@ func (p *Probe) SetRuleSet(rs *rules.RuleSet) {
 // RuleMatch is called by the ruleset when a rule matches
 func (p *Probe) RuleMatch(ctx *eval.Context, rule *rules.Rule) {
 	event := GetEvent(ctx)
-	probeContext := GetProbeContext(ctx)
 
 	// ensure that all the fields are resolved before sending
-	ResolveContainerID(p.probeContext, event, &event.ContainerContext)
-	ResolveContainerTags(p.probeContext, event, &event.ContainerContext)
+	event.ResolveContainerID(&event.ContainerContext)
+	event.ResolveContainerTags(&event.ContainerContext)
 
 	// needs to be resolved here, outside of the callback as using process tree
 	// which can be modified during queuing
-	service := GetProcessServiceTag(probeContext, event)
+	service := event.GetProcessServiceTag()
 
 	id := event.ContainerContext.ID
 
@@ -366,28 +365,23 @@ func (p *Probe) RuleMatch(ctx *eval.Context, rule *rules.Rule) {
 
 		// check from tagger
 		if service == "" {
-			service = probeContext.Resolvers.TagsResolver.GetValue(id, "service")
+			service = p.resolvers.TagsResolver.GetValue(id, "service")
 		}
 
 		if service == "" {
 			service = p.config.HostServiceName
 		}
 
-		return append(tags, probeContext.Resolvers.TagsResolver.Resolve(id)...)
-	}
-
-	probeEvent := Event{
-		ModelEvent:   event,
-		ProbeContext: p.probeContext,
+		return append(tags, p.resolvers.TagsResolver.Resolve(id)...)
 	}
 
 	for _, handler := range p.ruleHandlers {
-		handler.OnRuleMatch(rule, &probeEvent, service, extTagsCb)
+		handler.OnRuleMatch(rule, event, service, extTagsCb)
 	}
 }
 
 // DispatchEvent sends an event to the probe event handler
-func (p *Probe) DispatchEvent(event *model.Event) {
+func (p *Probe) DispatchEvent(event *Event) {
 	seclog.TraceTagf(event.GetEventType(), "Dispatching event %s", event)
 
 	value := p.ruleSet.Load()
@@ -400,16 +394,16 @@ func (p *Probe) DispatchEvent(event *model.Event) {
 
 	// send wildcard first
 	for _, handler := range p.handlers[model.UnknownEventType] {
-		handler.HandleEvent(p.probeContext, event)
+		handler.HandleEvent(event)
 	}
 
 	// send specific event
 	for _, handler := range p.handlers[event.GetEventType()] {
-		handler.HandleEvent(p.probeContext, event)
+		handler.HandleEvent(event)
 	}
 
 	// Process after evaluation because some monitors need the DentryResolver to have been called first.
-	p.monitor.ProcessEvent(p.probeContext, event)
+	p.monitor.ProcessEvent(event)
 }
 
 // DispatchActivityDump sends an activity dump to the probe activity dump handler
@@ -458,12 +452,12 @@ func (p *Probe) GetMonitor() *Monitor {
 	return p.monitor
 }
 
-func (p *Probe) zeroEvent() *model.Event {
+func (p *Probe) zeroEvent() *Event {
 	*p.event = eventZero
 	return p.event
 }
 
-func (p *Probe) unmarshalContexts(data []byte, event *model.Event) (int, error) {
+func (p *Probe) unmarshalContexts(data []byte, event *Event) (int, error) {
 	read, err := model.UnmarshalBinary(data, &event.PIDContext, &event.SpanContext, &event.ContainerContext)
 	if err != nil {
 		return 0, err
@@ -575,9 +569,9 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		}
 
 		// Resolve mount point
-		SetMountPoint(p.probeContext, event, &event.Mount)
+		event.SetMountPoint(&event.Mount)
 		// Resolve root
-		SetMountRoot(p.probeContext, event, &event.Mount)
+		event.SetMountRoot(&event.Mount)
 		// Insert new mount point in cache
 		err = p.resolvers.MountResolver.Insert(event.Mount)
 		if err != nil {
@@ -688,7 +682,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 	case model.ForkEventType:
-		if _, err = UnmarshalProcessCacheEntry(p.probeContext, event, data[offset:]); err != nil {
+		if _, err = event.UnmarshalProcessCacheEntry(data[offset:]); err != nil {
 			log.Errorf("failed to decode fork event: %s (offset %d, len %d)", err, offset, dataLen)
 			return
 		}
@@ -703,7 +697,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		p.resolvers.ProcessResolver.AddForkEntry(event.ProcessCacheEntry)
 	case model.ExecEventType:
 		// unmarshal and fill event.processCacheEntry
-		if _, err = UnmarshalProcessCacheEntry(p.probeContext, event, data[offset:]); err != nil {
+		if _, err = event.UnmarshalProcessCacheEntry(data[offset:]); err != nil {
 			log.Errorf("failed to decode exec event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
@@ -721,26 +715,26 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 
-		event.ProcessCacheEntry = ResolveProcessCacheEntry(p.probeContext, event)
+		event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
 		event.Exit.Process = &event.ProcessCacheEntry.Process
 	case model.SetuidEventType:
 		if _, err = event.SetUID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setuid event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-		defer p.resolvers.ProcessResolver.UpdateUID(p.probeContext, event, event.PIDContext.Pid)
+		defer p.resolvers.ProcessResolver.UpdateUID(event, event.PIDContext.Pid)
 	case model.SetgidEventType:
 		if _, err = event.SetGID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setgid event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-		defer p.resolvers.ProcessResolver.UpdateGID(p.probeContext, event, event.PIDContext.Pid)
+		defer p.resolvers.ProcessResolver.UpdateGID(event, event.PIDContext.Pid)
 	case model.CapsetEventType:
 		if _, err = event.Capset.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode capset event: %s (offset %d, len %d)", err, offset, len(data))
 			return
 		}
-		defer p.resolvers.ProcessResolver.UpdateCapset(event.PIDContext.Pid, event)
+		defer p.resolvers.ProcessResolver.UpdateCapset(event, event.PIDContext.Pid)
 	case model.SELinuxEventType:
 		if _, err = event.SELinux.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode selinux event: %s (offset %d, len %d)", err, offset, len(data))
@@ -835,7 +829,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	}
 
 	// resolve the process cache entry
-	event.ProcessCacheEntry = ResolveProcessCacheEntry(p.probeContext, event)
+	event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
 
 	// use ProcessCacheEntry process context as process context
 	event.ProcessContext = &event.ProcessCacheEntry.ProcessContext
@@ -845,7 +839,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	}
 
 	if eventType == model.ExitEventType {
-		defer p.resolvers.ProcessResolver.DeleteEntry(event.ProcessCacheEntry.Pid, ResolveEventTimestamp(p.probeContext, event))
+		defer p.resolvers.ProcessResolver.DeleteEntry(event.ProcessCacheEntry.Pid, event.ResolveEventTimestamp())
 	}
 
 	p.DispatchEvent(event)
@@ -875,7 +869,7 @@ func (p *Probe) OnNewDiscarder(ctx *eval.Context, rs *rules.RuleSet, field eval.
 	seclog.Tracef("New discarder of type %s for field %s", eventType, field)
 
 	if handler, ok := allDiscarderHandlers[eventType]; ok {
-		return handler(rs, ctx, event, p, Discarder{Field: field})
+		return handler(rs, event, p, Discarder{Field: field})
 	}
 
 	return nil
@@ -1461,7 +1455,7 @@ func NewProbe(config *config.Config, statsdClient statsd.ClientInterface) (*Prob
 	p.scrubber = pconfig.NewDefaultDataScrubber()
 	p.scrubber.AddCustomSensitiveWords(config.CustomSensitiveWords)
 
-	p.event = &model.Event{}
+	p.event = &Event{}
 
 	if useRingBuffers {
 		p.eventStream = NewRingBuffer(p.handleEvent)

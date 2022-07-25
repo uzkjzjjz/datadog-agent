@@ -202,8 +202,8 @@ type testModule struct {
 
 var testMod *testModule
 
-type ruleHandler func(*sprobe.Event, *model.Event, *rules.Rule)
-type eventHandler func(*sprobe.ProbeContext, *model.Event)
+type ruleHandler func(*sprobe.Event, *rules.Rule)
+type eventHandler func(*sprobe.Event)
 type customEventHandler func(*rules.Rule, *sprobe.CustomEvent)
 type eventDiscarderHandler func(ctx *eval.Context, rs *rules.RuleSet, field eval.Field, eventType eval.EventType) bool
 
@@ -233,7 +233,7 @@ type testProbeHandler struct {
 	customEventHandler *testcustomEventHandler
 }
 
-func (h *testProbeHandler) HandleEvent(probeContext *sprobe.ProbeContext, event *model.Event) {
+func (h *testProbeHandler) HandleEvent(event *sprobe.Event) {
 	h.RLock()
 	defer h.RUnlock()
 
@@ -241,7 +241,7 @@ func (h *testProbeHandler) HandleEvent(probeContext *sprobe.ProbeContext, event 
 	defer h.reloading.Unlock()
 
 	if h.eventHandler != nil && h.eventHandler.callback != nil {
-		h.eventHandler.callback(probeContext, event)
+		h.eventHandler.callback(event)
 	}
 }
 
@@ -345,10 +345,8 @@ func assertReturnValue(t *testing.T, retval, expected int64) bool {
 
 //nolint:deadcode,unused
 func assertFieldEqual(t *testing.T, event *sprobe.Event, field string, value interface{}, msgAndArgs ...interface{}) bool {
-	ctx := eval.NewContext(event.ModelEvent, event.ProbeContext)
-
 	t.Helper()
-	fieldValue, err := sprobe.GetFieldValue(ctx, field)
+	fieldValue, err := event.GetFieldValue(field)
 	if err != nil {
 		t.Errorf("failed to get field '%s': %s", field, err)
 		return false
@@ -358,10 +356,8 @@ func assertFieldEqual(t *testing.T, event *sprobe.Event, field string, value int
 
 //nolint:deadcode,unused
 func assertFieldStringArrayIndexedOneOf(t *testing.T, e *sprobe.Event, field string, index int, values []string, msgAndArgs ...interface{}) bool {
-	ctx := eval.NewContext(e.ModelEvent, e.ProbeContext)
-
 	t.Helper()
-	fieldValue, err := sprobe.GetFieldValue(ctx, field)
+	fieldValue, err := e.GetFieldValue(field)
 	if err != nil {
 		t.Errorf("failed to get field '%s': %s", field, err)
 		return false
@@ -987,13 +983,13 @@ func (tm *testModule) RegisterCustomEventHandler(cb customEventHandler) {
 	tm.probeHandler.Unlock()
 }
 
-func (tm *testModule) GetProbeEvent(action func() error, cb func(probeContext *sprobe.ProbeContext, event *model.Event) bool, timeout time.Duration, eventTypes ...model.EventType) error {
+func (tm *testModule) GetProbeEvent(action func() error, cb func(event *sprobe.Event) bool, timeout time.Duration, eventTypes ...model.EventType) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	message := make(chan ActionMessage, 1)
 
-	tm.RegisterEventHandler(func(probeContext *sprobe.ProbeContext, event *model.Event) {
+	tm.RegisterEventHandler(func(event *sprobe.Event) {
 		if len(eventTypes) > 0 {
 			match := false
 
@@ -1014,7 +1010,7 @@ func (tm *testModule) GetProbeEvent(action func() error, cb func(probeContext *s
 		case msg := <-message:
 			switch msg {
 			case Continue:
-				if cb(probeContext, event) {
+				if cb(event) {
 					cancel()
 				} else {
 					message <- Continue
@@ -1330,10 +1326,8 @@ func ifSyscallSupported(syscall string, test func(t *testing.T, syscallNB uintpt
 // contain a rule on "open.file.path"
 //nolint:deadcode,unused
 func waitForProbeEvent(test *testModule, action func() error, key string, value interface{}, eventType model.EventType) error {
-	return test.GetProbeEvent(action, func(probeContext *sprobe.ProbeContext, event *model.Event) bool {
-		ctx := eval.NewContext(event, probeContext)
-
-		if v, _ := sprobe.GetFieldValue(ctx, key); v == value {
+	return test.GetProbeEvent(action, func(event *sprobe.Event) bool {
+		if v, _ := event.GetFieldValue(key); v == value {
 			return true
 		}
 		return false

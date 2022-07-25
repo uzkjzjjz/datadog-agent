@@ -11,7 +11,6 @@ package module
 import (
 	"github.com/DataDog/datadog-agent/pkg/process/events/model"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
-	smodel "github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -22,12 +21,12 @@ type ProcessMonitoring struct {
 }
 
 // HandleEvent implement the EventHandler interface
-func (p *ProcessMonitoring) HandleEvent(probeContext *sprobe.ProbeContext, event *smodel.Event) {
+func (p *ProcessMonitoring) HandleEvent(event *sprobe.Event) {
 	// Force resolution of all event fields before exposing it through the API server
-	sprobe.ResolveFields(probeContext, event)
-	sprobe.ResolveEventTimestamp(probeContext, event)
+	event.ResolveFields()
+	event.ResolveEventTimestamp()
 
-	entry := sprobe.ResolveProcessCacheEntry(probeContext, event)
+	entry := event.ResolveProcessCacheEntry()
 	if entry == nil {
 		return
 	}

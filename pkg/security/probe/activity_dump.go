@@ -239,7 +239,7 @@ func (ad *ActivityDump) AddStorageRequest(request dump.StorageRequest) {
 // getTimeoutRawTimestamp returns the timeout timestamp of the current activity dump as a monolitic kernel timestamp
 func (ad *ActivityDump) getTimeoutRawTimestamp() int64 {
 	if ad.DumpMetadata.timeoutRaw == 0 {
-		ad.DumpMetadata.timeoutRaw = ad.adm.probeContext.Resolvers.TimeResolver.ComputeMonotonicTimestamp(ad.DumpMetadata.Start.Add(ad.DumpMetadata.Timeout))
+		ad.DumpMetadata.timeoutRaw = ad.adm.resolvers.TimeResolver.ComputeMonotonicTimestamp(ad.DumpMetadata.Start.Add(ad.DumpMetadata.Timeout))
 	}
 	return ad.DumpMetadata.timeoutRaw
 }
@@ -291,7 +291,7 @@ func (ad *ActivityDump) scrubAndRetainProcessArgsEnvs(nodes []*ProcessActivityNo
 	for _, node := range nodes {
 
 		// scrub the current process
-		node.scrubAndReleaseArgsEnvs(ad.adm.probeContext.Resolvers.ProcessResolver)
+		node.scrubAndReleaseArgsEnvs(ad.adm.resolvers.ProcessResolver)
 
 		// scrub each child recursively
 		ad.scrubAndRetainProcessArgsEnvs(node.Children)
@@ -439,7 +439,7 @@ func (ad *ActivityDump) findOrCreateProcessActivityNode(entry *model.ProcessCach
 
 		// go through the root nodes and check if one of them matches the input ProcessCacheEntry:
 		for _, root := range ad.ProcessActivityTree {
-			if root.Matches(entry, ad.DumpMetadata.DifferentiateArgs, ad.adm.probeContext.Resolvers) {
+			if root.Matches(entry, ad.DumpMetadata.DifferentiateArgs, ad.adm.resolvers) {
 				return root
 			}
 		}
@@ -454,7 +454,7 @@ func (ad *ActivityDump) findOrCreateProcessActivityNode(entry *model.ProcessCach
 		// to add the current entry no matter if it matches the selector or not. Go through the root children of the
 		// parent node and check if one of them matches the input ProcessCacheEntry.
 		for _, child := range parentNode.Children {
-			if child.Matches(entry, ad.DumpMetadata.DifferentiateArgs, ad.adm.probeContext.Resolvers) {
+			if child.Matches(entry, ad.DumpMetadata.DifferentiateArgs, ad.adm.resolvers) {
 				return child
 			}
 		}
@@ -539,12 +539,12 @@ func (ad *ActivityDump) SendStats() error {
 }
 
 // Snapshot snapshots the processes in the activity dump to capture all the
-func (ad *ActivityDump) Snapshot(ctx *ProbeContext) error {
+func (ad *ActivityDump) Snapshot() error {
 	ad.Lock()
 	defer ad.Unlock()
 
 	for _, pan := range ad.ProcessActivityTree {
-		if err := pan.snapshot(ctx, ad); err != nil {
+		if err := pan.snapshot(ad); err != nil {
 			return err
 		}
 		// iterate slowly
@@ -570,7 +570,7 @@ func (ad *ActivityDump) resolveTags() error {
 	}
 
 	var err error
-	ad.Tags, err = ad.adm.probeContext.Resolvers.TagsResolver.ResolveWithErr(ad.DumpMetadata.ContainerID)
+	ad.Tags, err = ad.adm.resolvers.TagsResolver.ResolveWithErr(ad.DumpMetadata.ContainerID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve %s: %w", ad.DumpMetadata.ContainerID, err)
 	}
@@ -904,10 +904,10 @@ func (pan *ProcessActivityNode) InsertFileEvent(event *Event, fileEvent *model.F
 }
 
 // snapshot uses procfs to retrieve information about the current process
-func (pan *ProcessActivityNode) snapshot(ctx *ProbeContext, ad *ActivityDump) error {
+func (pan *ProcessActivityNode) snapshot(ad *ActivityDump) error {
 	// call snapshot for all the children of the current node
 	for _, child := range pan.Children {
-		if err := child.snapshot(ctx, ad); err != nil {
+		if err := child.snapshot(ad); err != nil {
 			return err
 		}
 		// iterate slowly
@@ -1107,8 +1107,8 @@ func (pan *ProcessActivityNode) snapshotFiles(p *process.Process, ad *ActivityDu
 		evt.Open.File.FileFields.Inode = stat.Ino
 		evt.Open.File.FileFields.UID = stat.Uid
 		evt.Open.File.FileFields.GID = stat.Gid
-		evt.Open.File.FileFields.MTime = uint64(ad.adm.probeContext.Resolvers.TimeResolver.ComputeMonotonicTimestamp(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)))
-		evt.Open.File.FileFields.CTime = uint64(ad.adm.probeContext.Resolvers.TimeResolver.ComputeMonotonicTimestamp(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)))
+		evt.Open.File.FileFields.MTime = uint64(ad.adm.resolvers.TimeResolver.ComputeMonotonicTimestamp(time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec)))
+		evt.Open.File.FileFields.CTime = uint64(ad.adm.resolvers.TimeResolver.ComputeMonotonicTimestamp(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)))
 
 		evt.Open.File.Mode = evt.Open.File.FileFields.Mode
 		// TODO: add open flags by parsing `/proc/[pid]/fdinfo/fd` + O_RDONLY|O_CLOEXEC for the shared libs

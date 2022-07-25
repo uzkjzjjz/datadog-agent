@@ -19,7 +19,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/security/api"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -176,13 +175,13 @@ func (m *Monitor) GetStats() (map[string]interface{}, error) {
 }
 
 // ProcessEvent processes an event through the various monitors and controllers of the probe
-func (m *Monitor) ProcessEvent(ctx *ProbeContext, event *model.Event) {
+func (m *Monitor) ProcessEvent(event *Event) {
 	m.loadController.Count(event)
 
 	// Look for an unresolved path
 	if err := event.PathResolutionError; err != nil {
 		m.probe.DispatchCustomEvent(
-			NewAbnormalPathEvent(ctx, event, err),
+			NewAbnormalPathEvent(event, err),
 		)
 	} else {
 		if m.activityDumpManager != nil {

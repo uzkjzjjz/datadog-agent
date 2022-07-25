@@ -521,7 +521,7 @@ func getInUpperLayer(f *model.FileFields) *bool {
 	return &upperLayer
 }
 
-func newFileSerializer(ctx *ProbeContext, e *model.Event, fe *model.FileEvent, forceInode ...uint64) *FileSerializer {
+func newFileSerializer(e *Event, fe *model.FileEvent, forceInode ...uint64) *FileSerializer {
 	inode := fe.Inode
 	if len(forceInode) > 0 {
 		inode = forceInode[0]
@@ -529,17 +529,17 @@ func newFileSerializer(ctx *ProbeContext, e *model.Event, fe *model.FileEvent, f
 
 	mode := uint32(fe.FileFields.Mode)
 	return &FileSerializer{
-		Path:                ResolveFilePath(ctx, e, fe),
+		Path:                e.ResolveFilePath(fe),
 		PathResolutionError: fe.GetPathResolutionError(),
-		Name:                ResolveFileBasename(ctx, e, fe),
+		Name:                e.ResolveFileBasename(fe),
 		Inode:               getUint64Pointer(&inode),
 		MountID:             getUint32Pointer(&fe.MountID),
-		Filesystem:          ResolveFileFilesystem(ctx, e, fe),
+		Filesystem:          e.ResolveFileFilesystem(fe),
 		Mode:                getUint32Pointer(&mode), // only used by open events
 		UID:                 int64(fe.UID),
 		GID:                 int64(fe.GID),
-		User:                ResolveFileFieldsUser(ctx, e, &fe.FileFields),
-		Group:               ResolveFileFieldsGroup(ctx, e, &fe.FileFields),
+		User:                e.ResolveFileFieldsUser(&fe.FileFields),
+		Group:               e.ResolveFileFieldsGroup(&fe.FileFields),
 		Mtime:               getTimeIfNotZero(time.Unix(0, int64(fe.MTime))),
 		Ctime:               getTimeIfNotZero(time.Unix(0, int64(fe.CTime))),
 		InUpperLayer:        getInUpperLayer(&fe.FileFields),
@@ -587,10 +587,10 @@ func newCredentialsSerializer(ce *model.Credentials) *CredentialsSerializer {
 	}
 }
 
-func newProcessSerializer(ctx *ProbeContext, e *model.Event, ps *model.Process) *ProcessSerializer {
-	argv, argvTruncated := ctx.Resolvers.ProcessResolver.GetProcessScrubbedArgv(ps)
-	envs, EnvsTruncated := ctx.Resolvers.ProcessResolver.GetProcessEnvs(ps)
-	argv0, _ := ctx.Resolvers.ProcessResolver.GetProcessArgv0(ps)
+func newProcessSerializer(e *Event, ps *model.Process) *ProcessSerializer {
+	argv, argvTruncated := e.Resolvers.ProcessResolver.GetProcessScrubbedArgv(ps)
+	envs, EnvsTruncated := e.Resolvers.ProcessResolver.GetProcessEnvs(ps)
+	argv0, _ := e.Resolvers.ProcessResolver.GetProcessArgv0(ps)
 
 	psSerializer := &ProcessSerializer{
 		ForkTime: getTimeIfNotZero(ps.ForkTime),
@@ -602,7 +602,7 @@ func newProcessSerializer(ctx *ProbeContext, e *model.Event, ps *model.Process) 
 		PPid:          ps.PPid,
 		Comm:          ps.Comm,
 		TTY:           ps.TTYName,
-		Executable:    newFileSerializer(ctx, e, &ps.FileEvent),
+		Executable:    newFileSerializer(e, &ps.FileEvent),
 		Argv0:         argv0,
 		Args:          argv,
 		ArgsTruncated: argvTruncated,
@@ -629,7 +629,7 @@ func newProcessSerializer(ctx *ProbeContext, e *model.Event, ps *model.Process) 
 	return psSerializer
 }
 
-func newDDContextSerializer(ctx *ProbeContext, e *model.Event) *DDContextSerializer {
+func newDDContextSerializer(e *Event) *DDContextSerializer {
 	s := &DDContextSerializer{
 		SpanID:  e.SpanContext.SpanID,
 		TraceID: e.SpanContext.TraceID,
@@ -638,11 +638,13 @@ func newDDContextSerializer(ctx *ProbeContext, e *model.Event) *DDContextSeriali
 		return s
 	}
 
-	it := &model.ProcessAncestorsIterator{}
-	ptr := it.Front(eval.NewContext(e, ctx))
+	event := GetEvent(&eval.Context{Event: e})
 
-	for ptr != nil {
-		pce := (*model.ProcessCacheEntry)(ptr)
+	it := &model.ProcessAncestorsIterator{}
+	value := it.Front(event)
+
+	for value != nil {
+		pce := value.(*model.ProcessCacheEntry)
 
 		if pce.SpanID != 0 || pce.TraceID != 0 {
 			s.SpanID = pce.SpanID
@@ -650,20 +652,20 @@ func newDDContextSerializer(ctx *ProbeContext, e *model.Event) *DDContextSeriali
 			break
 		}
 
-		ptr = it.Next()
+		value = it.Next()
 	}
 
 	return s
 }
 
-func newUserContextSerializer(e *model.Event) *UserContextSerializer {
+func newUserContextSerializer(e *Event) *UserContextSerializer {
 	return &UserContextSerializer{
 		User:  e.ProcessContext.User,
 		Group: e.ProcessContext.Group,
 	}
 }
 
-func newProcessContextSerializer(ctx *ProbeContext, e *model.Event, pc *model.ProcessContext) *ProcessContextSerializer {
+func newProcessContextSerializer(e *Event, pc *model.ProcessContext) *ProcessContextSerializer {
 	if pc == nil || pc.Pid == 0 {
 		return nil
 	}
@@ -672,26 +674,28 @@ func newProcessContextSerializer(ctx *ProbeContext, e *model.Event, pc *model.Pr
 
 	if e == nil {
 		// custom events create an empty event
-		e = &model.Event{}
+		e = &Event{}
 		e.ProcessContext = pc
 	}
 
 	ps = ProcessContextSerializer{
-		ProcessSerializer: newProcessSerializer(ctx, e, &pc.Process),
+		ProcessSerializer: newProcessSerializer(e, &pc.Process),
 	}
 
+	event := GetEvent(&eval.Context{Event: e})
+
 	it := &model.ProcessAncestorsIterator{}
-	ptr := it.Front(eval.NewContext(e, ctx))
+	value := it.Front(event)
 
 	var ancestor *model.ProcessCacheEntry
 	var prev *ProcessSerializer
 
 	first := true
 
-	for ptr != nil {
-		pce := (*model.ProcessCacheEntry)(ptr)
+	for value != nil {
+		pce := value.(*model.ProcessCacheEntry)
 
-		s := newProcessSerializer(ctx, e, &pce.Process)
+		s := newProcessSerializer(e, &pce.Process)
 		ps.Ancestors = append(ps.Ancestors, s)
 
 		if first {
@@ -708,17 +712,17 @@ func newProcessContextSerializer(ctx *ProbeContext, e *model.Event, pc *model.Pr
 		ancestor = pce
 		prev = s
 
-		ptr = it.Next()
+		value = it.Next()
 	}
 	return &ps
 }
 
-func newSELinuxSerializer(ctx *ProbeContext, e *model.Event) *SELinuxEventSerializer {
+func newSELinuxSerializer(e *Event) *SELinuxEventSerializer {
 	switch e.SELinux.EventKind {
 	case model.SELinuxBoolChangeEventKind:
 		return &SELinuxEventSerializer{
 			BoolChange: &SELinuxBoolChangeSerializer{
-				Name:  ResolveSELinuxBoolName(ctx, e, &e.SELinux),
+				Name:  e.ResolveSELinuxBoolName(&e.SELinux),
 				State: e.SELinux.BoolChangeValue,
 			},
 		}
@@ -739,7 +743,7 @@ func newSELinuxSerializer(ctx *ProbeContext, e *model.Event) *SELinuxEventSerial
 	}
 }
 
-func newBPFMapSerializer(e *model.Event) *BPFMapSerializer {
+func newBPFMapSerializer(e *Event) *BPFMapSerializer {
 	if e.BPF.Map.ID == 0 {
 		return nil
 	}
@@ -749,7 +753,7 @@ func newBPFMapSerializer(e *model.Event) *BPFMapSerializer {
 	}
 }
 
-func newBPFProgramSerializer(e *model.Event) *BPFProgramSerializer {
+func newBPFProgramSerializer(e *Event) *BPFProgramSerializer {
 	if e.BPF.Program.ID == 0 {
 		return nil
 	}
@@ -763,7 +767,7 @@ func newBPFProgramSerializer(e *model.Event) *BPFProgramSerializer {
 	}
 }
 
-func newBPFEventSerializer(e *model.Event) *BPFEventSerializer {
+func newBPFEventSerializer(e *Event) *BPFEventSerializer {
 	return &BPFEventSerializer{
 		Cmd:     model.BPFCmd(e.BPF.Cmd).String(),
 		Map:     newBPFMapSerializer(e),
@@ -771,7 +775,7 @@ func newBPFEventSerializer(e *model.Event) *BPFEventSerializer {
 	}
 }
 
-func newMMapEventSerializer(e *model.Event) *MMapEventSerializer {
+func newMMapEventSerializer(e *Event) *MMapEventSerializer {
 	return &MMapEventSerializer{
 		Address:    fmt.Sprintf("0x%x", e.MMap.Addr),
 		Offset:     e.MMap.Offset,
@@ -781,7 +785,7 @@ func newMMapEventSerializer(e *model.Event) *MMapEventSerializer {
 	}
 }
 
-func newMProtectEventSerializer(e *model.Event) *MProtectEventSerializer {
+func newMProtectEventSerializer(e *Event) *MProtectEventSerializer {
 	return &MProtectEventSerializer{
 		VMStart:       fmt.Sprintf("0x%x", e.MProtect.VMStart),
 		VMEnd:         fmt.Sprintf("0x%x", e.MProtect.VMEnd),
@@ -790,15 +794,15 @@ func newMProtectEventSerializer(e *model.Event) *MProtectEventSerializer {
 	}
 }
 
-func newPTraceEventSerializer(ctx *ProbeContext, e *model.Event) *PTraceEventSerializer {
+func newPTraceEventSerializer(e *Event) *PTraceEventSerializer {
 	return &PTraceEventSerializer{
 		Request: model.PTraceRequest(e.PTrace.Request).String(),
 		Address: fmt.Sprintf("0x%x", e.PTrace.Address),
-		Tracee:  newProcessContextSerializer(ctx, e, e.PTrace.Tracee),
+		Tracee:  newProcessContextSerializer(e, e.PTrace.Tracee),
 	}
 }
 
-func newLoadModuleEventSerializer(e *model.Event) *ModuleEventSerializer {
+func newLoadModuleEventSerializer(e *Event) *ModuleEventSerializer {
 	loadedFromMemory := e.LoadModule.LoadedFromMemory
 	return &ModuleEventSerializer{
 		Name:             e.LoadModule.Name,
@@ -806,22 +810,22 @@ func newLoadModuleEventSerializer(e *model.Event) *ModuleEventSerializer {
 	}
 }
 
-func newUnloadModuleEventSerializer(e *model.Event) *ModuleEventSerializer {
+func newUnloadModuleEventSerializer(e *Event) *ModuleEventSerializer {
 	return &ModuleEventSerializer{
 		Name: e.UnloadModule.Name,
 	}
 }
 
-func newSignalEventSerializer(ctx *ProbeContext, e *model.Event) *SignalEventSerializer {
+func newSignalEventSerializer(e *Event) *SignalEventSerializer {
 	ses := &SignalEventSerializer{
 		Type:   model.Signal(e.Signal.Type).String(),
 		PID:    e.Signal.PID,
-		Target: newProcessContextSerializer(ctx, e, e.Signal.Target),
+		Target: newProcessContextSerializer(e, e.Signal.Target),
 	}
 	return ses
 }
 
-func newSpliceEventSerializer(e *model.Event) *SpliceEventSerializer {
+func newSpliceEventSerializer(e *Event) *SpliceEventSerializer {
 	return &SpliceEventSerializer{
 		PipeEntryFlag: model.PipeBufFlag(e.Splice.PipeEntryFlag).String(),
 		PipeExitFlag:  model.PipeBufFlag(e.Splice.PipeExitFlag).String(),
@@ -860,17 +864,17 @@ func newIPPortFamilySerializer(c *model.IPPortContext, family string) *IPPortFam
 	}
 }
 
-func newNetworkDeviceSerializer(ctx *ProbeContext, e *model.Event) *NetworkDeviceSerializer {
+func newNetworkDeviceSerializer(e *Event) *NetworkDeviceSerializer {
 	return &NetworkDeviceSerializer{
 		NetNS:   e.NetworkContext.Device.NetNS,
 		IfIndex: e.NetworkContext.Device.IfIndex,
-		IfName:  ResolveNetworkDeviceIfName(ctx, e, &e.NetworkContext.Device),
+		IfName:  e.ResolveNetworkDeviceIfName(&e.NetworkContext.Device),
 	}
 }
 
-func newNetworkContextSerializer(ctx *ProbeContext, e *model.Event) *NetworkContextSerializer {
+func newNetworkContextSerializer(e *Event) *NetworkContextSerializer {
 	return &NetworkContextSerializer{
-		Device:      newNetworkDeviceSerializer(ctx, e),
+		Device:      newNetworkDeviceSerializer(e),
 		L3Protocol:  model.L3Protocol(e.NetworkContext.L3Protocol).String(),
 		L4Protocol:  model.L4Protocol(e.NetworkContext.L4Protocol).String(),
 		Source:      newIPPortSerializer(&e.NetworkContext.Source),
@@ -879,7 +883,7 @@ func newNetworkContextSerializer(ctx *ProbeContext, e *model.Event) *NetworkCont
 	}
 }
 
-func newBindEventSerializer(e *model.Event) *BindEventSerializer {
+func newBindEventSerializer(e *Event) *BindEventSerializer {
 	bes := &BindEventSerializer{
 		Addr: newIPPortFamilySerializer(&e.Bind.Addr,
 			model.AddressFamily(e.Bind.AddrFamily).String()),
@@ -887,7 +891,7 @@ func newBindEventSerializer(e *model.Event) *BindEventSerializer {
 	return bes
 }
 
-func newExitEventSerializer(e *model.Event) *ExitEventSerializer {
+func newExitEventSerializer(e *Event) *ExitEventSerializer {
 	return &ExitEventSerializer{
 		Cause: model.ExitCause(e.Exit.Cause).String(),
 		Code:  e.Exit.Code,
@@ -907,9 +911,9 @@ func serializeSyscallRetval(retval int64) string {
 }
 
 // NewEventSerializer creates a new event serializer based on the event type
-func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer {
+func NewEventSerializer(event *Event) *EventSerializer {
 	var pc model.ProcessContext
-	if entry := ResolveProcessCacheEntry(ctx, event); entry != nil {
+	if entry := event.ResolveProcessCacheEntry(); entry != nil {
 		pc = entry.ProcessContext
 	}
 
@@ -917,13 +921,13 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		EventContextSerializer: EventContextSerializer{
 			Name: model.EventType(event.Type).String(),
 		},
-		ProcessContextSerializer: newProcessContextSerializer(ctx, event, &pc),
-		DDContextSerializer:      newDDContextSerializer(ctx, event),
+		ProcessContextSerializer: newProcessContextSerializer(event, &pc),
+		DDContextSerializer:      newDDContextSerializer(event),
 		UserContextSerializer:    newUserContextSerializer(event),
-		Date:                     utils.NewEasyjsonTime(ResolveEventTimestamp(ctx, event)),
+		Date:                     utils.NewEasyjsonTime(event.ResolveEventTimestamp()),
 	}
 
-	if id := ResolveContainerID(ctx, event, &event.ContainerContext); id != "" {
+	if id := event.ResolveContainerID(&event.ContainerContext); id != "" {
 		s.ContainerContextSerializer = &ContainerContextSerializer{
 			ID: id,
 		}
@@ -934,13 +938,13 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 	s.Category = model.GetEventTypeCategory(eventType.String())
 
 	if s.Category == model.NetworkCategory {
-		s.NetworkContextSerializer = newNetworkContextSerializer(ctx, event)
+		s.NetworkContextSerializer = newNetworkContextSerializer(event)
 	}
 
 	switch eventType {
 	case model.FileChmodEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Chmod.File),
+			FileSerializer: *newFileSerializer(event, &event.Chmod.File),
 			Destination: &FileSerializer{
 				Mode: &event.Chmod.Mode,
 			},
@@ -948,7 +952,7 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Chmod.Retval)
 	case model.FileChownEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Chown.File),
+			FileSerializer: *newFileSerializer(event, &event.Chown.File),
 			Destination: &FileSerializer{
 				UID: event.Chown.UID,
 				GID: event.Chown.GID,
@@ -958,14 +962,14 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 	case model.FileLinkEventType:
 		// use the source inode as the target one is a fake inode
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Link.Source),
-			Destination:    newFileSerializer(ctx, event, &event.Link.Target, event.Link.Source.Inode),
+			FileSerializer: *newFileSerializer(event, &event.Link.Source),
+			Destination:    newFileSerializer(event, &event.Link.Target, event.Link.Source.Inode),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Link.Retval)
 		s.Async = event.Async
 	case model.FileOpenEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Open.File),
+			FileSerializer: *newFileSerializer(event, &event.Open.File),
 		}
 
 		if event.Open.Flags&syscall.O_CREAT > 0 {
@@ -979,7 +983,7 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.Async = event.Async
 	case model.FileMkdirEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Mkdir.File),
+			FileSerializer: *newFileSerializer(event, &event.Mkdir.File),
 			Destination: &FileSerializer{
 				Mode: &event.Mkdir.Mode,
 			},
@@ -988,13 +992,13 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.Async = event.Async
 	case model.FileRmdirEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Rmdir.File),
+			FileSerializer: *newFileSerializer(event, &event.Rmdir.File),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Rmdir.Retval)
 		s.Async = event.Async
 	case model.FileUnlinkEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Unlink.File),
+			FileSerializer: *newFileSerializer(event, &event.Unlink.File),
 		}
 		s.FileSerializer.Flags = model.UnlinkFlags(event.Unlink.Flags).StringArray()
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Unlink.Retval)
@@ -1002,32 +1006,32 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 	case model.FileRenameEventType:
 		// use the new inode as the old one is a fake inode
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Rename.Old, event.Rename.New.Inode),
-			Destination:    newFileSerializer(ctx, event, &event.Rename.New),
+			FileSerializer: *newFileSerializer(event, &event.Rename.Old, event.Rename.New.Inode),
+			Destination:    newFileSerializer(event, &event.Rename.New),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Rename.Retval)
 		s.Async = event.Async
 	case model.FileRemoveXAttrEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.RemoveXAttr.File),
+			FileSerializer: *newFileSerializer(event, &event.RemoveXAttr.File),
 			Destination: &FileSerializer{
-				XAttrName:      ResolveXAttrName(ctx, event, &event.RemoveXAttr),
-				XAttrNamespace: ResolveXAttrNamespace(ctx, event, &event.RemoveXAttr),
+				XAttrName:      event.ResolveXAttrName(&event.RemoveXAttr),
+				XAttrNamespace: event.ResolveXAttrNamespace(&event.RemoveXAttr),
 			},
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.RemoveXAttr.Retval)
 	case model.FileSetXAttrEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.SetXAttr.File),
+			FileSerializer: *newFileSerializer(event, &event.SetXAttr.File),
 			Destination: &FileSerializer{
-				XAttrName:      ResolveXAttrName(ctx, event, &event.SetXAttr),
-				XAttrNamespace: ResolveXAttrNamespace(ctx, event, &event.SetXAttr),
+				XAttrName:      event.ResolveXAttrName(&event.SetXAttr),
+				XAttrNamespace: event.ResolveXAttrNamespace(&event.SetXAttr),
 			},
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.SetXAttr.Retval)
 	case model.FileUtimesEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.Utimes.File),
+			FileSerializer: *newFileSerializer(event, &event.Utimes.File),
 			Destination: &FileSerializer{
 				Atime: getTimeIfNotZero(event.Utimes.Atime),
 				Mtime: getTimeIfNotZero(event.Utimes.Mtime),
@@ -1037,13 +1041,13 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 	case model.FileMountEventType:
 		s.FileEventSerializer = &FileEventSerializer{
 			FileSerializer: FileSerializer{
-				Path:                ResolveMountRoot(ctx, event, &event.Mount),
+				Path:                event.ResolveMountRoot(&event.Mount),
 				PathResolutionError: event.Mount.GetRootPathResolutionError(),
 				MountID:             &event.Mount.RootMountID,
 				Inode:               &event.Mount.RootInode,
 			},
 			Destination: &FileSerializer{
-				Path:                ResolveMountPoint(ctx, event, &event.Mount),
+				Path:                event.ResolveMountPoint(&event.Mount),
 				PathResolutionError: event.Mount.GetMountPointPathResolutionError(),
 				MountID:             &event.Mount.ParentMountID,
 				Inode:               &event.Mount.ParentInode,
@@ -1062,21 +1066,21 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 	case model.SetuidEventType:
 		s.ProcessContextSerializer.Credentials.Destination = &SetuidSerializer{
 			UID:    int(event.SetUID.UID),
-			User:   ResolveSetuidUser(ctx, event, &event.SetUID),
+			User:   event.ResolveSetuidUser(&event.SetUID),
 			EUID:   int(event.SetUID.EUID),
-			EUser:  ResolveSetuidEUser(ctx, event, &event.SetUID),
+			EUser:  event.ResolveSetuidEUser(&event.SetUID),
 			FSUID:  int(event.SetUID.FSUID),
-			FSUser: ResolveSetuidFSUser(ctx, event, &event.SetUID),
+			FSUser: event.ResolveSetuidFSUser(&event.SetUID),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 	case model.SetgidEventType:
 		s.ProcessContextSerializer.Credentials.Destination = &SetgidSerializer{
 			GID:     int(event.SetGID.GID),
-			Group:   ResolveSetgidGroup(ctx, event, &event.SetGID),
+			Group:   event.ResolveSetgidGroup(&event.SetGID),
 			EGID:    int(event.SetGID.EGID),
-			EGroup:  ResolveSetgidEGroup(ctx, event, &event.SetGID),
+			EGroup:  event.ResolveSetgidEGroup(&event.SetGID),
 			FSGID:   int(event.SetGID.FSGID),
-			FSGroup: ResolveSetgidFSGroup(ctx, event, &event.SetGID),
+			FSGroup: event.ResolveSetgidFSGroup(&event.SetGID),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 	case model.CapsetEventType:
@@ -1089,21 +1093,21 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 	case model.ExitEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.ProcessContext.Process.FileEvent),
+			FileSerializer: *newFileSerializer(event, &event.ProcessContext.Process.FileEvent),
 		}
 		s.ExitEventSerializer = newExitEventSerializer(event)
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 	case model.ExecEventType:
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.ProcessContext.Process.FileEvent),
+			FileSerializer: *newFileSerializer(event, &event.ProcessContext.Process.FileEvent),
 		}
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 	case model.SELinuxEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 		s.FileEventSerializer = &FileEventSerializer{
-			FileSerializer: *newFileSerializer(ctx, event, &event.SELinux.File),
+			FileSerializer: *newFileSerializer(event, &event.SELinux.File),
 		}
-		s.SELinuxEventSerializer = newSELinuxSerializer(ctx, event)
+		s.SELinuxEventSerializer = newSELinuxSerializer(event)
 	case model.BPFEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(0)
 		s.BPFEventSerializer = newBPFEventSerializer(event)
@@ -1111,7 +1115,7 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.MMap.Retval)
 		if event.MMap.Flags&unix.MAP_ANONYMOUS == 0 {
 			s.FileEventSerializer = &FileEventSerializer{
-				FileSerializer: *newFileSerializer(ctx, event, &event.MMap.File),
+				FileSerializer: *newFileSerializer(event, &event.MMap.File),
 			}
 		}
 		s.MMapEventSerializer = newMMapEventSerializer(event)
@@ -1120,12 +1124,12 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.MProtectEventSerializer = newMProtectEventSerializer(event)
 	case model.PTraceEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.PTrace.Retval)
-		s.PTraceEventSerializer = newPTraceEventSerializer(ctx, event)
+		s.PTraceEventSerializer = newPTraceEventSerializer(event)
 	case model.LoadModuleEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.LoadModule.Retval)
 		if !event.LoadModule.LoadedFromMemory {
 			s.FileEventSerializer = &FileEventSerializer{
-				FileSerializer: *newFileSerializer(ctx, event, &event.LoadModule.File),
+				FileSerializer: *newFileSerializer(event, &event.LoadModule.File),
 			}
 		}
 		s.ModuleEventSerializer = newLoadModuleEventSerializer(event)
@@ -1134,13 +1138,13 @@ func NewEventSerializer(ctx *ProbeContext, event *model.Event) *EventSerializer 
 		s.ModuleEventSerializer = newUnloadModuleEventSerializer(event)
 	case model.SignalEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Signal.Retval)
-		s.SignalEventSerializer = newSignalEventSerializer(ctx, event)
+		s.SignalEventSerializer = newSignalEventSerializer(event)
 	case model.SpliceEventType:
 		s.EventContextSerializer.Outcome = serializeSyscallRetval(event.Splice.Retval)
 		s.SpliceEventSerializer = newSpliceEventSerializer(event)
 		if event.Splice.File.Inode != 0 {
 			s.FileEventSerializer = &FileEventSerializer{
-				FileSerializer: *newFileSerializer(ctx, event, &event.Splice.File),
+				FileSerializer: *newFileSerializer(event, &event.Splice.File),
 			}
 		}
 	case model.DNSEventType:

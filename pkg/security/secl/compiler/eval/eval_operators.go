@@ -46,7 +46,7 @@ func Or(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*BoolEval
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -168,7 +168,7 @@ func And(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*BoolEva
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -271,7 +271,7 @@ func IntEquals(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*Boo
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -342,7 +342,7 @@ func IntAnd(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEva
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &IntEvaluator{
@@ -413,7 +413,7 @@ func IntOr(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEval
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &IntEvaluator{
@@ -484,7 +484,7 @@ func IntXor(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*IntEva
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &IntEvaluator{
@@ -565,7 +565,7 @@ func BoolEquals(a *BoolEvaluator, b *BoolEvaluator, opts *Opts, state *State) (*
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -646,7 +646,7 @@ func GreaterThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*B
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -727,7 +727,7 @@ func GreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *Sta
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -808,7 +808,7 @@ func LesserThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *State) (*Bo
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -889,7 +889,7 @@ func LesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *Stat
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -970,7 +970,7 @@ func DurationLesserThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *Sta
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -1051,7 +1051,7 @@ func DurationLesserOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, sta
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -1132,7 +1132,7 @@ func DurationGreaterThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, state *St
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{
@@ -1213,7 +1213,7 @@ func DurationGreaterOrEqualThan(a *IntEvaluator, b *IntEvaluator, opts *Opts, st
 	if a.EvalFnc == nil && b.EvalFnc == nil {
 		ea, eb := a.Value, b.Value
 
-		ctx := NewContext(nil, nil)
+		ctx := NewContext(nil)
 		_ = ctx
 
 		return &BoolEvaluator{

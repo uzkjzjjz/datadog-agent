@@ -881,7 +881,7 @@ func (p *ProcessResolver) Get(pid uint32) *model.ProcessCacheEntry {
 }
 
 // UpdateUID updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateUID(ctx *ProbeContext, e *model.Event, pid uint32) {
+func (p *ProcessResolver) UpdateUID(e *Event, pid uint32) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}
@@ -891,16 +891,16 @@ func (p *ProcessResolver) UpdateUID(ctx *ProbeContext, e *model.Event, pid uint3
 	entry := p.entryCache[pid]
 	if entry != nil {
 		entry.Credentials.UID = e.SetUID.UID
-		entry.Credentials.User = ResolveSetuidUser(ctx, e, &e.SetUID)
+		entry.Credentials.User = e.ResolveSetuidUser(&e.SetUID)
 		entry.Credentials.EUID = e.SetUID.EUID
-		entry.Credentials.EUser = ResolveSetuidEUser(ctx, e, &e.SetUID)
+		entry.Credentials.EUser = e.ResolveSetuidEUser(&e.SetUID)
 		entry.Credentials.FSUID = e.SetUID.FSUID
-		entry.Credentials.FSUser = ResolveSetuidFSUser(ctx, e, &e.SetUID)
+		entry.Credentials.FSUser = e.ResolveSetuidFSUser(&e.SetUID)
 	}
 }
 
 // UpdateGID updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateGID(ctx *ProbeContext, e *model.Event, pid uint32) {
+func (p *ProcessResolver) UpdateGID(e *Event, pid uint32) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}
@@ -910,16 +910,16 @@ func (p *ProcessResolver) UpdateGID(ctx *ProbeContext, e *model.Event, pid uint3
 	entry := p.entryCache[pid]
 	if entry != nil {
 		entry.Credentials.GID = e.SetGID.GID
-		entry.Credentials.Group = ResolveSetgidGroup(ctx, e, &e.SetGID)
+		entry.Credentials.Group = e.ResolveSetgidGroup(&e.SetGID)
 		entry.Credentials.EGID = e.SetGID.EGID
-		entry.Credentials.EGroup = ResolveSetgidEGroup(ctx, e, &e.SetGID)
+		entry.Credentials.EGroup = e.ResolveSetgidEGroup(&e.SetGID)
 		entry.Credentials.FSGID = e.SetGID.FSGID
-		entry.Credentials.FSGroup = ResolveSetgidFSGroup(ctx, e, &e.SetGID)
+		entry.Credentials.FSGroup = e.ResolveSetgidFSGroup(&e.SetGID)
 	}
 }
 
 // UpdateCapset updates the credentials of the provided pid
-func (p *ProcessResolver) UpdateCapset(pid uint32, e *model.Event) {
+func (p *ProcessResolver) UpdateCapset(e *Event, pid uint32) {
 	if e.ProcessContext.Pid != e.ProcessContext.Tid {
 		return
 	}

@@ -9,10 +9,6 @@
 
 package {{.Name}}
 
-import (
-    "github.com/DataDog/datadog-agent/pkg/security/secl/model"
-)
-
 // ResolveFields resolves all the fields associate to the event type. Context fields are automatically resolved.
 func (ev *Event) ResolveFields() {
     // resolve context fields that are not related to any event type
@@ -41,7 +37,7 @@ func (ev *Event) ResolveFields() {
             {{- $Field := index $.Fields $FieldName }}
                 {{- if and (ne $Field.Handler "") (not $Field.Iterator) (eq $Field.CachelessResolution false) }}
                     {{- if (eq $Field.Prefix "") }}
-                        _ = {{ print $Field.Handler "(ctx, ev)"}}
+                        _ = {{ print "ev." $Field.Handler "()"}}
                     {{- else}}
                         {{$Ptr := "&"}}
                         {{$Parent := index $.AllFields $Field.Prefix}}
@@ -49,7 +45,7 @@ func (ev *Event) ResolveFields() {
                             {{$Ptr = ""}}
                         {{end}}
 
-                        _ = {{ print $Field.Handler "(ctx, ev, " $Ptr "ev." $Field.Prefix ")"}}
+                        _ = {{ print "ev." $Field.Handler "(" $Ptr "ev." $Field.Prefix ")"}}
                     {{- end}}
                 {{- end -}}
             {{end}}

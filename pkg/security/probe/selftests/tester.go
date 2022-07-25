@@ -189,7 +189,7 @@ type selfTestEvent struct {
 // IsExpectedEvent sends an event to the tester
 func (t *SelfTester) IsExpectedEvent(rule *rules.Rule, event *probe.Event) bool {
 	if atomic.LoadUint32(&t.waitingForEvent) != 0 && rule.Definition.Policy.Source == policySource {
-		s := probe.NewEventSerializer(event.ProbeContext, event.ModelEvent)
+		s := probe.NewEventSerializer(event)
 		if s == nil || s.FileEventSerializer == nil {
 			return true
 		}

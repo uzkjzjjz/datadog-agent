@@ -28,7 +28,6 @@ const (
 )
 
 var (
-	eventZero model.Event
 	modelZero model.Model
 )
 
@@ -375,7 +374,7 @@ func (ev *Event) ResolveSELinuxBoolName(e *model.SELinuxEvent) string {
 }
 
 // ExtractEventInfo extracts cpu and timestamp from the raw data event
-func (ev *Event) ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
+func ExtractEventInfo(record *perf.Record) (uint64, uint64, error) {
 	if len(record.RawSample) < 16 {
 		return 0, 0, model.ErrNotEnoughData
 	}
