@@ -12,6 +12,7 @@ import (
 	model "github.com/DataDog/agent-payload/v5/process"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/network"
+	"github.com/DataDog/datadog-agent/pkg/network/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/gogo/protobuf/jsonpb"
 )
@@ -93,7 +94,7 @@ func modelConnections(conns *network.Connections) *model.Connections {
 	payload.Conns = agentConns
 	payload.Domains = dnsFormatter.Domains()
 	payload.Dns = dnsFormatter.DNS()
-	payload.ConnTelemetryMap = FormatConnectionTelemetry(conns.ConnTelemetry)
+	payload.ConnTelemetryMap = telemetry.Report(telemetry.BackendMetric)
 	payload.CompilationTelemetryByAsset = FormatCompilationTelemetry(conns.CompilationTelemetryByAsset)
 	payload.Routes = routes
 	payload.Tags = tagsSet.GetStrings()

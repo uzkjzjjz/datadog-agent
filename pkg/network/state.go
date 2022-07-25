@@ -45,12 +45,6 @@ type State interface {
 		http map[http.Key]*http.RequestStats,
 	) Delta
 
-	// GetTelemetryDelta returns the telemetry delta since last time the given client requested telemetry data.
-	GetTelemetryDelta(
-		id string,
-		telemetry map[ConnTelemetryType]int64,
-	) map[ConnTelemetryType]int64
-
 	// RegisterClient starts tracking stateful data for the given client
 	// If the client is already registered, it does nothing.
 	RegisterClient(clientID string)
@@ -81,16 +75,6 @@ type Delta struct {
 	DNSStats dns.StatsByKeyByNameByType
 }
 
-type telemetry struct {
-	closedConnDropped  int64
-	connDropped        int64
-	statsResets        int64
-	timeSyncCollisions int64
-	dnsStatsDropped    int64
-	httpStatsDropped   int64
-	dnsPidCollisions   int64
-}
-
 const minClosedCapacity = 1024
 
 type client struct {
@@ -102,9 +86,8 @@ type client struct {
 	closedConnections []ConnectionStats
 	stats             map[string]*StatCounters
 	// maps by dns key the domain (string) to stats structure
-	dnsStats        dns.StatsByKeyByNameByType
-	httpStatsDelta  map[http.Key]*http.RequestStats
-	lastTelemetries map[ConnTelemetryType]int64
+	dnsStats       dns.StatsByKeyByNameByType
+	httpStatsDelta map[http.Key]*http.RequestStats
 }
 
 func (c *client) Reset(active map[string]*ConnectionStats) {
@@ -134,8 +117,7 @@ type networkState struct {
 	sync.Mutex
 
 	// clients is a map of the connection id string to the client structure
-	clients   map[string]*client
-	telemetry telemetry
+	clients map[string]*client
 
 	buf             []byte // Shared buffer
 	latestTimeEpoch uint64
@@ -152,7 +134,6 @@ type networkState struct {
 func NewState(clientExpiry time.Duration, maxClosedConns, maxClientStats int, maxDNSStats int, maxHTTPStats int) State {
 	return &networkState{
 		clients:        map[string]*client{},
-		telemetry:      telemetry{},
 		clientExpiry:   clientExpiry,
 		maxClosedConns: maxClosedConns,
 		maxClientStats: maxClientStats,
@@ -172,22 +153,6 @@ func (ns *networkState) getClients() []string {
 	}
 
 	return clients
-}
-
-// GetTelemetryDelta returns the telemetry delta for a given client.
-// As for now, this only keeps track of monotonic telemetry, as the
-// other ones are already relative to the last time they were fetched.
-func (ns *networkState) GetTelemetryDelta(
-	id string,
-	telemetry map[ConnTelemetryType]int64,
-) map[ConnTelemetryType]int64 {
-	ns.Lock()
-	defer ns.Unlock()
-
-	if len(telemetry) > 0 {
-		return ns.getTelemetryDelta(id, telemetry)
-	}
-	return nil
 }
 
 // GetDelta returns the connections for the given client
@@ -231,43 +196,6 @@ func (ns *networkState) GetDelta(
 		HTTP:     client.httpStatsDelta,
 		DNSStats: client.dnsStats,
 	}
-}
-
-// saveTelemetry saves the non-monotonic telemetry data for each registered clients.
-// It does so by accumulating values per telemetry point.
-func (ns *networkState) saveTelemetry(telemetry map[ConnTelemetryType]int64) {
-	for _, cl := range ns.clients {
-		for _, telType := range ConnTelemetryTypes {
-			if val, ok := telemetry[telType]; ok {
-				cl.lastTelemetries[telType] += val
-			}
-		}
-	}
-}
-
-func (ns *networkState) getTelemetryDelta(id string, telemetry map[ConnTelemetryType]int64) map[ConnTelemetryType]int64 {
-	var res = make(map[ConnTelemetryType]int64)
-	client := ns.getClient(id)
-	ns.saveTelemetry(telemetry)
-
-	for _, telType := range MonotonicConnTelemetryTypes {
-		if val, ok := telemetry[telType]; ok {
-			res[telType] = val
-			if prev, ok := client.lastTelemetries[telType]; ok {
-				res[telType] -= prev
-			}
-			client.lastTelemetries[telType] = val
-		}
-	}
-
-	for _, telType := range ConnTelemetryTypes {
-		if _, ok := client.lastTelemetries[telType]; ok {
-			res[telType] = client.lastTelemetries[telType]
-			client.lastTelemetries[telType] = 0
-		}
-	}
-
-	return res
 }
 
 // RegisterClient registers a client before it first gets stream of data.
@@ -586,28 +514,6 @@ func (ns *networkState) RemoveConnections(keys []string) {
 			delete(c.stats, key)
 		}
 	}
-
-	// Flush log line if any metric is non zero
-	if ns.telemetry.statsResets > 0 || ns.telemetry.closedConnDropped > 0 || ns.telemetry.connDropped > 0 || ns.telemetry.timeSyncCollisions > 0 {
-		s := "state telemetry: "
-		s += " [%d stats stats_resets]"
-		s += " [%d connections dropped due to stats]"
-		s += " [%d closed connections dropped]"
-		s += " [%d dns stats dropped]"
-		s += " [%d HTTP stats dropped]"
-		s += " [%d DNS pid collisions]"
-		s += " [%d time sync collisions]"
-		log.Warnf(s,
-			ns.telemetry.statsResets,
-			ns.telemetry.connDropped,
-			ns.telemetry.closedConnDropped,
-			ns.telemetry.dnsStatsDropped,
-			ns.telemetry.httpStatsDropped,
-			ns.telemetry.dnsPidCollisions,
-			ns.telemetry.timeSyncCollisions)
-	}
-
-	ns.telemetry = telemetry{}
 }
 
 // GetStats returns a map of statistics about the current network state
@@ -625,16 +531,7 @@ func (ns *networkState) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"clients": clientInfo,
-		"telemetry": map[string]int64{
-			"stats_resets":         ns.telemetry.statsResets,
-			"closed_conn_dropped":  ns.telemetry.closedConnDropped,
-			"conn_dropped":         ns.telemetry.connDropped,
-			"time_sync_collisions": ns.telemetry.timeSyncCollisions,
-			"dns_stats_dropped":    ns.telemetry.dnsStatsDropped,
-			"http_stats_dropped":   ns.telemetry.httpStatsDropped,
-			"dns_pid_collisions":   ns.telemetry.dnsPidCollisions,
-		},
+		"clients":            clientInfo,
 		"current_time":       time.Now().Unix(),
 		"latest_bpf_time_ns": ns.latestTimeEpoch,
 	}

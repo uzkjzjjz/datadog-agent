@@ -10,30 +10,38 @@ package http
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/network/stats"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"go.uber.org/atomic"
 )
 
 type telemetry struct {
 	then    int64
 	elapsed int64
 
-	hits1XX, hits2XX, hits3XX, hits4XX, hits5XX int64 `stats:"atomic"`
-	misses                                      int64 `stats:"atomic"` // this happens when we can't cope with the rate of events
-	dropped                                     int64 `stats:"atomic"` // this happens when httpStatKeeper reaches capacity
-	rejected                                    int64 `stats:"atomic"` // this happens when an user-defined reject-filter matches a request
-	malformed                                   int64 `stats:"atomic"` // this happens when the request doesn't have the expected format
-	aggregations                                int64 `stats:"atomic"`
-
-	reporter stats.Reporter
+	hits1XX, hits2XX, hits3XX, hits4XX, hits5XX *atomic.Int64
+	misses                                      *atomic.Int64 // this happens when we can't cope with the rate of events
+	dropped                                     *atomic.Int64 // this happens when httpStatKeeper reaches capacity
+	rejected                                    *atomic.Int64 // this happens when an user-defined reject-filter matches a request
+	malformed                                   *atomic.Int64 // this happens when the request doesn't have the expected format
+	aggregations                                *atomic.Int64
 }
 
 func newTelemetry() (*telemetry, error) {
 	t := &telemetry{
-		then: time.Now().Unix(),
+		then:         time.Now().Unix(),
+		hits1XX:      telemetry.All.HTTPHits1XX,
+		hits2XX:      telemetry.All.HTTPHits2XX,
+		hits3XX:      telemetry.All.HTTPHits3XX,
+		hits4XX:      telemetry.All.HTTPHits4XX,
+		hits5XX:      telemetry.All.HTTPHits5XX,
+		misses:       telemetry.All.HTTPMisses,
+		dropped:      telemetry.All.HTTPDropped,
+		rejected:     telemetry.All.HTTPRejected,
+		malformed:    telemetry.All.HTTPMalformed,
+		aggregations: telemetry.All.HTTPAggregations,
 	}
 
 	var err error
@@ -49,15 +57,15 @@ func (t *telemetry) aggregate(txs []httpTX, err error) {
 	for _, tx := range txs {
 		switch tx.StatusClass() {
 		case 100:
-			atomic.AddInt64(&t.hits1XX, 1)
+			t.hits1XX.Add(1)
 		case 200:
-			atomic.AddInt64(&t.hits2XX, 1)
+			t.hits2XX.Add(1)
 		case 300:
-			atomic.AddInt64(&t.hits3XX, 1)
+			t.hits3XX.Add(1)
 		case 400:
-			atomic.AddInt64(&t.hits4XX, 1)
+			t.hits4XX.Add(1)
 		case 500:
-			atomic.AddInt64(&t.hits5XX, 1)
+			t.hits5XX.Add(1)
 		}
 	}
 
@@ -100,8 +108,4 @@ func (t *telemetry) reset() telemetry {
 	)
 
 	return *delta
-}
-
-func (t *telemetry) report() map[string]interface{} {
-	return t.reporter.Report()
 }

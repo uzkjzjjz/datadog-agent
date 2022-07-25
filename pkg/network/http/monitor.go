@@ -40,7 +40,6 @@ type Monitor struct {
 	batchManager           *batchManager
 	batchCompletionHandler *ddebpf.PerfHandler
 	telemetry              *telemetry
-	telemetrySnapshot      *telemetry
 	pollRequests           chan chan HTTPMonitorStats
 	statkeeper             *httpStatKeeper
 
@@ -103,7 +102,6 @@ func NewMonitor(c *config.Config, offsets []manager.ConstantEditor, sockFD *ebpf
 		batchManager:           newBatchManager(batchMap, batchStateMap, numCPUs),
 		batchCompletionHandler: mgr.batchCompletionHandler,
 		telemetry:              telemetry,
-		telemetrySnapshot:      nil,
 		pollRequests:           make(chan chan HTTPMonitorStats),
 		closeFilterFn:          closeFilterFn,
 		statkeeper:             statkeeper,
@@ -185,25 +183,6 @@ func (m *Monitor) GetHTTPStats() map[Key]*RequestStats {
 	stats := <-reply
 	m.telemetrySnapshot = &stats.telemetry
 	return stats.requestStats
-}
-
-func (m *Monitor) GetStats() map[string]interface{} {
-	empty := map[string]interface{}{}
-	if m == nil {
-		return empty
-	}
-
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	if m.stopped {
-		return empty
-	}
-
-	if m.telemetrySnapshot == nil {
-		return empty
-	}
-
-	return m.telemetrySnapshot.report()
 }
 
 // Stop HTTP monitoring

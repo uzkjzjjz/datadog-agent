@@ -20,7 +20,6 @@ import (
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
-	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/network/config/sysctl"
@@ -30,6 +29,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/http"
 	"github.com/DataDog/datadog-agent/pkg/network/netlink"
 	"github.com/DataDog/datadog-agent/pkg/network/stats"
+	"github.com/DataDog/datadog-agent/pkg/network/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
@@ -343,108 +343,19 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 		ips = append(ips, conn.Source, conn.Dest)
 	}
 	names := t.reverseDNS.Resolve(ips)
-	ctm := t.state.GetTelemetryDelta(clientID, t.getConnTelemetry(len(active)))
-	rctm := t.getRuntimeCompilationTelemetry()
 	atomic.StoreInt64(&t.lastCheck, time.Now().Unix())
 
 	return &network.Connections{
-		BufferedData:                delta.BufferedData,
-		DNS:                         names,
-		DNSStats:                    delta.DNSStats,
-		HTTP:                        delta.HTTP,
-		ConnTelemetry:               ctm,
-		CompilationTelemetryByAsset: rctm,
+		BufferedData: delta.BufferedData,
+		DNS:          names,
+		DNSStats:     delta.DNSStats,
+		HTTP:         delta.HTTP,
 	}, nil
 }
 
 func (t *Tracer) RegisterClient(clientID string) error {
 	t.state.RegisterClient(clientID)
 	return nil
-}
-
-func (t *Tracer) getConnTelemetry(mapSize int) map[network.ConnTelemetryType]int64 {
-	kprobeStats := ddebpf.GetProbeTotals()
-	tm := map[network.ConnTelemetryType]int64{
-		network.MonotonicKprobesTriggered: kprobeStats.Hits,
-		network.MonotonicKprobesMissed:    kprobeStats.Misses,
-		network.ConnsBpfMapSize:           int64(mapSize),
-		network.MonotonicConnsClosed:      atomic.LoadInt64(&t.closedConns),
-	}
-
-	stats, err := t.getStats(conntrackStats, dnsStats, epbfStats, httpStats)
-	if err != nil {
-		return nil
-	}
-
-	conntrackStats := stats["conntrack"].(map[string]int64)
-	if rt, ok := conntrackStats["registers_total"]; ok {
-		tm[network.MonotonicConntrackRegisters] = rt
-	}
-	if rtd, ok := conntrackStats["registers_dropped"]; ok {
-		tm[network.MonotonicConntrackRegistersDropped] = rtd
-	}
-	if sp, ok := conntrackStats["sampling_pct"]; ok {
-		tm[network.ConntrackSamplingPercent] = sp
-	}
-
-	dnsStats := stats["dns"].(map[string]int64)
-	if pp, ok := dnsStats["packets_processed"]; ok {
-		tm[network.MonotonicDNSPacketsProcessed] = pp
-	}
-
-	if ds, ok := dnsStats["dropped_stats"]; ok {
-		tm[network.DNSStatsDropped] = ds
-	}
-
-	httpStats := stats["http"].(map[string]interface{})
-	if ds, ok := httpStats["dropped"]; ok {
-		tm[network.HTTPRequestsDropped] = ds.(int64)
-	}
-
-	if ms, ok := httpStats["misses"]; ok {
-		tm[network.HTTPRequestsMissed] = ms.(int64)
-	}
-
-	ebpfStats := stats["ebpf"].(map[string]int64)
-	if usp, ok := ebpfStats["udp_sends_processed"]; ok {
-		tm[network.MonotonicUDPSendsProcessed] = usp
-	}
-	if usm, ok := ebpfStats["udp_sends_missed"]; ok {
-		tm[network.MonotonicUDPSendsMissed] = usm
-	}
-
-	return tm
-}
-
-func (t *Tracer) getRuntimeCompilationTelemetry() map[string]network.RuntimeCompilationTelemetry {
-	telemetryByAsset := map[string]map[string]int64{
-		"tracer":          runtime.Tracer.GetTelemetry(),
-		"conntrack":       runtime.Conntrack.GetTelemetry(),
-		"http":            runtime.Http.GetTelemetry(),
-		"oomKill":         runtime.OomKill.GetTelemetry(),
-		"runtimeSecurity": runtime.RuntimeSecurity.GetTelemetry(),
-		"tcpQueueLength":  runtime.TcpQueueLength.GetTelemetry(),
-	}
-
-	result := make(map[string]network.RuntimeCompilationTelemetry)
-	for assetName, telemetry := range telemetryByAsset {
-		tm := network.RuntimeCompilationTelemetry{}
-		if enabled, ok := telemetry["runtime_compilation_enabled"]; ok {
-			tm.RuntimeCompilationEnabled = enabled == 1
-		}
-		if result, ok := telemetry["runtime_compilation_result"]; ok {
-			tm.RuntimeCompilationResult = int32(result)
-		}
-		if result, ok := telemetry["kernel_header_fetch_result"]; ok {
-			tm.KernelHeaderFetchResult = int32(result)
-		}
-		if duration, ok := telemetry["runtime_compilation_duration"]; ok {
-			tm.RuntimeCompilationDuration = duration
-		}
-		result[assetName] = tm
-	}
-
-	return result
 }
 
 // getConnections returns all the active connections in the ebpf maps along with the latest timestamp.  It takes
@@ -562,69 +473,9 @@ func (t *Tracer) udpConnTimeout(isAssured bool) uint64 {
 	return defaultUDPConnTimeoutNanoSeconds
 }
 
-type statsComp int
-
-const (
-	conntrackStats statsComp = iota
-	dnsStats
-	epbfStats
-	gatewayLookupStats
-	httpStats
-	kprobesStats
-	stateStats
-	tracerStats
-)
-
-var allStats = []statsComp{
-	conntrackStats,
-	dnsStats,
-	epbfStats,
-	gatewayLookupStats,
-	httpStats,
-	kprobesStats,
-	stateStats,
-	tracerStats,
-}
-
-func (t *Tracer) getStats(comps ...statsComp) (map[string]interface{}, error) {
-	if t.state == nil {
-		return nil, fmt.Errorf("internal state not yet initialized")
-	}
-
-	if len(comps) == 0 {
-		comps = allStats
-	}
-
-	ret := map[string]interface{}{}
-	for _, c := range comps {
-		switch c {
-		case conntrackStats:
-			ret["conntrack"] = t.conntracker.GetStats()
-		case dnsStats:
-			ret["dns"] = t.reverseDNS.GetStats()
-		case epbfStats:
-			ret["ebpf"] = t.ebpfTracer.GetTelemetry()
-		case gatewayLookupStats:
-			ret["gateway_lookup"] = t.gwLookup.GetStats()
-		case httpStats:
-			ret["http"] = t.httpMonitor.GetStats()
-		case kprobesStats:
-			ret["kprobes"] = ddebpf.GetProbeStats()
-		case stateStats:
-			ret["state"] = t.state.GetStats()["telemetry"]
-		case tracerStats:
-			tracerStats := t.statsReporter.Report()
-			tracerStats["runtime"] = runtime.Tracer.GetTelemetry()
-			ret["tracer"] = tracerStats
-		}
-	}
-
-	return ret, nil
-}
-
 // GetStats returns a map of statistics about the current tracer's internal state
 func (t *Tracer) GetStats() (map[string]interface{}, error) {
-	return t.getStats()
+	return telemetry.Report()
 }
 
 // DebugNetworkState returns a map with the current tracer's internal state, for debugging

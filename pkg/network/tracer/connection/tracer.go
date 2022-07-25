@@ -24,8 +24,6 @@ type Tracer interface {
 	// Remove deletes the connection from tracking state.
 	// It does not prevent the connection from re-appearing later, if additional traffic occurs.
 	Remove(conn *network.ConnectionStats) error
-	// GetTelemetry returns relevant telemetry.
-	GetTelemetry() map[string]int64
 	// GetMap returns the underlying named map. This is useful if any maps are shared with other eBPF components.
 	// An individual tracer implementation may choose which maps to expose via this function.
 	GetMap(string) *ebpf.Map
