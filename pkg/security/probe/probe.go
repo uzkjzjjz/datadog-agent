@@ -648,12 +648,15 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 
+		log.Infof("[exec] resolving process cache entry")
 		if err = p.resolvers.ProcessResolver.ResolveNewProcessCacheEntry(event.ProcessCacheEntry); err != nil {
 			log.Debugf("failed to resolve new process cache entry context: %s", err)
 		}
 
 		p.resolvers.ProcessResolver.AddExecEntry(event.ProcessCacheEntry)
 
+		log.Infof("[PID: %d] exec data offset: %v", event.ProcessCacheEntry.Pid, offset)
+		log.Infof("[PID: %d] exec data: %v", event.ProcessCacheEntry.Pid, data)
 		event.Exec.Process = &event.ProcessCacheEntry.Process
 	case model.ExitEventType:
 		if _, err = event.Exit.UnmarshalBinary(data[offset:]); err != nil {
@@ -661,11 +664,19 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			return
 		}
 
+		log.Infof("[exit] resolving process cache entry")
 		event.ProcessCacheEntry = event.ResolveProcessCacheEntry()
-		log.Infof("[PID: %d] exit time before ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
-		p.resolvers.ProcessResolver.ApplyBootTime(event.ProcessCacheEntry)
 		event.Exit.Process = &event.ProcessCacheEntry.Process
+		event.ProcessCacheEntry.ExitTime = event.Exit.ExitTime
+		log.Infof("[PID: %d] exit time before ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
+		// Print cache entry
+		// can't reapply bootime to exec and fork times
+		event.ProcessCacheEntry.ExitTime = p.resolvers.TimeResolver.ApplyBootTime(event.ProcessCacheEntry.ExitTime)
 		log.Infof("[PID: %d] exit time after  ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
+		log.Infof("[PID: %d] test code: %d", event.ProcessCacheEntry.Pid, event.Exit.Test)
+		log.Infof("[PID: %d] exit data offset: %v", event.ProcessCacheEntry.Pid, offset)
+		log.Infof("[PID: %d] exit data: %v", event.ProcessCacheEntry.Pid, data)
+		// Print cache entry
 	case model.SetuidEventType:
 		if _, err = event.SetUID.UnmarshalBinary(data[offset:]); err != nil {
 			log.Errorf("failed to decode setuid event: %s (offset %d, len %d)", err, offset, len(data))

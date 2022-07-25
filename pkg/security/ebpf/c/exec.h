@@ -59,8 +59,8 @@ struct exit_event_t {
     struct span_context_t span;
     struct container_context_t container;
     u32 exit_code;
-    u64 exit_timestamp;
     u32 test;
+    u64 exit_timestamp;
 };
 
 struct _tracepoint_sched_process_fork {
