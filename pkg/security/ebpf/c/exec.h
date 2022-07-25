@@ -59,6 +59,8 @@ struct exit_event_t {
     struct span_context_t span;
     struct container_context_t container;
     u32 exit_code;
+    u64 exit_timestamp;
+    u32 test;
 };
 
 struct _tracepoint_sched_process_fork {
@@ -524,6 +526,7 @@ int kprobe_do_exit(struct pt_regs *ctx) {
         }
 
         // update exit time
+        // HOW DO WE ACCESS this cache in system-probe
         struct pid_cache_t *pid_entry = (struct pid_cache_t *) bpf_map_lookup_elem(&pid_cache, &tgid);
         if (pid_entry) {
             pid_entry->exit_timestamp = bpf_ktime_get_ns();
@@ -535,6 +538,8 @@ int kprobe_do_exit(struct pt_regs *ctx) {
         fill_container_context(cache_entry, &event.container);
         fill_span_context(&event.span);
         event.exit_code = (u32)PT_REGS_PARM1(ctx);
+        event.test = 12;
+        event.exit_timestamp = bpf_ktime_get_ns();
         send_event(ctx, EVENT_EXIT, event);
 
         unregister_span_memory();

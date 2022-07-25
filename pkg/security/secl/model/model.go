@@ -386,8 +386,10 @@ type ExecEvent struct {
 //msgp:ignore ExitEvent
 type ExitEvent struct {
 	*Process
-	Cause uint32 `field:"cause"` // Cause of the process termination (one of EXITED, SIGNALED, COREDUMPED)
-	Code  uint32 `field:"code"`  // Exit code of the process or number of the signal that caused the process to terminate
+	Cause    uint32    `field:"cause"` // Cause of the process termination (one of EXITED, SIGNALED, COREDUMPED)
+	Code     uint32    `field:"code"`  // Exit code of the process or number of the signal that caused the process to terminate
+	ExitTime time.Time `field:"exit_time"`
+	Test     uint32    `field:"test"`
 }
 
 // FileFields holds the information required to identify a file

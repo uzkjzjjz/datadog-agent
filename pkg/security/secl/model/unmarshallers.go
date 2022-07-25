@@ -232,7 +232,10 @@ func (e *ExitEvent) UnmarshalBinary(data []byte) (int, error) {
 		}
 	}
 
-	return 4, nil
+	e.Test = ByteOrder.Uint32(data[4:8])
+	e.ExitTime = unmarshalTime(data[8:16])
+
+	return 16, nil
 }
 
 // UnmarshalBinary unmarshalls a binary representation of itself
