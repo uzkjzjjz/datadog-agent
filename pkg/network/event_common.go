@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
+
 	"github.com/DataDog/datadog-agent/pkg/network/dns"
 	"github.com/DataDog/datadog-agent/pkg/network/http"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
-	"github.com/dustin/go-humanize"
 )
 
 // ConnectionType will be either TCP or UDP
@@ -361,6 +362,8 @@ func ConnectionSummary(c *ConnectionStats, names map[util.Address][]dns.Hostname
 			time.Duration(c.RTTVar)*time.Microsecond,
 		)
 	}
+
+	str += fmt.Sprintf(", last updated: %d", c.LastUpdateEpoch)
 
 	return str
 }

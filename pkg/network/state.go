@@ -89,6 +89,7 @@ type telemetry struct {
 	dnsStatsDropped    int64
 	httpStatsDropped   int64
 	dnsPidCollisions   int64
+	dupConnections     int64
 }
 
 const minClosedCapacity = 1024
@@ -206,7 +207,7 @@ func (ns *networkState) GetDelta(
 
 	// Update the latest known time
 	ns.latestTimeEpoch = latestTime
-	connsByKey := getConnsByKey(active, ns.buf)
+	connsByKey := ns.getConnsByKey(active, ns.buf)
 
 	clientBuffer := clientPool.Get(id)
 	client := ns.getClient(id)
@@ -282,11 +283,12 @@ func (ns *networkState) logTelemetry() {
 		dnsStatsDropped:    ns.telemetry.dnsStatsDropped - ns.lastTelemetry.dnsStatsDropped,
 		httpStatsDropped:   ns.telemetry.httpStatsDropped - ns.lastTelemetry.httpStatsDropped,
 		dnsPidCollisions:   ns.telemetry.dnsPidCollisions - ns.lastTelemetry.dnsPidCollisions,
+		dupConnections:     ns.telemetry.dupConnections - ns.lastTelemetry.dupConnections,
 	}
 
 	// Flush log line if any metric is non zero
 	if delta.statsResets > 0 || delta.closedConnDropped > 0 || delta.connDropped > 0 || delta.timeSyncCollisions > 0 ||
-		delta.dnsStatsDropped > 0 || delta.httpStatsDropped > 0 || delta.dnsPidCollisions > 0 {
+		delta.dnsStatsDropped > 0 || delta.httpStatsDropped > 0 || delta.dnsPidCollisions > 0 || delta.dupConnections > 0 {
 		s := "state telemetry: "
 		s += " [%d stats stats_resets]"
 		s += " [%d connections dropped due to stats]"
@@ -295,6 +297,7 @@ func (ns *networkState) logTelemetry() {
 		s += " [%d HTTP stats dropped]"
 		s += " [%d DNS pid collisions]"
 		s += " [%d time sync collisions]"
+		s += " [%d dup connections]"
 		log.Warnf(s,
 			delta.statsResets,
 			delta.connDropped,
@@ -302,7 +305,9 @@ func (ns *networkState) logTelemetry() {
 			delta.dnsStatsDropped,
 			delta.httpStatsDropped,
 			delta.dnsPidCollisions,
-			delta.timeSyncCollisions)
+			delta.timeSyncCollisions,
+			delta.dupConnections,
+		)
 	}
 
 	ns.lastTelemetry = ns.telemetry
@@ -322,10 +327,14 @@ func (ns *networkState) RegisterClient(id string) {
 }
 
 // getConnsByKey returns a mapping of byte-key -> connection for easier access + manipulation
-func getConnsByKey(conns []ConnectionStats, buf []byte) map[string]*ConnectionStats {
+func (ns *networkState) getConnsByKey(conns []ConnectionStats, buf []byte) map[string]*ConnectionStats {
 	connsByKey := make(map[string]*ConnectionStats, len(conns))
 	for i, c := range conns {
 		key := c.ByteKey(buf)
+		if dup, ok := connsByKey[string(key)]; ok {
+			log.Debugf("found dup connection: %s", dup)
+			ns.telemetry.dupConnections++
+		}
 		connsByKey[string(key)] = &conns[i]
 	}
 	return connsByKey
@@ -494,10 +503,12 @@ func (ns *networkState) mergeConnections(id string, active map[string]*Connectio
 		if activeConn, ok := active[key]; ok {
 			// If closed conn is newer it means that the active connection is outdated, let's ignore it
 			if closedConn.LastUpdateEpoch > activeConn.LastUpdateEpoch {
+				log.Debugf("closed conn newer closed=%s active=%s", closedConn, activeConn)
 				ns.updateConnWithStats(client, key, closedConn)
 			} else if closedConn.LastUpdateEpoch < activeConn.LastUpdateEpoch {
 				// Else if the active conn is newer, it likely means that it became active again
 				// in this case we aggregate the two
+				log.Debugf("closed conn older closed=%s active=%s", closedConn, activeConn)
 				addConnections(closedConn, activeConn)
 				ns.createStatsForKey(client, key)
 				ns.updateConnWithStatWithActiveConn(client, key, activeConn, closedConn)
@@ -650,6 +661,7 @@ func (ns *networkState) GetStats() map[string]interface{} {
 			"dns_stats_dropped":    ns.telemetry.dnsStatsDropped,
 			"http_stats_dropped":   ns.telemetry.httpStatsDropped,
 			"dns_pid_collisions":   ns.telemetry.dnsPidCollisions,
+			"dup_connections":      ns.telemetry.dupConnections,
 		},
 		"current_time":       time.Now().Unix(),
 		"latest_bpf_time_ns": ns.latestTimeEpoch,
