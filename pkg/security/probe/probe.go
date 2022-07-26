@@ -675,7 +675,7 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 		log.Infof("[PID: %d] exit time after  ApplyBootTime: %s", event.ProcessCacheEntry.Pid, event.ProcessCacheEntry.ExitTime.String())
 		log.Infof("[PID: %d] test code: %d", event.ProcessCacheEntry.Pid, event.Exit.Test)
 		log.Infof("[PID: %d] exit data offset: %v", event.ProcessCacheEntry.Pid, offset)
-		log.Infof("[PID: %d] exit data: %v", event.ProcessCacheEntry.Pid, data)
+		log.Infof("[PID: %d] exit data: %v", event.ProcessCacheEntry.Pid, data[offset:])
 		// Print cache entry
 	case model.SetuidEventType:
 		if _, err = event.SetUID.UnmarshalBinary(data[offset:]); err != nil {

@@ -59,7 +59,7 @@ struct exit_event_t {
     struct span_context_t span;
     struct container_context_t container;
     u32 exit_code;
-    u32 test;
+    u32 padding
     u64 exit_timestamp;
 };
 
@@ -538,8 +538,12 @@ int kprobe_do_exit(struct pt_regs *ctx) {
         fill_container_context(cache_entry, &event.container);
         fill_span_context(&event.span);
         event.exit_code = (u32)PT_REGS_PARM1(ctx);
-        event.test = 12;
         event.exit_timestamp = bpf_ktime_get_ns();
+
+        char comm[TASK_COMM_LEN] = {};
+        bpf_get_current_comm(comm, sizeof(comm));
+        bpf_printk("comm: %s\n", comm);
+
         send_event(ctx, EVENT_EXIT, event);
 
         unregister_span_memory();
@@ -647,6 +651,10 @@ int kprobe_security_bprm_committed_creds(struct pt_regs *ctx) {
 
             // [activity_dump] check if this process should be traced
             should_trace_new_process(ctx, now, tgid, event.proc_entry.container.container_id, event.proc_entry.comm);
+
+            char comm[TASK_COMM_LEN] = {};
+            bpf_get_current_comm(comm, sizeof(comm));
+            bpf_printk("comm: %s\n", comm);
 
             // send the entry to maintain userspace cache
             send_event(ctx, EVENT_EXEC, event);

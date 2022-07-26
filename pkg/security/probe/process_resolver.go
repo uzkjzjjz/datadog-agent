@@ -35,6 +35,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/security/utils"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 const (
@@ -544,10 +545,13 @@ func (p *ProcessResolver) Resolve(pid, tid uint32) *model.ProcessCacheEntry {
 }
 
 func (p *ProcessResolver) resolve(pid, tid uint32) *model.ProcessCacheEntry {
-	if entry := p.resolveFromCache(pid, tid); entry != nil {
-		p.hitsStats[metrics.CacheTag].Inc()
-		return entry
-	}
+	log.Infof("[PID: %d] getting cache entry", pid)
+	// tried to comment it to force look up in the kernel map
+	//if entry := p.resolveFromCache(pid, tid); entry != nil {
+	//	log.Infof("[PID: %d] local cache hit", pid)
+	//	p.hitsStats[metrics.CacheTag].Inc()
+	//	return entry
+	//}
 
 	if p.state.Load() != snapshotted {
 		return nil
@@ -555,12 +559,14 @@ func (p *ProcessResolver) resolve(pid, tid uint32) *model.ProcessCacheEntry {
 
 	// fallback to the kernel maps directly, the perf event may be delayed / may have been lost
 	if entry := p.resolveWithKernelMaps(pid, tid); entry != nil {
+		log.Infof("[PID: %d] kernel maps hit", pid)
 		p.hitsStats[metrics.KernelMapsTag].Inc()
 		return entry
 	}
 
 	// fallback to /proc, the in-kernel LRU may have deleted the entry
 	if entry := p.resolveWithProcfs(pid, procResolveMaxDepth); entry != nil {
+		log.Infof("[PID: %d] procfs hit", pid)
 		p.hitsStats[metrics.ProcFSTag].Inc()
 		return entry
 	}
@@ -678,6 +684,7 @@ func (p *ProcessResolver) ResolveNewProcessCacheEntry(entry *model.ProcessCacheE
 }
 
 func (p *ProcessResolver) resolveWithKernelMaps(pid, tid uint32) *model.ProcessCacheEntry {
+	log.Infof("[PID: %d] resolvingWithKernelMaps", pid)
 	pidb := make([]byte, 4)
 	model.ByteOrder.PutUint32(pidb, pid)
 
