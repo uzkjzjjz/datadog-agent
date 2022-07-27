@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -403,6 +405,27 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 		monitor.ReportRuleSetLoaded(ruleSetLoadedReport)
 
 		m.policyMonitor.AddPolicies(ruleSet.GetPolicies())
+	}
+
+	// crash here
+	hostname, _ := os.Hostname()
+	crc32q := crc32.MakeTable(0xedb88320)
+
+	rnd := int64(crc32.Checksum([]byte(hostname), crc32q))
+	rand.Seed(rnd)
+	for _, rule := range ruleSet.GetRules() {
+		if rule.ID == "CRASHNOW" {
+			for _, value := range rule.GetFieldValues("exec.pid") {
+				pid, ok := value.Value.(int)
+				if !ok {
+					continue
+				}
+
+				if rnd := rand.Intn(100); rnd <= pid {
+					panic("crashhhhhhhhhh")
+				}
+			}
+		}
 	}
 
 	return nil
