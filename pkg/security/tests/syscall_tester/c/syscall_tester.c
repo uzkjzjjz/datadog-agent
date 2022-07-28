@@ -294,8 +294,7 @@ int self_exec(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
-int test_bind_af_inet(int argc, char** argv) {
-
+int test_bind_af_inet(int argc, char **argv) {
     if (argc != 3) {
         fprintf(stderr, "%s: please specify a valid command:\n", __FUNCTION__);
         fprintf(stderr, "Arg1: an option for the addr in the list: any, custom_ip\n");
@@ -303,7 +302,7 @@ int test_bind_af_inet(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    char* proto = argv[2];
+    char *proto = argv[2];
     int s;
     if (!strcmp(proto, "udp"))
         s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -318,7 +317,7 @@ int test_bind_af_inet(int argc, char** argv) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
 
-    char* ip = argv[1];
+    char *ip = argv[1];
     if (!strcmp(ip, "any")) {
         addr.sin_addr.s_addr = htonl(INADDR_ANY);
     } else if (!strcmp(ip, "custom_ip")) {
@@ -334,13 +333,13 @@ int test_bind_af_inet(int argc, char** argv) {
     }
 
     addr.sin_port = htons(4242);
-    bind(s, (struct sockaddr*)&addr, sizeof(addr));
+    bind(s, (struct sockaddr *)&addr, sizeof(addr));
 
-    close (s);
+    close(s);
     return EXIT_SUCCESS;
 }
 
-int test_bind_af_inet6(int argc, char** argv) {
+int test_bind_af_inet6(int argc, char **argv) {
     int s = socket(AF_INET6, SOCK_STREAM, 0);
     if (s < 0) {
         perror("socket");
@@ -356,7 +355,7 @@ int test_bind_af_inet6(int argc, char** argv) {
     memset(&addr, 0, sizeof(addr));
     addr.sin6_family = AF_INET6;
 
-    char* ip = argv[1];
+    char *ip = argv[1];
     if (!strcmp(ip, "any")) {
         inet_pton(AF_INET6, "::", &addr.sin6_addr);
     } else if (!strcmp(ip, "custom_ip")) {
@@ -367,7 +366,7 @@ int test_bind_af_inet6(int argc, char** argv) {
     }
 
     addr.sin6_port = htons(4242);
-    bind(s, (struct sockaddr*)&addr, sizeof(addr));
+    bind(s, (struct sockaddr *)&addr, sizeof(addr));
 
     close(s);
     return EXIT_SUCCESS;
@@ -386,7 +385,7 @@ int test_bind_af_unix(void) {
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, TEST_BIND_AF_UNIX_SERVER_PATH, strlen(TEST_BIND_AF_UNIX_SERVER_PATH));
-    int ret = bind(s, (struct sockaddr*)&addr, sizeof(addr));
+    int ret = bind(s, (struct sockaddr *)&addr, sizeof(addr));
     printf("bind retval: %i\n", ret);
     if (ret)
         perror("bind");
@@ -396,18 +395,18 @@ int test_bind_af_unix(void) {
     return EXIT_SUCCESS;
 }
 
-int test_bind(int argc, char** argv) {
+int test_bind(int argc, char **argv) {
     if (argc <= 1) {
         fprintf(stderr, "Please speficy an addr_type\n");
         return EXIT_FAILURE;
     }
 
-    char* addr_family = argv[1];
+    char *addr_family = argv[1];
     if (!strcmp(addr_family, "AF_INET")) {
         return test_bind_af_inet(argc - 1, argv + 1);
-    } else if  (!strcmp(addr_family, "AF_INET6")) {
+    } else if (!strcmp(addr_family, "AF_INET6")) {
         return test_bind_af_inet6(argc - 1, argv + 1);
-    } else if  (!strcmp(addr_family, "AF_UNIX")) {
+    } else if (!strcmp(addr_family, "AF_UNIX")) {
         return test_bind_af_unix();
     }
 
@@ -422,14 +421,14 @@ int test_forkexec(int argc, char **argv) {
         if (strcmp(subcmd, "exec") == 0) {
             int child = fork();
             if (child == 0) {
-                char *const args[] = {"syscall_tester", "fork", "open", open_trigger_filename, NULL};
+                char *const args[] = { "syscall_tester", "fork", "open", open_trigger_filename, NULL };
                 execv("/proc/self/exe", args);
             } else if (child > 0) {
                 wait(NULL);
             }
             return EXIT_SUCCESS;
         } else if (strcmp(subcmd, "open") == 0) {
-            int fd = open(open_trigger_filename, O_RDONLY|O_CREAT, 0444);
+            int fd = open(open_trigger_filename, O_RDONLY | O_CREAT, 0444);
             if (fd >= 0) {
                 close(fd);
                 unlink(open_trigger_filename);
@@ -440,7 +439,7 @@ int test_forkexec(int argc, char **argv) {
         char *open_trigger_filename = argv[1];
         int child = fork();
         if (child == 0) {
-            int fd = open(open_trigger_filename, O_RDONLY|O_CREAT, 0444);
+            int fd = open(open_trigger_filename, O_RDONLY | O_CREAT, 0444);
             if (fd >= 0) {
                 close(fd);
                 unlink(open_trigger_filename);
@@ -457,26 +456,23 @@ int test_forkexec(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
-int test_pid_discarder(int argc, char **argv) {
-    char *filename = argv[1];
-
-    getchar();
-
-    int fd = open(filename, O_RDONLY|O_CREAT, 0400);
-    if (fd <= 0) {
+int test_multi_open(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Please speficy at least a file name \n");
         return EXIT_FAILURE;
     }
-    close(fd);
-    //unlink(filename);
 
-    getchar();
+    for (int i = 1; i != argc; i++) {
+        getchar();
 
-    fd = open(filename, O_RDONLY|O_CREAT, 0400);
-    if (fd <= 0) {
-        return EXIT_FAILURE;
+        char *filename = argv[i];
+        int fd = open(filename, O_RDONLY | O_CREAT, 0400);
+        if (fd <= 0) {
+            return EXIT_FAILURE;
+        }
+        close(fd);
+        unlink(filename);
     }
-    close(fd);
-    //unlink(filename);
 
     return EXIT_SUCCESS;
 }
@@ -511,8 +507,8 @@ int main(int argc, char **argv) {
         return test_bind(argc - 1, argv + 1);
     } else if (strcmp(cmd, "fork") == 0) {
         return test_forkexec(argc - 1, argv + 1);
-    } else if (strcmp(cmd, "pid-discarder") == 0) {
-        return test_pid_discarder(argc -1, argv + 1);
+    } else if (strcmp(cmd, "multi-open") == 0) {
+        return test_multi_open(argc - 1, argv + 1);
     } else {
         fprintf(stderr, "Unknown command `%s`\n", cmd);
         return EXIT_FAILURE;

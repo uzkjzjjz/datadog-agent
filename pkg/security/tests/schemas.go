@@ -187,3 +187,8 @@ func validateActivityDumpSchema(t *testing.T, ad string) bool {
 func validateActivityDumpProtoSchema(t *testing.T, ad string) bool {
 	return validateStringSchema(t, ad, "file:///schemas/activity_dump_proto.schema.json")
 }
+
+//nolint:deadcode,unused
+func validateProcessContext(t *testing.T, ad string) bool {
+	return validateStringSchema(t, ad, "file:///schemas/process_context.json")
+}

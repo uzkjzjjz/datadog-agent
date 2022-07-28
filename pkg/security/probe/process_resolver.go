@@ -544,7 +544,7 @@ func (p *ProcessResolver) Resolve(pid, tid uint32) *model.ProcessCacheEntry {
 }
 
 func (p *ProcessResolver) resolve(pid, tid uint32) *model.ProcessCacheEntry {
-	if entry := p.resolveFromCache(pid, tid); entry != nil {
+	if entry := p.ResolveFromCache(pid, tid); entry != nil {
 		p.hitsStats[metrics.CacheTag].Inc()
 		return entry
 	}
@@ -554,13 +554,13 @@ func (p *ProcessResolver) resolve(pid, tid uint32) *model.ProcessCacheEntry {
 	}
 
 	// fallback to the kernel maps directly, the perf event may be delayed / may have been lost
-	if entry := p.ResolveWithKernelMaps(pid, tid); entry != nil {
+	if entry := p.ResolveFromKernelMaps(pid, tid); entry != nil {
 		p.hitsStats[metrics.KernelMapsTag].Inc()
 		return entry
 	}
 
 	// fallback to /proc, the in-kernel LRU may have deleted the entry
-	if entry := p.ResolveWithProcfs(pid); entry != nil {
+	if entry := p.ResolveFromProcfs(pid); entry != nil {
 		p.hitsStats[metrics.ProcFSTag].Inc()
 		return entry
 	}
@@ -629,7 +629,8 @@ func (p *ProcessResolver) ApplyBootTime(entry *model.ProcessCacheEntry) {
 	entry.ExitTime = p.resolvers.TimeResolver.ApplyBootTime(entry.ExitTime)
 }
 
-func (p *ProcessResolver) resolveFromCache(pid, tid uint32) *model.ProcessCacheEntry {
+// ResolveFromCache resolves cache entry from the cache
+func (p *ProcessResolver) ResolveFromCache(pid, tid uint32) *model.ProcessCacheEntry {
 	entry, exists := p.entryCache[pid]
 	if !exists {
 		return nil
@@ -659,40 +660,47 @@ func (p *ProcessResolver) ResolveNewProcessCacheEntry(entry *model.ProcessCacheE
 	return nil
 }
 
-// ResolveWithKernelMaps resolves the entry from the kernel maps
-func (p *ProcessResolver) ResolveWithKernelMaps(pid, tid uint32) *model.ProcessCacheEntry {
+// ResolveFromKernelMaps resolves the entry from the kernel maps
+func (p *ProcessResolver) ResolveFromKernelMaps(pid, tid uint32) *model.ProcessCacheEntry {
 	pidb := make([]byte, 4)
 	model.ByteOrder.PutUint32(pidb, pid)
 
 	pidCache, err := p.pidCacheMap.LookupBytes(pidb)
 	if err != nil || pidCache == nil {
+		fmt.Printf("111111\n")
 		return nil
 	}
 
 	// first 4 bytes are the actual cookie
 	procCache, err := p.procCacheMap.LookupBytes(pidCache[0:4])
 	if err != nil || procCache == nil {
+		fmt.Printf("222222\n")
 		return nil
 	}
 
 	entry := p.NewProcessCacheEntry(model.PIDContext{Pid: pid, Tid: tid})
 
 	var cc model.ContainerContext
-	if _, err := cc.UnmarshalBinary(procCache); err != nil {
+	read, err := cc.UnmarshalBinary(procCache);
+	if err != nil {
+		fmt.Printf("3333333\n")
 		return nil
 	}
 	entry.ContainerID = cc.ID
 
-	if _, err := entry.UnmarshalProcEntryBinary(procCache[64:]); err != nil {
+	if _, err := entry.UnmarshalProcEntryBinary(procCache[read:]); err != nil {
+		fmt.Printf("4444444\n")
 		return nil
 	}
 
 	if _, err := entry.UnmarshalPidCacheBinary(pidCache); err != nil {
+		fmt.Printf("5555555\n")
 		return nil
 	}
 
 	// resolve paths and other context fields
 	if err = p.ResolveNewProcessCacheEntry(entry); err != nil {
+		fmt.Printf("6666666\n")
 		return nil
 	}
 
@@ -722,12 +730,12 @@ func IsKThread(ppid, pid uint32) bool {
 	return ppid == 2 || pid == 2
 }
 
-// ResolveWithProcfs resolves the entry from procfs
-func (p *ProcessResolver) ResolveWithProcfs(pid uint32) *model.ProcessCacheEntry {
-	return p.resolveWithProcfs(pid, procResolveMaxDepth)
+// ResolveFromProcfs resolves the entry from procfs
+func (p *ProcessResolver) ResolveFromProcfs(pid uint32) *model.ProcessCacheEntry {
+	return p.resolveFromProcfs(pid, procResolveMaxDepth)
 }
 
-func (p *ProcessResolver) resolveWithProcfs(pid uint32, maxDepth int) *model.ProcessCacheEntry {
+func (p *ProcessResolver) resolveFromProcfs(pid uint32, maxDepth int) *model.ProcessCacheEntry {
 	if maxDepth < 1 || pid == 0 {
 		return nil
 	}
@@ -757,7 +765,7 @@ func (p *ProcessResolver) resolveWithProcfs(pid uint32, maxDepth int) *model.Pro
 		ppid = entry.PPid
 	}
 
-	parent := p.resolveWithProcfs(ppid, maxDepth-1)
+	parent := p.resolveFromProcfs(ppid, maxDepth-1)
 	if inserted && entry != nil && parent != nil {
 		if parent.Equals(entry) {
 			entry.SetParent(parent)

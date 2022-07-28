@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -1403,6 +1404,100 @@ func TestProcessBusybox(t *testing.T) {
 			return nil
 		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_busybox_4", rule.ID, "wrong rule triggered")
+		}))
+	})
+}
+
+func TestProcessResolution(t *testing.T) {
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_resolution",
+			Expression: `open.file.path == "{{.Root}}/test-process-resolution"`,
+		},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	testFile, _, err := test.Path("test-process-resolution")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(testFile)
+
+	syscallTester, err := loadSyscallTester(t, test, "syscall_tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wrapper, err := newDockerCmdWrapper(test.Root())
+	if err != nil {
+		t.Skip("docker no available")
+		return
+	}
+
+	var cmd *exec.Cmd
+	var stdin io.WriteCloser
+	defer func() {
+		if cmd != nil {
+			if stdin != nil {
+				stdin.Close()
+			}
+
+			if err := cmd.Wait(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+
+	wrapper.Run(t, "resolution", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		test.WaitSignal(t, func() error {
+			var err error
+
+			args := []string{"multi-open", testFile, testFile}
+
+			cmd := exec.Command(syscallTester, args...)
+			stdin, err = cmd.StdinPipe()
+			if err != nil {
+				return err
+			}
+
+			if err := cmd.Start(); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = io.WriteString(stdin, "\n")
+
+			return err
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assert.Equal(t, "test_resolution", rule.ID, "wrong rule triggered")
+
+			value, err := event.GetFieldValue("process.pid")
+			if err != nil {
+				t.Errorf("not able to get pid")
+			}
+			pid := uint32(value.(int))
+
+			resolvers := test.probe.GetResolvers()
+
+			mapsEntry := resolvers.ProcessResolver.ResolveFromKernelMaps(pid, pid)
+			if mapsEntry == nil {
+				t.Errorf("not able to resolve the entry")
+			}
+
+			fmt.Printf(">>>>: %d : %+v\n", pid, event)
+
+			cacheEntry := resolvers.ProcessResolver.ResolveFromCache(pid, pid)
+			if cacheEntry == nil {
+				t.Errorf("not able to resolve the entry")
+			}
+
+			if _, err = io.WriteString(stdin, "\n"); err != nil {
+				t.Error(err)
+			}
 		}))
 	})
 }
