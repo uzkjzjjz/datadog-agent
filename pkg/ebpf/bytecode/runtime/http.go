@@ -4,4 +4,8 @@
 
 package runtime
 
+<<<<<<< HEAD
 var Http = NewRuntimeAsset("http.c", "45789237490e0f07192d4465719199a55d20b6b7f90a1cb0c905e0031f66959b")
+=======
+var Http = NewRuntimeAsset("http.c", "24f73985fbb195505da42bb5d7aa28c09439b26abd7df142b65abb2b486bc9a7")
+>>>>>>> b71ac91ed (fix runtime classifier.c)
