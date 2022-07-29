@@ -29,7 +29,7 @@ import (
 
 // newSenders returns a list of senders based on the given agent configuration, using climit
 // as the maximum number of concurrent outgoing connections, writing to path.
-func newSenders(cfg *config.AgentConfig, r eventRecorder, path string, climit, qsize int) []*sender {
+func newSenders(cfg *config.AgentConfig, r eventRecorder, path string, climit, qsize int, stats bool) []*sender {
 	if e := cfg.Endpoints; len(e) == 0 || e[0].Host == "" || e[0].APIKey == "" {
 		panic(errors.New("config was not properly validated"))
 	}
@@ -37,9 +37,18 @@ func newSenders(cfg *config.AgentConfig, r eventRecorder, path string, climit, q
 	maxConns := math.Max(1, float64(climit/len(cfg.Endpoints)))
 	senders := make([]*sender, len(cfg.Endpoints))
 	for i, endpoint := range cfg.Endpoints {
-		url, err := url.Parse(endpoint.Host + path)
+		var host string
+		if stats {
+			if host == "" {
+				panic(errors.New("config was not properly validated"))
+			}
+			host = endpoint.StatsHost
+		} else {
+			host = endpoint.Host
+		}
+		url, err := url.Parse(host + path)
 		if err != nil {
-			log.Criticalf("Invalid host endpoint: %q", endpoint.Host)
+			log.Criticalf("Invalid host endpoint: %q", host)
 			os.Exit(1)
 		}
 		senders[i] = newSender(&senderConfig{

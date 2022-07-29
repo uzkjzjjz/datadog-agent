@@ -147,6 +147,11 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 	} else {
 		c.Endpoints[0].Host = coreconfig.GetMainEndpoint(apiEndpointPrefix, "apm_config.apm_dd_url")
 	}
+
+	if apm_stats_host := coreconfig.Datadog.GetString("apm_config.apm_stats_dd_url"); apm_stats_host != "" {
+		c.Endpoints[0].StatsHost = apm_stats_host
+	}
+
 	c.Endpoints = appendEndpoints(c.Endpoints, "apm_config.additional_endpoints")
 
 	if coreconfig.Datadog.IsSet("proxy.no_proxy") {

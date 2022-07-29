@@ -83,6 +83,7 @@ func setupAPM(config Config) {
 	config.BindEnv("apm_config.env", "DD_APM_ENV")
 	config.BindEnv("apm_config.apm_non_local_traffic", "DD_APM_NON_LOCAL_TRAFFIC")
 	config.BindEnv("apm_config.apm_dd_url", "DD_APM_DD_URL")
+	config.BindEnv("apm_config.apm_stats_dd_url", "DD_APM_STATS_DD_URL")
 	config.BindEnv("apm_config.connection_limit", "DD_APM_CONNECTION_LIMIT", "DD_CONNECTION_LIMIT")
 	config.BindEnv("apm_config.connection_reset_interval", "DD_APM_CONNECTION_RESET_INTERVAL")
 	config.BindEnv("apm_config.profiling_dd_url", "DD_APM_PROFILING_DD_URL")

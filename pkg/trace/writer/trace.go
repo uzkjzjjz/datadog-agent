@@ -105,7 +105,7 @@ func NewTraceWriter(cfg *config.AgentConfig) *TraceWriter {
 		tw.tick = time.Duration(s*1000) * time.Millisecond
 	}
 	log.Debugf("Trace writer initialized (climit=%d qsize=%d)", climit, qsize)
-	tw.senders = newSenders(cfg, tw, pathTraces, climit, qsize)
+	tw.senders = newSenders(cfg, tw, pathTraces, climit, qsize, false)
 	return tw
 }
 

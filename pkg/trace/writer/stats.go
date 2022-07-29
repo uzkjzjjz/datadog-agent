@@ -82,7 +82,7 @@ func NewStatsWriter(cfg *config.AgentConfig, in <-chan pb.StatsPayload) *StatsWr
 		qsize = int(math.Max(1, maxmem/payloadSize))
 	}
 	log.Debugf("Stats writer initialized (climit=%d qsize=%d)", climit, qsize)
-	sw.senders = newSenders(cfg, sw, pathStats, climit, qsize)
+	sw.senders = newSenders(cfg, sw, pathStats, climit, qsize, false)
 	return sw
 }
 

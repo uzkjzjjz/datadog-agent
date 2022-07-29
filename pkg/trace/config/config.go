@@ -27,6 +27,7 @@ var ErrMissingAPIKey = errors.New("you must specify an API Key, either via a con
 type Endpoint struct {
 	APIKey string `json:"-"` // never marshal this
 	Host   string
+	StatsHost   string
 
 	// NoProxy will be set to true when the proxy setting for the trace API endpoint
 	// needs to be ignored (e.g. it is part of the "no_proxy" list in the yaml settings).
