@@ -7,11 +7,13 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
-	coreConfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/stretchr/testify/suite"
+
+	coreConfig "github.com/DataDog/datadog-agent/pkg/config"
 )
 
 type ConfigTestSuite struct {
@@ -20,7 +22,7 @@ type ConfigTestSuite struct {
 }
 
 func (suite *ConfigTestSuite) SetupTest() {
-	suite.config = coreConfig.Mock()
+	suite.config = coreConfig.Mock(nil)
 }
 
 func (suite *ConfigTestSuite) TestDefaultDatadogConfig() {
@@ -32,7 +34,11 @@ func (suite *ConfigTestSuite) TestDefaultDatadogConfig() {
 	suite.Equal("agent-443-intake.logs.datadoghq.com", suite.config.GetString("logs_config.dd_url_443"))
 	suite.Equal(false, suite.config.GetBool("logs_config.use_port_443"))
 	suite.Equal(true, suite.config.GetBool("logs_config.dev_mode_use_proto"))
-	suite.Equal(100, suite.config.GetInt("logs_config.open_files_limit"))
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		suite.Equal(200, suite.config.GetInt("logs_config.open_files_limit"))
+	} else {
+		suite.Equal(500, suite.config.GetInt("logs_config.open_files_limit"))
+	}
 	suite.Equal(9000, suite.config.GetInt("logs_config.frame_size"))
 	suite.Equal("", suite.config.GetString("logs_config.socks5_proxy_address"))
 	suite.Equal("", suite.config.GetString("logs_config.logs_dd_url"))
@@ -161,7 +167,6 @@ func (suite *ConfigTestSuite) TestMultipleHttpEndpointsEnvVar() {
 		RecoveryInterval: 10,
 		RecoveryReset:    true,
 		Version:          EPIntakeVersion1,
-		IsReliable:       true,
 	}
 	expectedAdditionalEndpoint1 := Endpoint{
 		APIKey:           "456",
@@ -218,7 +223,7 @@ func (suite *ConfigTestSuite) TestMultipleTCPEndpointsEnvVar() {
 		UseCompression:   false,
 		CompressionLevel: 0,
 		ProxyAddress:     "proxy.test:3128",
-		IsReliable:       true}
+	}
 	expectedAdditionalEndpoint := Endpoint{
 		APIKey:           "456",
 		Host:             "additional.endpoint",
@@ -226,7 +231,8 @@ func (suite *ConfigTestSuite) TestMultipleTCPEndpointsEnvVar() {
 		UseSSL:           true,
 		UseCompression:   false,
 		CompressionLevel: 0,
-		ProxyAddress:     "proxy.test:3128"}
+		ProxyAddress:     "proxy.test:3128",
+	}
 
 	expectedEndpoints := NewEndpoints(expectedMainEndpoint, []Endpoint{expectedAdditionalEndpoint}, true, false)
 	endpoints, err := buildTCPEndpoints(defaultLogsConfigKeys())
@@ -272,7 +278,6 @@ func (suite *ConfigTestSuite) TestMultipleHttpEndpointsInConfig() {
 		BackoffMax:       coreConfig.DefaultLogsSenderBackoffMax,
 		RecoveryInterval: coreConfig.DefaultLogsSenderBackoffRecoveryInterval,
 		Version:          EPIntakeVersion1,
-		IsReliable:       true,
 	}
 	expectedAdditionalEndpoint1 := Endpoint{
 		APIKey:           "456",
@@ -349,7 +354,6 @@ func (suite *ConfigTestSuite) TestMultipleHttpEndpointsInConfig2() {
 		TrackType:        "test-track",
 		Protocol:         "test-proto",
 		Origin:           "test-source",
-		IsReliable:       true,
 	}
 	expectedAdditionalEndpoint1 := Endpoint{
 		APIKey:           "456",
@@ -412,7 +416,6 @@ func (suite *ConfigTestSuite) TestMultipleTCPEndpointsInConf() {
 		UseCompression:   false,
 		CompressionLevel: 0,
 		ProxyAddress:     "proxy.test:3128",
-		IsReliable:       true,
 	}
 	expectedAdditionalEndpoint := Endpoint{
 		APIKey:           "456",
@@ -421,7 +424,8 @@ func (suite *ConfigTestSuite) TestMultipleTCPEndpointsInConf() {
 		UseSSL:           true,
 		UseCompression:   false,
 		CompressionLevel: 0,
-		ProxyAddress:     "proxy.test:3128"}
+		ProxyAddress:     "proxy.test:3128",
+	}
 
 	expectedEndpoints := NewEndpoints(expectedMainEndpoint, []Endpoint{expectedAdditionalEndpoint}, true, false)
 	endpoints, err := buildTCPEndpoints(defaultLogsConfigKeys())
@@ -454,7 +458,6 @@ func (suite *ConfigTestSuite) TestEndpointsSetLogsDDUrl() {
 		TrackType:        "test-track",
 		Protocol:         "test-proto",
 		Origin:           "test-source",
-		IsReliable:       true,
 	}
 
 	expectedEndpoints := &Endpoints{
@@ -500,7 +503,6 @@ func (suite *ConfigTestSuite) TestEndpointsSetDDSite() {
 		TrackType:        "test-track",
 		Origin:           "test-source",
 		Protocol:         "test-proto",
-		IsReliable:       true,
 	}
 
 	expectedEndpoints := &Endpoints{
@@ -536,7 +538,6 @@ func (suite *ConfigTestSuite) TestBuildServerlessEndpoints() {
 		TrackType:        "test-track",
 		Origin:           "lambda-extension",
 		Protocol:         "test-proto",
-		IsReliable:       true,
 	}
 
 	expectedEndpoints := &Endpoints{
@@ -571,7 +572,6 @@ func getTestEndpoint(host string, port int, ssl bool) Endpoint {
 		TrackType:        "test-track",
 		Protocol:         "test-proto",
 		Origin:           "test-source",
-		IsReliable:       true,
 	}
 }
 

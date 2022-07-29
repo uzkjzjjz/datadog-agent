@@ -22,9 +22,10 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/mholt/archiver/v3"
+
 	"github.com/DataDog/datadog-agent/pkg/metadata/host"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/mholt/archiver/v3"
 )
 
 const sysfsHeadersPath = "/sys/kernel/kheaders.tar.xz"
@@ -88,7 +89,7 @@ func GetKernelHeaders(downloadEnabled bool, headerDirs []string, headerDownloadD
 	}
 
 	downloadedDirs := validateHeaderDirs(hv, getDownloadedHeaderDirs(headerDownloadDir), false)
-	if !containsCriticalHeaders(downloadedDirs) {
+	if len(downloadedDirs) > 0 && !containsCriticalHeaders(downloadedDirs) {
 		// If this happens, it means we've previously downloaded kernel headers containing broken
 		// symlinks. We'll delete these to prevent them from affecting the next download
 		log.Infof("deleting previously downloaded kernel headers")
@@ -103,7 +104,7 @@ func GetKernelHeaders(downloadEnabled bool, headerDirs []string, headerDownloadD
 	log.Debugf("unable to find downloaded kernel headers: no valid headers found")
 
 	if !downloadEnabled {
-		return nil, headersNotFound, fmt.Errorf("no valid matching kernel header directories found")
+		return nil, headersNotFound, fmt.Errorf("no valid matching kernel header directories found. To download kernel headers, set system_probe_config.enable_kernel_header_download to true")
 	}
 
 	d := headerDownloader{aptConfigDir, yumReposDir, zypperReposDir}
@@ -276,6 +277,7 @@ func getSysfsHeaderDirs(v Version) ([]string, error) {
 			_ = os.RemoveAll(tmpPath)
 			return nil, fmt.Errorf("header version %s does not match expected host version %s", v, hv)
 		}
+		log.Debugf("found valid kernel headers at %s", tmpPath)
 		return []string{tmpPath}, nil
 	}
 

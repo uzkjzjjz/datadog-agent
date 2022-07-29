@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
+
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	telemetry_utils "github.com/DataDog/datadog-agent/pkg/telemetry/utils"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -22,10 +23,12 @@ const (
 
 // EventPlatformNameTranslations contains human readable translations for event platform event types
 var EventPlatformNameTranslations = map[string]string{
-	"dbm-samples":              "Database Monitoring Query Samples",
-	"dbm-metrics":              "Database Monitoring Query Metrics",
-	"dbm-activity":             "Database Monitoring Activity Samples",
-	"network-devices-metadata": "Network Devices Metadata",
+	"dbm-samples":                "Database Monitoring Query Samples",
+	"dbm-metrics":                "Database Monitoring Query Metrics",
+	"dbm-activity":               "Database Monitoring Activity Samples",
+	"network-devices-metadata":   "Network Devices Metadata",
+	"network-devices-netflow":    "Network Devices NetFlow",
+	"network-devices-snmp-traps": "SNMP Traps",
 }
 
 var (

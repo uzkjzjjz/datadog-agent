@@ -15,6 +15,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"go.uber.org/atomic"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -55,7 +56,7 @@ type CollectorRunConfig struct {
 	APIClient       *apiserver.APIClient
 	ClusterID       string
 	Config          *config.OrchestratorConfig
-	MsgGroupRef     *int32
+	MsgGroupRef     *atomic.Int32
 	CustomResources *[]schema.GroupVersionResource
 }
 

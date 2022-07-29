@@ -15,10 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/config"
-	httputils "github.com/DataDog/datadog-agent/pkg/util/http"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/DataDog/datadog-agent/pkg/config"
+	httputils "github.com/DataDog/datadog-agent/pkg/util/http"
 )
 
 var (
@@ -111,6 +112,50 @@ func TestGetInstanceID(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, expected, val)
 	assert.Equal(t, lastRequest.URL.Path, "/instance-id")
+}
+
+func TestGetHostAliases(t *testing.T) {
+	tests := []struct {
+		name          string
+		instanceID    string
+		expectedHosts []string
+	}{
+		{
+			name:          "Instance ID found",
+			instanceID:    "i-0b22a22eec53b9321",
+			expectedHosts: []string{"i-0b22a22eec53b9321"},
+		},
+		{
+			name:          "No Instance ID found",
+			expectedHosts: []string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/plain")
+				var responseCode int
+				if tc.instanceID != "" {
+					responseCode = http.StatusOK
+				} else {
+					responseCode = http.StatusInternalServerError
+				}
+				w.WriteHeader(responseCode)
+				_, _ = io.WriteString(w, tc.instanceID)
+			}))
+			defer ts.Close()
+
+			metadataURL = ts.URL
+			config.Datadog.Set("ec2_metadata_timeout", 1000)
+			defer resetPackageVars()
+
+			ctx := context.Background()
+			aliases, err := GetHostAliases(ctx)
+			assert.Equal(t, tc.expectedHosts, aliases)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestGetHostname(t *testing.T) {

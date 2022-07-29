@@ -20,10 +20,9 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/ast"
 )
 
-func newOptsWithParams(constants map[string]interface{}, legacyFields map[Field]Field) *Opts {
-	return &Opts{
+func newReplCtxWithParams(constants map[string]interface{}, legacyFields map[Field]Field) ReplacementContext {
+	opts := &Opts{
 		Constants:    constants,
-		Macros:       make(map[MacroID]*Macro),
 		LegacyFields: legacyFields,
 		Variables: map[string]VariableValue{
 			"pid": NewIntVariable(func(ctx *Context) int {
@@ -34,9 +33,13 @@ func newOptsWithParams(constants map[string]interface{}, legacyFields map[Field]
 			}, nil),
 		},
 	}
+	return ReplacementContext{
+		Opts:       opts,
+		MacroStore: &MacroStore{},
+	}
 }
 
-func parseRule(expr string, model Model, opts *Opts) (*Rule, error) {
+func parseRule(expr string, model Model, replCtx ReplacementContext) (*Rule, error) {
 	rule := &Rule{
 		ID:         "id1",
 		Expression: expr,
@@ -46,7 +49,7 @@ func parseRule(expr string, model Model, opts *Opts) (*Rule, error) {
 		return nil, fmt.Errorf("parsing error: %v", err)
 	}
 
-	if err := rule.GenEvaluator(model, opts); err != nil {
+	if err := rule.GenEvaluator(model, replCtx); err != nil {
 		return rule, fmt.Errorf("compilation error: %v", err)
 	}
 
@@ -58,8 +61,8 @@ func eval(t *testing.T, event *testEvent, expr string) (bool, *ast.Rule, error) 
 
 	ctx := NewContext(unsafe.Pointer(event))
 
-	opts := newOptsWithParams(testConstants, nil)
-	rule, err := parseRule(expr, model, opts)
+	replCtx := newReplCtxWithParams(testConstants, nil)
+	rule, err := parseRule(expr, model, replCtx)
 	if err != nil {
 		return false, nil, err
 	}
@@ -68,15 +71,23 @@ func eval(t *testing.T, event *testEvent, expr string) (bool, *ast.Rule, error) 
 	return r1, rule.GetAst(), nil
 }
 
+func emptyReplCtx() ReplacementContext {
+	return ReplacementContext{
+		Opts:       &Opts{},
+		MacroStore: &MacroStore{},
+	}
+}
+
 func TestStringError(t *testing.T) {
 	model := &testModel{}
 
-	rule, err := parseRule(`process.name != "/usr/bin/vipw" && process.uid != 0 && open.filename == 3`, model, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(`process.name != "/usr/bin/vipw" && process.uid != 0 && open.filename == 3`, model, replCtx)
 	if rule == nil {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, &Opts{})
+	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 73 {
 		t.Fatal("should report a string type error")
 	}
@@ -85,12 +96,13 @@ func TestStringError(t *testing.T) {
 func TestIntError(t *testing.T) {
 	model := &testModel{}
 
-	rule, err := parseRule(`process.name != "/usr/bin/vipw" && process.uid != "test" && Open.Filename == "/etc/shadow"`, model, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(`process.name != "/usr/bin/vipw" && process.uid != "test" && Open.Filename == "/etc/shadow"`, model, replCtx)
 	if rule == nil {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, &Opts{})
+	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 51 {
 		t.Fatal("should report a string type error")
 	}
@@ -99,12 +111,13 @@ func TestIntError(t *testing.T) {
 func TestBoolError(t *testing.T) {
 	model := &testModel{}
 
-	rule, err := parseRule(`(process.name != "/usr/bin/vipw") == "test"`, model, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(`(process.name != "/usr/bin/vipw") == "test"`, model, replCtx)
 	if rule == nil {
 		t.Fatal(err)
 	}
 
-	_, err = ruleToEvaluator(rule.GetAst(), model, &Opts{})
+	_, err = ruleToEvaluator(rule.GetAst(), model, emptyReplCtx())
 	if err == nil || err.(*ErrAstToEval).Pos.Column != 38 {
 		t.Fatal("should report a bool type error")
 	}
@@ -290,6 +303,9 @@ func TestStringMatcher(t *testing.T) {
 			name:  "/usr/bin/c$t",
 			argv0: "http://example.com",
 		},
+		open: testOpen{
+			filename: "dGVzdA==.dGVzdA==.dGVzdA==.dGVzdA==.dGVzdA==.example.com",
+		},
 	}
 
 	tests := []struct {
@@ -333,6 +349,7 @@ func TestStringMatcher(t *testing.T) {
 		{Expr: `r".*/bin/.*" == process.name`, Expected: true},
 		{Expr: `process.argv0 =~ "http://*"`, Expected: true},
 		{Expr: `process.argv0 =~ "*example.com"`, Expected: true},
+		{Expr: `open.filename == r"^((?:[A-Za-z\d+]{4})*(?:[A-Za-z\d+]{3}=|[A-Za-z\d+]{2}==)\.)*(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$"`, Expected: true},
 	}
 
 	for _, test := range tests {
@@ -539,9 +556,12 @@ func TestPartial(t *testing.T) {
 
 	for _, test := range tests {
 		model := &testModel{}
-		opts := &Opts{Constants: testConstants, Variables: variables}
+		replCtx := ReplacementContext{
+			Opts:       &Opts{Constants: testConstants, Variables: variables},
+			MacroStore: &MacroStore{},
+		}
 
-		rule, err := parseRule(test.Expr, model, opts)
+		rule, err := parseRule(test.Expr, model, replCtx)
 		if err != nil {
 			t.Fatalf("error while evaluating `%s`: %s", test.Expr, err)
 		}
@@ -562,22 +582,21 @@ func TestPartial(t *testing.T) {
 
 func TestMacroList(t *testing.T) {
 	model := &testModel{}
-	opts := newOptsWithParams(make(map[string]interface{}), nil)
+	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
 	macro, err := NewMacro(
 		"list",
 		`[ "/etc/shadow", "/etc/password" ]`,
 		model,
-		opts,
+		replCtx,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	opts.AddMacro(macro)
+	replCtx.AddMacro(macro)
 
 	expr := `"/etc/shadow" in list`
-	rule, err := parseRule(expr, model, opts)
+	rule, err := parseRule(expr, model, replCtx)
 	if err != nil {
 		t.Fatalf("error while evaluating `%s`: %s", expr, err)
 	}
@@ -591,19 +610,18 @@ func TestMacroList(t *testing.T) {
 
 func TestMacroExpression(t *testing.T) {
 	model := &testModel{}
-	opts := newOptsWithParams(make(map[string]interface{}), nil)
+	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
 	macro, err := NewMacro(
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		replCtx,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	opts.AddMacro(macro)
+	replCtx.AddMacro(macro)
 
 	event := &testEvent{
 		process: testProcess{
@@ -616,7 +634,7 @@ func TestMacroExpression(t *testing.T) {
 
 	expr := `process.name == "httpd" && is_passwd`
 
-	rule, err := parseRule(expr, model, opts)
+	rule, err := parseRule(expr, model, replCtx)
 	if err != nil {
 		t.Fatalf("error while evaluating `%s`: %s", expr, err)
 	}
@@ -629,19 +647,18 @@ func TestMacroExpression(t *testing.T) {
 
 func TestMacroPartial(t *testing.T) {
 	model := &testModel{}
-	opts := newOptsWithParams(make(map[string]interface{}), nil)
+	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
 	macro, err := NewMacro(
 		"is_passwd",
 		`open.filename in [ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		replCtx,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	opts.AddMacro(macro)
+	replCtx.AddMacro(macro)
 
 	event := &testEvent{
 		process: testProcess{
@@ -654,7 +671,7 @@ func TestMacroPartial(t *testing.T) {
 
 	expr := `process.name == "httpd" && is_passwd`
 
-	rule, err := parseRule(expr, model, opts)
+	rule, err := parseRule(expr, model, replCtx)
 	if err != nil {
 		t.Fatalf("error while evaluating `%s`: %s", expr, err)
 	}
@@ -693,33 +710,31 @@ func TestNestedMacros(t *testing.T) {
 	}
 
 	model := &testModel{}
-	opts := newOptsWithParams(make(map[string]interface{}), nil)
+	replCtx := newReplCtxWithParams(make(map[string]interface{}), nil)
 
 	macro1, err := NewMacro(
 		"sensitive_files",
 		`[ "/etc/shadow", "/etc/passwd" ]`,
 		model,
-		opts,
+		replCtx,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	opts.AddMacro(macro1)
+	replCtx.AddMacro(macro1)
 
 	macro2, err := NewMacro(
 		"is_sensitive_opened",
 		`open.filename in sensitive_files`,
 		model,
-		opts,
+		replCtx,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	replCtx.AddMacro(macro2)
 
-	opts.AddMacro(macro2)
-
-	rule, err := parseRule(macro2.ID, model, opts)
+	rule, err := parseRule(macro2.ID, model, replCtx)
 	if err != nil {
 		t.Fatalf("error while evaluating `%s`: %s", macro2.ID, err)
 	}
@@ -732,14 +747,15 @@ func TestNestedMacros(t *testing.T) {
 
 func TestFieldValidator(t *testing.T) {
 	expr := `process.uid == -100 && open.filename == "/etc/passwd"`
-	if _, err := parseRule(expr, &testModel{}, &Opts{}); err == nil {
+	replCtx := newReplCtxWithParams(nil, nil)
+	if _, err := parseRule(expr, &testModel{}, replCtx); err == nil {
 		t.Error("expected an error on process.uid being negative")
 	}
 }
 
 func TestLegacyField(t *testing.T) {
 	model := &testModel{}
-	opts := newOptsWithParams(testConstants, legacyFields)
+	replCtx := newReplCtxWithParams(testConstants, legacyFields)
 
 	tests := []struct {
 		Expr     string
@@ -751,7 +767,7 @@ func TestLegacyField(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := parseRule(test.Expr, model, opts)
+		_, err := parseRule(test.Expr, model, replCtx)
 		if err == nil != test.Expected {
 			t.Errorf("expected result `%t` not found, got `%t`\n%s", test.Expected, err == nil, test.Expr)
 		}
@@ -760,7 +776,7 @@ func TestLegacyField(t *testing.T) {
 
 func TestRegisterSyntaxError(t *testing.T) {
 	model := &testModel{}
-	opts := newOptsWithParams(testConstants, nil)
+	replCtx := newReplCtxWithParams(testConstants, nil)
 
 	tests := []struct {
 		Expr     string
@@ -776,7 +792,7 @@ func TestRegisterSyntaxError(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := parseRule(test.Expr, model, opts)
+		_, err := parseRule(test.Expr, model, replCtx)
 		if err == nil != test.Expected {
 			t.Errorf("expected result `%t` not found, got `%t`\n%s", test.Expected, err == nil, test.Expr)
 		}
@@ -927,9 +943,9 @@ func TestRegisterPartial(t *testing.T) {
 
 	for _, test := range tests {
 		model := &testModel{}
-		opts := &Opts{Constants: testConstants}
+		replCtx := newReplCtxWithParams(testConstants, nil)
 
-		rule, err := parseRule(test.Expr, model, opts)
+		rule, err := parseRule(test.Expr, model, replCtx)
 		if err != nil {
 			t.Fatalf("error while evaluating `%s`: %s", test.Expr, err)
 		}
@@ -1034,18 +1050,27 @@ func TestDuration(t *testing.T) {
 	}
 }
 
+func parseCIDR(t *testing.T, ip string) net.IPNet {
+	ipnet, err := ParseCIDR(ip)
+	if err != nil {
+		t.Error(err)
+	}
+	return *ipnet
+}
+
 func TestIPv4(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.0.1/24")
-	var cidrs []*net.IPNet
+	var cidrs []net.IPNet
 	for _, cidrStr := range []string{"192.168.0.1/24", "10.0.0.1/16"} {
 		_, cidrTmp, _ := net.ParseCIDR(cidrStr)
-		cidrs = append(cidrs, cidrTmp)
+		cidrs = append(cidrs, *cidrTmp)
 	}
+
 	event := &testEvent{
 		network: testNetwork{
-			ip:    net.ParseIP("192.168.0.1"),
-			ips:   []net.IP{net.ParseIP("192.168.0.1"), net.ParseIP("192.169.0.1")},
-			cidr:  cidr,
+			ip:    parseCIDR(t, "192.168.0.1"),
+			ips:   []net.IPNet{parseCIDR(t, "192.168.0.1"), parseCIDR(t, "192.169.0.1")},
+			cidr:  *cidr,
 			cidrs: cidrs,
 		},
 	}
@@ -1059,7 +1084,7 @@ func TestIPv4(t *testing.T) {
 		{Expr: `192.168.0.15 in 192.168.0.1/24`, Expected: true},
 		{Expr: `192.168.0.16 not in 192.168.1.1/24`, Expected: true},
 		{Expr: `192.168.0.16/16 in 192.168.1.1/8`, Expected: true},
-		{Expr: `192.168.0.16/16 intersects 192.168.1.1/8`, Expected: true},
+		{Expr: `192.168.0.16/16 allin 192.168.1.1/8`, Expected: true},
 		{Expr: `193.168.0.16/16 in 192.168.1.1/8`, Expected: false},
 		{Expr: `network.ip == 192.168.0.1`, Expected: true},
 		{Expr: `network.ip == 127.0.0.1`, Expected: false},
@@ -1081,23 +1106,22 @@ func TestIPv4(t *testing.T) {
 		{Expr: `network.ip in [ 10.0.0.1, 127.0.0.1, 192.169.4.1/16, ::ffff:192.168.0.1/128 ]`, Expected: true},
 		{Expr: `192.168.0.1 in [ 10.0.0.1, 127.0.0.1, 192.169.4.1/16, ::ffff:192.168.0.1/128 ]`, Expected: true},
 		{Expr: `192.168.0.1/24 in [ 10.0.0.1, 127.0.0.1, 192.169.4.1/16, ::ffff:192.168.0.1/120 ]`, Expected: true},
-		{Expr: `192.168.0.1/24 intersects [ 10.0.0.1, 127.0.0.1, 192.169.4.1/16, ::ffff:192.168.0.1/120 ]`, Expected: false},
+		{Expr: `192.168.0.1/24 allin [ 10.0.0.1, 127.0.0.1, 192.169.4.1/16, ::ffff:192.168.0.1/120 ]`, Expected: true},
 
 		{Expr: `network.ips in 192.168.0.0/16`, Expected: true},
 		{Expr: `network.ips not in 192.168.0.0/16`, Expected: false},
-		{Expr: `network.ips intersects 192.168.0.0/16`, Expected: false},
-		{Expr: `network.ips intersects 192.168.0.0/8`, Expected: true},
+		{Expr: `network.ips allin 192.168.0.0/16`, Expected: false},
+		{Expr: `network.ips allin 192.168.0.0/8`, Expected: true},
 		{Expr: `network.ips in [ 192.168.0.0/32, 193.168.0.0/16, ::ffff:192.168.0.1 ]`, Expected: true},
 		{Expr: `network.ips not in [ 192.168.0.0/32, 193.168.0.0/16 ]`, Expected: true},
-		{Expr: `network.ips intersects [ 192.168.0.0/8, 0.0.0.0/0 ]`, Expected: true},
-		{Expr: `network.ips intersects [ 192.168.0.0/8, 1.0.0.0/8 ]`, Expected: false},
-		{Expr: `network.ips intersects [ 192.168.0.0/8, 1.0.0.0/8 ]`, Expected: false},
-		{Expr: `192.0.0.0/8 intersects network.ips`, Expected: true},
+		{Expr: `network.ips allin [ 192.168.0.0/8, 0.0.0.0/0 ]`, Expected: true},
+		{Expr: `network.ips allin [ 192.168.0.0/8, 1.0.0.0/8 ]`, Expected: false},
+		{Expr: `192.0.0.0/8 allin network.ips`, Expected: true},
 
 		{Expr: `network.cidr in 192.168.0.0/8`, Expected: true},
 		{Expr: `network.cidr in 193.168.0.0/8`, Expected: false},
 		{Expr: `network.cidrs in 10.0.0.1/8`, Expected: true},
-		{Expr: `network.cidrs intersects 10.0.0.1/8`, Expected: false},
+		{Expr: `network.cidrs allin 10.0.0.1/8`, Expected: false},
 	}
 
 	for _, test := range tests {
@@ -1114,16 +1138,16 @@ func TestIPv4(t *testing.T) {
 
 func TestIPv6(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("2001:0:0eab:dead::a0:abcd:4e/112")
-	var cidrs []*net.IPNet
+	var cidrs []net.IPNet
 	for _, cidrStr := range []string{"2001:0:0eab:dead::a0:abcd:4e/112", "2001:0:0eab:c00f::a0:abcd:4e/64"} {
 		_, cidrTmp, _ := net.ParseCIDR(cidrStr)
-		cidrs = append(cidrs, cidrTmp)
+		cidrs = append(cidrs, *cidrTmp)
 	}
 	event := &testEvent{
 		network: testNetwork{
-			ip:    net.ParseIP("2001:0:0eab:dead::a0:abcd:4e"),
-			ips:   []net.IP{net.ParseIP("2001:0:0eab:dead::a0:abcd:4e"), net.ParseIP("2001:0:0eab:dead::a0:abce:4e")},
-			cidr:  cidr,
+			ip:    parseCIDR(t, "2001:0:0eab:dead::a0:abcd:4e"),
+			ips:   []net.IPNet{parseCIDR(t, "2001:0:0eab:dead::a0:abcd:4e"), parseCIDR(t, "2001:0:0eab:dead::a0:abce:4e")},
+			cidr:  *cidr,
 			cidrs: cidrs,
 		},
 	}
@@ -1137,7 +1161,7 @@ func TestIPv6(t *testing.T) {
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e in 2001:0:0eab:dead::a0:abcd:0/120`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e not in 2001:0:0eab:dead::a0:abcd:ab00/120`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 in 2001:0:0eab:dead::a0:abcd:1b00/32`, Expected: true},
-		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 intersects 2001:0:0eab:dead::a0:abcd:1b00/32`, Expected: true},
+		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 allin 2001:0:0eab:dead::a0:abcd:1b00/32`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 in [ 2001:0:0eab:dead::a0:abcd:1b00/32 ]`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e/32 in [ 2001:0:0eab:dead::a0:abcd:1b00/64 ]`, Expected: true},
 		{Expr: `network.ip == 2001:0:0eab:dead::a0:abcd:4e`, Expected: true},
@@ -1155,22 +1179,22 @@ func TestIPv6(t *testing.T) {
 		{Expr: `network.ip in [ ::1, 2001:124:0eab:dead::a0:abcd:4f, 2001:0:0eab:dead::a0:abcd:0/112 ]`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e in [ 2001:0:0eab:dead::a0:abcd:4e, ::1, 2002:0:0eab:dead::/64, ::ffff:192.168.0.1/128 ]`, Expected: true},
 		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 in [ 10.0.0.1, 127.0.0.1, 2001:0:0eab:dead::a0:abcd:1b00/32, ::ffff:192.168.0.1/120 ]`, Expected: true},
-		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 intersects [ 10.0.0.1, 127.0.0.1, 2001:0:0eab:dead::a0:abcd:1b00/32, ::ffff:192.168.0.1/120 ]`, Expected: false},
+		{Expr: `2001:0:0eab:dead::a0:abcd:4e/64 allin [ 10.0.0.1, 127.0.0.1, 2001:0:0eab:dead::a0:abcd:1b00/32, ::ffff:192.168.0.1/120 ]`, Expected: true},
 
 		{Expr: `network.ips in 2001:0:0eab:dead::a0:abcd:0/120`, Expected: true},
 		{Expr: `network.ips not in 2001:0:0eab:dead::a0:abcd:0/120`, Expected: false},
-		{Expr: `network.ips intersects 2001:0:0eab:dead::a0:abcd:0/120`, Expected: false},
-		{Expr: `network.ips intersects 2001:0:0eab:dead::a0:abcd:0/104`, Expected: true},
+		{Expr: `network.ips allin 2001:0:0eab:dead::a0:abcd:0/120`, Expected: false},
+		{Expr: `network.ips allin 2001:0:0eab:dead::a0:abcd:0/104`, Expected: true},
 		{Expr: `network.ips in [ 2001:0:0eab:dead::a0:abcd:0/128, 2001:0:0eab:dead::a0:abcd:0/120, 2001:0:0eab:dead::a0:abce:4e ]`, Expected: true},
 		{Expr: `network.ips not in [ 2001:0:0eab:dead::a0:abcd:0/128, 2001:0:0eab:dead::a0:abcf:4e/120 ]`, Expected: true},
-		{Expr: `network.ips intersects [ 2001:0:0eab:dead::a0:abcd:0/104, 2001::1/16 ]`, Expected: true},
-		{Expr: `network.ips intersects [ 2001:0:0eab:dead::a0:abcd:0/104, 2002::1/16 ]`, Expected: false},
-		{Expr: `2001:0:0eab:dead::a0:abcd:0/104 intersects network.ips`, Expected: true},
+		{Expr: `network.ips allin [ 2001:0:0eab:dead::a0:abcd:0/104, 2001::1/16 ]`, Expected: true},
+		{Expr: `network.ips allin [ 2001:0:0eab:dead::a0:abcd:0/104, 2002::1/16 ]`, Expected: false},
+		{Expr: `2001:0:0eab:dead::a0:abcd:0/104 allin network.ips`, Expected: true},
 
 		{Expr: `network.cidr in 2001:0:0eab:dead::a0:abcd:4e/112`, Expected: true},
 		{Expr: `network.cidr in 2002:0:0eab:dead::a0:abcd:4e/72`, Expected: false},
 		{Expr: `network.cidrs in 2001:0:0eab:dead::a0:abcd:4e/64`, Expected: true},
-		{Expr: `network.cidrs intersects 2001:0:0eab:dead::a0:abcd:4e/64`, Expected: false},
+		{Expr: `network.cidrs allin 2001:0:0eab:dead::a0:abcd:4e/64`, Expected: false},
 	}
 
 	for _, test := range tests {
@@ -1298,9 +1322,9 @@ func TestOpOverridePartials(t *testing.T) {
 
 	for _, test := range tests {
 		model := &testModel{}
-		opts := &Opts{Constants: testConstants}
+		replCtx := newReplCtxWithParams(testConstants, nil)
 
-		rule, err := parseRule(test.Expr, model, opts)
+		rule, err := parseRule(test.Expr, model, replCtx)
 		if err != nil {
 			t.Fatalf("error while evaluating `%s`: %s", test.Expr, err)
 		}
@@ -1345,7 +1369,8 @@ func BenchmarkArray(b *testing.B) {
 
 	expr := strings.Join(exprs, " && ")
 
-	rule, err := parseRule(expr, &testModel{}, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(expr, &testModel{}, replCtx)
 	if err != nil {
 		b.Fatalf("%s\n%s", err, expr)
 	}
@@ -1378,7 +1403,8 @@ func BenchmarkComplex(b *testing.B) {
 
 	expr := strings.Join(exprs, " && ")
 
-	rule, err := parseRule(expr, &testModel{}, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(expr, &testModel{}, replCtx)
 	if err != nil {
 		b.Fatalf("%s\n%s", err, expr)
 	}
@@ -1415,12 +1441,13 @@ func BenchmarkPartial(b *testing.B) {
 
 	model := &testModel{}
 
-	rule, err := parseRule(expr, model, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(expr, model, replCtx)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	if err := rule.GenEvaluator(model, &Opts{}); err != nil {
+	if err := rule.GenEvaluator(model, emptyReplCtx()); err != nil {
 		b.Fatal(err)
 	}
 
@@ -1457,7 +1484,8 @@ func BenchmarkPool(b *testing.B) {
 
 	expr := strings.Join(exprs, " && ")
 
-	rule, err := parseRule(expr, &testModel{}, &Opts{})
+	replCtx := newReplCtxWithParams(nil, nil)
+	rule, err := parseRule(expr, &testModel{}, replCtx)
 	if err != nil {
 		b.Fatalf("%s\n%s", err, expr)
 	}

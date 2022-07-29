@@ -82,6 +82,7 @@ type DemultiplexerOptions struct {
 	SharedForwarderOptions         *forwarder.Options
 	UseNoopForwarder               bool
 	UseNoopEventPlatformForwarder  bool
+	UseNoopOrchestratorForwarder   bool
 	UseEventPlatformForwarder      bool
 	UseOrchestratorForwarder       bool
 	UseContainerLifecycleForwarder bool
@@ -110,8 +111,8 @@ type trigger struct {
 type flushTrigger struct {
 	trigger
 
-	flushedSketches *[]metrics.SketchSeriesList
-	seriesSink      metrics.SerieSink
+	sketchesSink metrics.SketchesSink
+	seriesSink   metrics.SerieSink
 }
 
 // DefaultDemultiplexerOptions returns the default options to initialize a Demultiplexer.
@@ -129,40 +130,49 @@ func DefaultDemultiplexerOptions(options *forwarder.Options) DemultiplexerOption
 	}
 }
 
-func startSendingIterableSeries(
-	serializer serializer.MetricSerializer,
+func createIterableMetrics(
 	flushAndSerializeInParallel FlushAndSerializeInParallel,
+	serializer serializer.MetricSerializer,
 	logPayloads bool,
-	start time.Time) (*metrics.IterableSeries, chan struct{}) {
-	seriesSink := metrics.NewIterableSeries(func(se *metrics.Serie) {
-		if logPayloads {
-			log.Debugf("Flushing serie: %s", se)
-		}
-		tagsetTlm.updateHugeSerieTelemetry(se)
-	}, flushAndSerializeInParallel.BufferSize, flushAndSerializeInParallel.ChannelSize)
-	done := make(chan struct{})
-	go sendIterableSeries(serializer, start, seriesSink, done)
-	return seriesSink, done
-}
+	isServerless bool,
+) (*metrics.IterableSeries, *metrics.IterableSketches) {
+	var series *metrics.IterableSeries
+	var sketches *metrics.IterableSketches
 
-func stopIterableSeries(seriesSink *metrics.IterableSeries, done chan struct{}) {
-	seriesSink.SenderStopped()
-	<-done
+	if serializer.AreSeriesEnabled() {
+		series = metrics.NewIterableSeries(func(se *metrics.Serie) {
+			if logPayloads {
+				log.Debugf("Flushing serie: %s", se)
+			}
+			tagsetTlm.updateHugeSerieTelemetry(se)
+		}, flushAndSerializeInParallel.BufferSize, flushAndSerializeInParallel.ChannelSize)
+	}
+
+	if serializer.AreSketchesEnabled() {
+		sketches = metrics.NewIterableSketches(func(sketch *metrics.SketchSeries) {
+			if logPayloads {
+				log.Debugf("Flushing Sketches: %v", sketch)
+			}
+			if isServerless {
+				log.DebugfServerless("Sending sketches payload : %s", sketch.String())
+			}
+			tagsetTlm.updateHugeSketchesTelemetry(sketch)
+		}, flushAndSerializeInParallel.BufferSize, flushAndSerializeInParallel.ChannelSize)
+	}
+	return series, sketches
 }
 
 // sendIterableSeries is continuously sending series to the serializer, until another routine calls SenderStopped on the
 // series sink.
 // Mainly meant to be executed in its own routine, sendIterableSeries is closing the `done` channel once it has returned
 // from SendIterableSeries (because the SenderStopped methods has been called on the sink).
-func sendIterableSeries(serializer serializer.MetricSerializer, start time.Time, series *metrics.IterableSeries, done chan<- struct{}) {
+func sendIterableSeries(serializer serializer.MetricSerializer, start time.Time, serieSource metrics.SerieSource) {
 	log.Debug("Demultiplexer: sendIterableSeries: start sending iterable series to the serializer")
-	err := serializer.SendIterableSeries(series)
+	err := serializer.SendIterableSeries(serieSource)
 	// if err == nil, SenderStopped was called and it is safe to read the number of series.
-	count := series.SeriesCount()
-	series.IterationStopped()
+	count := serieSource.Count()
 	addFlushCount("Series", int64(count))
 	updateSerieTelemetry(start, count, err)
-	close(done)
 	log.Debug("Demultiplexer: sendIterableSeries: stop routine")
 }
 

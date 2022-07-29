@@ -20,6 +20,17 @@ func fakeEnvWithValue(name, value string) corev1.EnvVar {
 	}
 }
 
+func fakeEnvWithFieldRefValue(name, value string) corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: name,
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: value,
+			},
+		},
+	}
+}
+
 func fakeEnv(name string) corev1.EnvVar {
 	return corev1.EnvVar{
 		Name:  name,
@@ -48,10 +59,25 @@ func fakePodWithContainer(name string, containers ...corev1.Container) *corev1.P
 	}
 }
 
+func withLabels(pod *corev1.Pod, labels map[string]string) *corev1.Pod {
+	pod.Labels = labels
+	return pod
+}
+
 func fakePodWithLabel(k, v string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
+				k: v,
+			},
+		},
+	}
+}
+
+func fakePodWithAnnotation(k, v string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
 				k: v,
 			},
 		},

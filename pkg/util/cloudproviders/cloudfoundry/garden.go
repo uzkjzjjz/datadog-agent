@@ -13,6 +13,7 @@ import (
 	"code.cloudfoundry.org/garden"
 	"code.cloudfoundry.org/garden/client"
 	"code.cloudfoundry.org/garden/client/connection"
+
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/retry"
@@ -48,6 +49,10 @@ const (
 	SidecarPresentTagKey = "sidecar_present"
 	// SidecarCountTagKey tag key for container tags
 	SidecarCountTagKey = "sidecar_count"
+	// SegmentNameTagKey tag key for container tags
+	SegmentNameTagKey = "segment_name"
+	// SegmentIDTagKey tag key for container tags
+	SegmentIDTagKey = "segment_id"
 )
 
 var (

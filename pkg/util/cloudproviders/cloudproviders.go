@@ -12,7 +12,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/metadata/inventories"
 	"github.com/DataDog/datadog-agent/pkg/util"
 	ecscommon "github.com/DataDog/datadog-agent/pkg/util/ecs/common"
-	"github.com/DataDog/datadog-agent/pkg/util/hostname/kubelet"
+	"github.com/DataDog/datadog-agent/pkg/util/kubelet"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"github.com/DataDog/datadog-agent/pkg/util/ec2"
@@ -94,6 +94,7 @@ func GetHostAliases(ctx context.Context) []string {
 
 	detectors := []cloudProviderAliasesDetector{
 		{name: alibaba.CloudProviderName, callback: alibaba.GetHostAliases},
+		{name: ec2.CloudProviderName, callback: ec2.GetHostAliases},
 		{name: azure.CloudProviderName, callback: azure.GetHostAliases},
 		{name: gce.CloudProviderName, callback: gce.GetHostAliases},
 		{name: cloudfoundry.CloudProviderName, callback: cloudfoundry.GetHostAliases},

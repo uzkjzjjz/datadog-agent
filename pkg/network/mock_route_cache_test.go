@@ -15,8 +15,9 @@ package network
 import (
 	reflect "reflect"
 
-	util "github.com/DataDog/datadog-agent/pkg/process/util"
 	gomock "github.com/golang/mock/gomock"
+
+	util "github.com/DataDog/datadog-agent/pkg/process/util"
 )
 
 // MockRouteCache is a mock of RouteCache interface.
@@ -40,6 +41,18 @@ func NewMockRouteCache(ctrl *gomock.Controller) *MockRouteCache {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRouteCache) EXPECT() *MockRouteCacheMockRecorder {
 	return m.recorder
+}
+
+// Close mocks base method.
+func (m *MockRouteCache) Close() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Close")
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockRouteCacheMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockRouteCache)(nil).Close))
 }
 
 // Get mocks base method.
@@ -92,6 +105,18 @@ func NewMockRouter(ctrl *gomock.Controller) *MockRouter {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRouter) EXPECT() *MockRouterMockRecorder {
 	return m.recorder
+}
+
+// Close mocks base method.
+func (m *MockRouter) Close() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Close")
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockRouterMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockRouter)(nil).Close))
 }
 
 // GetStats mocks base method.

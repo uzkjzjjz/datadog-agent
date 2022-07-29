@@ -12,16 +12,19 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"time"
+
+	manager "github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
+	"golang.org/x/sys/unix"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
+	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	manager "github.com/DataDog/ebpf-manager"
-	"github.com/cilium/ebpf"
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -42,6 +45,10 @@ const (
 
 	// size of the channel containing completed http_notification_objects
 	batchNotificationsChanSize = 100
+
+	probeUID = "http"
+
+	maxRequestLinger = 30 * time.Second
 )
 
 type ebpfProgram struct {
@@ -50,6 +57,7 @@ type ebpfProgram struct {
 	bytecode    bytecode.AssetReader
 	offsets     []manager.ConstantEditor
 	subprograms []subprogram
+	mapCleaner  *ddebpf.MapCleaner
 
 	batchCompletionHandler *ddebpf.PerfHandler
 }
@@ -64,7 +72,7 @@ type subprogram interface {
 func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *ebpf.Map) (*ebpfProgram, error) {
 	var bytecode bytecode.AssetReader
 	var err error
-	if c.EnableRuntimeCompiler {
+	if enableRuntimeCompilation(c) {
 		bytecode, err = getRuntimeCompiledHTTP(c)
 		if err != nil {
 			if !c.AllowPrecompiledFallback {
@@ -91,6 +99,7 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 			{Name: "ssl_read_args"},
 			{Name: "bio_new_socket_args"},
 			{Name: "fd_by_ssl_bio"},
+			{Name: "ssl_ctx_by_pid_tgid"},
 		},
 		PerfMaps: []*manager.PerfMap{
 			{
@@ -98,14 +107,16 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 				PerfMapOptions: manager.PerfMapOptions{
 					PerfRingBufferSize: 8 * os.Getpagesize(),
 					Watermark:          1,
-					DataHandler:        batchCompletionHandler.DataHandler,
+					RecordHandler:      batchCompletionHandler.RecordHandler,
 					LostHandler:        batchCompletionHandler.LostHandler,
+					RecordGetter:       batchCompletionHandler.RecordGetter,
 				},
 			},
 		},
 		Probes: []*manager.Probe{
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.TCPSendMsgReturn), EBPFFuncName: "kretprobe__tcp_sendmsg"}, KProbeMaxActive: maxActive},
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: httpSocketFilter, EBPFFuncName: "socket__http_filter"}},
+			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.TCPSendMsg), EBPFFuncName: "kprobe__tcp_sendmsg", UID: probeUID}, KProbeMaxActive: maxActive},
+			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.TCPSendMsgReturn), EBPFFuncName: "kretprobe__tcp_sendmsg", UID: probeUID}, KProbeMaxActive: maxActive},
+			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: httpSocketFilter, EBPFFuncName: "socket__http_filter", UID: probeUID}},
 		},
 	}
 
@@ -147,12 +158,21 @@ func (e *ebpfProgram) Init() error {
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					EBPFSection:  httpSocketFilter,
 					EBPFFuncName: "socket__http_filter",
+					UID:          probeUID,
+				},
+			},
+			&manager.ProbeSelector{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  string(probes.TCPSendMsg),
+					EBPFFuncName: "kprobe__tcp_sendmsg",
+					UID:          probeUID,
 				},
 			},
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					EBPFSection:  string(probes.TCPSendMsgReturn),
 					EBPFFuncName: "kretprobe__tcp_sendmsg",
+					UID:          probeUID,
 				},
 			},
 		},
@@ -181,14 +201,59 @@ func (e *ebpfProgram) Start() error {
 		s.Start()
 	}
 
+	e.setupMapCleaner()
+
 	return nil
 }
 
 func (e *ebpfProgram) Close() error {
+	e.mapCleaner.Stop()
 	err := e.Manager.Stop(manager.CleanAll)
 	e.batchCompletionHandler.Stop()
 	for _, s := range e.subprograms {
 		s.Stop()
 	}
 	return err
+}
+
+func (e *ebpfProgram) setupMapCleaner() {
+	httpMap, _, _ := e.GetMap(httpInFlightMap)
+	httpMapCleaner, err := ddebpf.NewMapCleaner(httpMap, new(netebpf.ConnTuple), new(httpTX))
+	if err != nil {
+		log.Errorf("error creating map cleaner: %s", err)
+		return
+	}
+
+	ttl := maxRequestLinger.Nanoseconds()
+	httpMapCleaner.Clean(5*time.Minute, func(now int64, key, val interface{}) bool {
+		httpTX, ok := val.(*httpTX)
+		if !ok {
+			return false
+		}
+
+		if updated := int64(httpTX.response_last_seen); updated > 0 {
+			return (now - updated) > ttl
+		}
+
+		started := int64(httpTX.request_started)
+		return started > 0 && (now-started) > ttl
+	})
+
+	e.mapCleaner = httpMapCleaner
+}
+
+func enableRuntimeCompilation(c *config.Config) bool {
+	if !c.EnableRuntimeCompiler {
+		return false
+	}
+
+	// The runtime-compiled version of HTTP monitoring requires Kernel 4.5
+	// because we use the `bpf_skb_load_bytes` helper.
+	kversion, err := kernel.HostVersion()
+	if err != nil {
+		log.Warn("could not determine the current kernel version. falling back to pre-compiled program.")
+		return false
+	}
+
+	return kversion >= kernel.VersionCode(4, 5, 0)
 }

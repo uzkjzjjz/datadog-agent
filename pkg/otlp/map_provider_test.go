@@ -9,12 +9,12 @@
 package otlp
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/config"
-	"go.opentelemetry.io/collector/config/configunmarshaler"
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/DataDog/datadog-agent/pkg/otlp/internal/testutil"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
@@ -32,6 +32,9 @@ func TestNewMap(t *testing.T) {
 				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 1234, 0),
 				TracePort:          5003,
 				TracesEnabled:      true,
+				Debug: map[string]interface{}{
+					"loglevel": "disabled",
+				},
 			},
 			ocfg: map[string]interface{}{
 				"receivers": map[string]interface{}{
@@ -72,14 +75,16 @@ func TestNewMap(t *testing.T) {
 				MetricsEnabled:     true,
 				Metrics: map[string]interface{}{
 					"delta_ttl":                                2000,
-					"report_quantiles":                         false,
-					"send_monotonic_counter":                   true,
 					"resource_attributes_as_tags":              true,
 					"instrumentation_library_metadata_as_tags": true,
+					"instrumentation_scope_metadata_as_tags":   true,
 					"histograms": map[string]interface{}{
 						"mode":                   "counters",
 						"send_count_sum_metrics": true,
 					},
+				},
+				Debug: map[string]interface{}{
+					"loglevel": "disabled",
 				},
 			},
 			ocfg: map[string]interface{}{
@@ -108,10 +113,82 @@ func TestNewMap(t *testing.T) {
 					"serializer": map[string]interface{}{
 						"metrics": map[string]interface{}{
 							"delta_ttl":                                2000,
-							"report_quantiles":                         false,
-							"send_monotonic_counter":                   true,
 							"resource_attributes_as_tags":              true,
 							"instrumentation_library_metadata_as_tags": true,
+							"instrumentation_scope_metadata_as_tags":   true,
+							"histograms": map[string]interface{}{
+								"mode":                   "counters",
+								"send_count_sum_metrics": true,
+							},
+						},
+					},
+				},
+				"service": map[string]interface{}{
+					"telemetry": map[string]interface{}{"metrics": map[string]interface{}{"level": "none"}},
+					"pipelines": map[string]interface{}{
+						"traces": map[string]interface{}{
+							"receivers": []interface{}{"otlp"},
+							"exporters": []interface{}{"otlp"},
+						},
+						"metrics": map[string]interface{}{
+							"receivers":  []interface{}{"otlp"},
+							"processors": []interface{}{"batch"},
+							"exporters":  []interface{}{"serializer"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "only HTTP, metrics and traces, invalid loglevel(ignored)",
+			pcfg: PipelineConfig{
+				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 0, 1234),
+				TracePort:          5003,
+				TracesEnabled:      true,
+				MetricsEnabled:     true,
+				Metrics: map[string]interface{}{
+					"delta_ttl":                                2000,
+					"resource_attributes_as_tags":              true,
+					"instrumentation_library_metadata_as_tags": true,
+					"instrumentation_scope_metadata_as_tags":   true,
+					"histograms": map[string]interface{}{
+						"mode":                   "counters",
+						"send_count_sum_metrics": true,
+					},
+				},
+				Debug: map[string]interface{}{
+					"loglevel": "foo",
+				},
+			},
+			ocfg: map[string]interface{}{
+				"receivers": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"protocols": map[string]interface{}{
+							"http": map[string]interface{}{
+								"endpoint": "bindhost:1234",
+							},
+						},
+					},
+				},
+				"processors": map[string]interface{}{
+					"batch": map[string]interface{}{
+						"timeout": "10s",
+					},
+				},
+				"exporters": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"tls": map[string]interface{}{
+							"insecure": true,
+						},
+						"compression": "none",
+						"endpoint":    "localhost:5003",
+					},
+					"serializer": map[string]interface{}{
+						"metrics": map[string]interface{}{
+							"delta_ttl":                                2000,
+							"resource_attributes_as_tags":              true,
+							"instrumentation_library_metadata_as_tags": true,
+							"instrumentation_scope_metadata_as_tags":   true,
 							"histograms": map[string]interface{}{
 								"mode":                   "counters",
 								"send_count_sum_metrics": true,
@@ -141,6 +218,9 @@ func TestNewMap(t *testing.T) {
 				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 1234, 5678),
 				TracePort:          5003,
 				TracesEnabled:      true,
+				Debug: map[string]interface{}{
+					"loglevel": "disabled",
+				},
 			},
 			ocfg: map[string]interface{}{
 				"receivers": map[string]interface{}{
@@ -183,14 +263,16 @@ func TestNewMap(t *testing.T) {
 				MetricsEnabled:     true,
 				Metrics: map[string]interface{}{
 					"delta_ttl":                                1500,
-					"report_quantiles":                         true,
-					"send_monotonic_counter":                   false,
 					"resource_attributes_as_tags":              false,
 					"instrumentation_library_metadata_as_tags": false,
+					"instrumentation_scope_metadata_as_tags":   false,
 					"histograms": map[string]interface{}{
 						"mode":                   "nobuckets",
 						"send_count_sum_metrics": true,
 					},
+				},
+				Debug: map[string]interface{}{
+					"loglevel": "disabled",
 				},
 			},
 			ocfg: map[string]interface{}{
@@ -212,10 +294,9 @@ func TestNewMap(t *testing.T) {
 					"serializer": map[string]interface{}{
 						"metrics": map[string]interface{}{
 							"delta_ttl":                                1500,
-							"report_quantiles":                         true,
-							"send_monotonic_counter":                   false,
 							"resource_attributes_as_tags":              false,
 							"instrumentation_library_metadata_as_tags": false,
+							"instrumentation_scope_metadata_as_tags":   false,
 							"histograms": map[string]interface{}{
 								"mode":                   "nobuckets",
 								"send_count_sum_metrics": true,
@@ -235,30 +316,208 @@ func TestNewMap(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "only gRPC, only Traces, logging info",
+			pcfg: PipelineConfig{
+				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 1234, 0),
+				TracePort:          5003,
+				TracesEnabled:      true,
+				Debug: map[string]interface{}{
+					"loglevel": "info",
+				},
+			},
+			ocfg: map[string]interface{}{
+				"receivers": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"protocols": map[string]interface{}{
+							"grpc": map[string]interface{}{
+								"endpoint": "bindhost:1234",
+							},
+						},
+					},
+				},
+				"exporters": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"tls": map[string]interface{}{
+							"insecure": true,
+						},
+						"compression": "none",
+						"endpoint":    "localhost:5003",
+					},
+					"logging": map[string]interface{}{
+						"loglevel": "info",
+					},
+				},
+				"service": map[string]interface{}{
+					"telemetry": map[string]interface{}{"metrics": map[string]interface{}{"level": "none"}},
+					"pipelines": map[string]interface{}{
+						"traces": map[string]interface{}{
+							"receivers": []interface{}{"otlp"},
+							"exporters": []interface{}{"otlp", "logging"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "only HTTP, only metrics, logging debug",
+			pcfg: PipelineConfig{
+				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 0, 1234),
+				TracePort:          5003,
+				MetricsEnabled:     true,
+				Metrics: map[string]interface{}{
+					"delta_ttl":                                1500,
+					"resource_attributes_as_tags":              false,
+					"instrumentation_library_metadata_as_tags": false,
+					"histograms": map[string]interface{}{
+						"mode":                   "nobuckets",
+						"send_count_sum_metrics": true,
+					},
+				},
+				Debug: map[string]interface{}{
+					"loglevel": "debug",
+				},
+			},
+			ocfg: map[string]interface{}{
+				"receivers": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"protocols": map[string]interface{}{
+							"http": map[string]interface{}{
+								"endpoint": "bindhost:1234",
+							},
+						},
+					},
+				},
+				"processors": map[string]interface{}{
+					"batch": map[string]interface{}{
+						"timeout": "10s",
+					},
+				},
+				"exporters": map[string]interface{}{
+					"serializer": map[string]interface{}{
+						"metrics": map[string]interface{}{
+							"delta_ttl":                                1500,
+							"resource_attributes_as_tags":              false,
+							"instrumentation_library_metadata_as_tags": false,
+							"histograms": map[string]interface{}{
+								"mode":                   "nobuckets",
+								"send_count_sum_metrics": true,
+							},
+						},
+					},
+					"logging": map[string]interface{}{
+						"loglevel": "debug",
+					},
+				},
+				"service": map[string]interface{}{
+					"telemetry": map[string]interface{}{"metrics": map[string]interface{}{"level": "none"}},
+					"pipelines": map[string]interface{}{
+						"metrics": map[string]interface{}{
+							"receivers":  []interface{}{"otlp"},
+							"processors": []interface{}{"batch"},
+							"exporters":  []interface{}{"serializer", "logging"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "only HTTP, metrics and traces, logging warn",
+			pcfg: PipelineConfig{
+				OTLPReceiverConfig: testutil.OTLPConfigFromPorts("bindhost", 0, 1234),
+				TracePort:          5003,
+				TracesEnabled:      true,
+				MetricsEnabled:     true,
+				Metrics: map[string]interface{}{
+					"delta_ttl":                                2000,
+					"resource_attributes_as_tags":              true,
+					"instrumentation_library_metadata_as_tags": true,
+					"histograms": map[string]interface{}{
+						"mode":                   "counters",
+						"send_count_sum_metrics": true,
+					},
+				},
+				Debug: map[string]interface{}{
+					"loglevel": "warn",
+				},
+			},
+			ocfg: map[string]interface{}{
+				"receivers": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"protocols": map[string]interface{}{
+							"http": map[string]interface{}{
+								"endpoint": "bindhost:1234",
+							},
+						},
+					},
+				},
+				"processors": map[string]interface{}{
+					"batch": map[string]interface{}{
+						"timeout": "10s",
+					},
+				},
+				"exporters": map[string]interface{}{
+					"otlp": map[string]interface{}{
+						"tls": map[string]interface{}{
+							"insecure": true,
+						},
+						"compression": "none",
+						"endpoint":    "localhost:5003",
+					},
+					"serializer": map[string]interface{}{
+						"metrics": map[string]interface{}{
+							"delta_ttl":                                2000,
+							"resource_attributes_as_tags":              true,
+							"instrumentation_library_metadata_as_tags": true,
+							"histograms": map[string]interface{}{
+								"mode":                   "counters",
+								"send_count_sum_metrics": true,
+							},
+						},
+					},
+					"logging": map[string]interface{}{
+						"loglevel": "warn",
+					},
+				},
+				"service": map[string]interface{}{
+					"telemetry": map[string]interface{}{"metrics": map[string]interface{}{"level": "none"}},
+					"pipelines": map[string]interface{}{
+						"traces": map[string]interface{}{
+							"receivers": []interface{}{"otlp"},
+							"exporters": []interface{}{"otlp", "logging"},
+						},
+						"metrics": map[string]interface{}{
+							"receivers":  []interface{}{"otlp"},
+							"processors": []interface{}{"batch"},
+							"exporters":  []interface{}{"serializer", "logging"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, testInstance := range tests {
 		t.Run(testInstance.name, func(t *testing.T) {
 			cfg, err := buildMap(testInstance.pcfg)
 			require.NoError(t, err)
-			tcfg := config.NewMapFromStringMap(testInstance.ocfg)
+			tcfg := confmap.NewFromStringMap(testInstance.ocfg)
 			assert.Equal(t, tcfg.ToStringMap(), cfg.ToStringMap())
 		})
 	}
 }
 
 func TestUnmarshal(t *testing.T) {
-	cfg, err := buildMap(PipelineConfig{
+	provider, err := newMapProvider(PipelineConfig{
 		OTLPReceiverConfig: testutil.OTLPConfigFromPorts("localhost", 4317, 4318),
 		TracePort:          5001,
 		MetricsEnabled:     true,
 		TracesEnabled:      true,
 		Metrics: map[string]interface{}{
 			"delta_ttl":                                2000,
-			"report_quantiles":                         false,
-			"send_monotonic_counter":                   true,
 			"resource_attributes_as_tags":              true,
 			"instrumentation_library_metadata_as_tags": true,
+			"instrumentation_scope_metadata_as_tags":   true,
 			"histograms": map[string]interface{}{
 				"mode":                   "counters",
 				"send_count_sum_metrics": true,
@@ -269,7 +528,6 @@ func TestUnmarshal(t *testing.T) {
 	components, err := getComponents(&serializer.MockSerializer{})
 	require.NoError(t, err)
 
-	cu := configunmarshaler.NewDefault()
-	_, err = cu.Unmarshal(cfg, components)
+	_, err = provider.Get(context.Background(), components)
 	require.NoError(t, err)
 }

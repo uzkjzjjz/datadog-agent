@@ -6,14 +6,14 @@
 package settings
 
 import (
-	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	"github.com/DataDog/datadog-agent/pkg/dogstatsd"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDogstatsdMetricsStats(t *testing.T) {
@@ -34,7 +34,7 @@ func TestDogstatsdMetricsStats(t *testing.T) {
 
 	err = s.Set("true")
 	assert.Nil(err)
-	assert.Equal(atomic.LoadUint64(&common.DSD.Debug.Enabled), uint64(1))
+	assert.Equal(common.DSD.Debug.Enabled.Load(), true)
 	v, err := s.Get()
 	assert.Nil(err)
 	assert.Equal(v, true)
@@ -43,7 +43,7 @@ func TestDogstatsdMetricsStats(t *testing.T) {
 
 	err = s.Set("false")
 	assert.Nil(err)
-	assert.Equal(atomic.LoadUint64(&common.DSD.Debug.Enabled), uint64(0))
+	assert.Equal(common.DSD.Debug.Enabled.Load(), false)
 	v, err = s.Get()
 	assert.Nil(err)
 	assert.Equal(v, false)
@@ -52,7 +52,7 @@ func TestDogstatsdMetricsStats(t *testing.T) {
 
 	err = s.Set(true)
 	assert.Nil(err)
-	assert.Equal(atomic.LoadUint64(&common.DSD.Debug.Enabled), uint64(1))
+	assert.Equal(common.DSD.Debug.Enabled.Load(), true)
 	v, err = s.Get()
 	assert.Nil(err)
 	assert.Equal(v, true)
@@ -61,14 +61,14 @@ func TestDogstatsdMetricsStats(t *testing.T) {
 
 	err = s.Set(false)
 	assert.Nil(err)
-	assert.Equal(atomic.LoadUint64(&common.DSD.Debug.Enabled), uint64(0))
+	assert.Equal(common.DSD.Debug.Enabled.Load(), false)
 	v, err = s.Get()
 	assert.Nil(err)
 	assert.Equal(v, false)
 
 	// ensure the getter uses the value from the actual server
 
-	atomic.StoreUint64(&common.DSD.Debug.Enabled, 1)
+	common.DSD.Debug.Enabled.Store(true)
 	v, err = s.Get()
 	assert.Nil(err)
 	assert.Equal(v, true)

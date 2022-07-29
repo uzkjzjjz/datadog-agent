@@ -22,6 +22,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
+	ddgostatsd "github.com/DataDog/datadog-go/v5/statsd"
+
 	commonagent "github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/cmd/manager"
 	"github.com/DataDog/datadog-agent/cmd/security-agent/api"
@@ -40,10 +42,11 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/tagger/remote"
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/startstop"
 	"github.com/DataDog/datadog-agent/pkg/version"
-	ddgostatsd "github.com/DataDog/datadog-go/v5/statsd"
+	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 
 	coreconfig "github.com/DataDog/datadog-agent/pkg/config"
 )
@@ -248,11 +251,11 @@ func RunAgent(ctx context.Context) (err error) {
 
 	// get hostname
 	// FIXME: use gRPC cross-agent communication API to retrieve hostname
-	hostname, err := util.GetHostname(context.TODO())
+	hostnameDetected, err := hostname.Get(context.TODO())
 	if err != nil {
 		return log.Errorf("Error while getting hostname, exiting: %v", err)
 	}
-	log.Infof("Hostname is: %s", hostname)
+	log.Infof("Hostname is: %s", hostnameDetected)
 
 	// setup the forwarder
 	keysPerDomain, err := coreconfig.GetMultipleEndpoints()
@@ -265,17 +268,21 @@ func RunAgent(ctx context.Context) (err error) {
 	opts.UseEventPlatformForwarder = false
 	opts.UseOrchestratorForwarder = false
 	opts.UseContainerLifecycleForwarder = false
-	demux := aggregator.InitAndStartAgentDemultiplexer(opts, hostname)
+	demux := aggregator.InitAndStartAgentDemultiplexer(opts, hostnameDetected)
 	demux.AddAgentStartupTelemetry(fmt.Sprintf("%s - Datadog Security Agent", version.AgentVersion))
 
 	stopper = startstop.NewSerialStopper()
 
-	// Retrieve statsd host and port from the datadog agent configuration file
-	statsdHost := coreconfig.GetBindHost()
-	statsdPort := coreconfig.Datadog.GetInt("dogstatsd_port")
-
 	// Create a statsd Client
-	statsdAddr := fmt.Sprintf("%s:%d", statsdHost, statsdPort)
+	statsdAddr := os.Getenv("STATSD_URL")
+	if statsdAddr == "" {
+		// Retrieve statsd host and port from the datadog agent configuration file
+		statsdHost := coreconfig.GetBindHost()
+		statsdPort := coreconfig.Datadog.GetInt("dogstatsd_port")
+
+		statsdAddr = fmt.Sprintf("%s:%d", statsdHost, statsdPort)
+	}
+
 	statsdClient, err := ddgostatsd.New(statsdAddr)
 	if err != nil {
 		return log.Criticalf("Error creating statsd Client: %s", err)
@@ -290,7 +297,11 @@ func RunAgent(ctx context.Context) (err error) {
 		}
 	}
 
-	complianceAgent, err := startCompliance(hostname, stopper, statsdClient)
+	// Start workloadmeta store
+	store := workloadmeta.GetGlobalStore()
+	store.Start(ctx)
+
+	complianceAgent, err := startCompliance(hostnameDetected, stopper, statsdClient)
 	if err != nil {
 		return err
 	}
@@ -300,7 +311,7 @@ func RunAgent(ctx context.Context) (err error) {
 	}
 
 	// start runtime security agent
-	runtimeAgent, err := startRuntimeSecurity(hostname, stopper, statsdClient)
+	runtimeAgent, err := startRuntimeSecurity(hostnameDetected, stopper, statsdClient)
 	if err != nil {
 		return err
 	}

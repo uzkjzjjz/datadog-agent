@@ -11,35 +11,35 @@ package tracer
 import (
 	"context"
 	"net"
-	"sync/atomic"
 	"time"
+
+	"github.com/hashicorp/golang-lru/simplelru"
+	"go.uber.org/atomic"
 
 	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
-	"github.com/DataDog/datadog-agent/pkg/network/stats"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/DataDog/datadog-agent/pkg/util/atomicstats"
 	"github.com/DataDog/datadog-agent/pkg/util/ec2"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/hashicorp/golang-lru/simplelru"
 )
 
 const maxRouteCacheSize = int(^uint(0) >> 1) // max int
 const maxSubnetCacheSize = 1024
 
 type gatewayLookup struct {
+	procRoot            string
 	routeCache          network.RouteCache
 	subnetCache         *simplelru.LRU // interface index to subnet cache
 	subnetForHwAddrFunc func(net.HardwareAddr) (network.Subnet, error)
 
 	// stats
-	subnetCacheSize    uint64 `stats:"atomic"`
-	subnetCacheMisses  uint64 `stats:"atomic"`
-	subnetCacheLookups uint64 `stats:"atomic"`
-	subnetLookups      uint64 `stats:"atomic"`
-	subnetLookupErrors uint64 `stats:"atomic"`
-
-	statsReporter stats.Reporter
+	subnetCacheSize    *atomic.Uint64 `stats:""`
+	subnetCacheMisses  *atomic.Uint64 `stats:""`
+	subnetCacheLookups *atomic.Uint64 `stats:""`
+	subnetLookups      *atomic.Uint64 `stats:""`
+	subnetLookupErrors *atomic.Uint64 `stats:""`
 }
 
 type cloudProvider interface {
@@ -62,13 +62,14 @@ func newGatewayLookup(config *config.Config) *gatewayLookup {
 		return nil
 	}
 
-	gl := &gatewayLookup{subnetForHwAddrFunc: ec2SubnetForHardwareAddr}
-
-	var err error
-	gl.statsReporter, err = stats.NewReporter(gl)
-	if err != nil {
-		log.Errorf("could not create stats reporter for gateway lookup: %s", err)
-		return nil
+	gl := &gatewayLookup{
+		procRoot:            config.ProcRoot,
+		subnetForHwAddrFunc: ec2SubnetForHardwareAddr,
+		subnetCacheSize:     atomic.NewUint64(0),
+		subnetCacheMisses:   atomic.NewUint64(0),
+		subnetCacheLookups:  atomic.NewUint64(0),
+		subnetLookups:       atomic.NewUint64(0),
+		subnetLookupErrors:  atomic.NewUint64(0),
 	}
 
 	router, err := network.NewNetlinkRouter(config.ProcRoot)
@@ -100,51 +101,59 @@ func (g *gatewayLookup) Lookup(cs *network.ConnectionStats) *network.Via {
 		return nil
 	}
 
-	buf := util.IPBufferPool.Get().(*[]byte)
-	defer util.IPBufferPool.Put(buf)
 	// if there is no gateway, we don't need to add subnet info
 	// for gateway resolution in the backend
-	if util.NetIPFromAddress(r.Gateway, *buf).IsUnspecified() {
+	if r.Gateway.IsZero() || r.Gateway.IsUnspecified() {
 		return nil
 	}
 
-	atomic.AddUint64(&g.subnetCacheLookups, 1)
+	g.subnetCacheLookups.Inc()
 	v, ok := g.subnetCache.Get(r.IfIndex)
 	if !ok {
-		atomic.AddUint64(&g.subnetCacheMisses, 1)
+		g.subnetCacheMisses.Inc()
 
-		ifi, err := net.InterfaceByIndex(r.IfIndex)
-		if err != nil {
-			log.Errorf("error getting interface for interface index %d: %s", r.IfIndex, err)
-			// negative cache for 1 minute
-			g.subnetCache.Add(r.IfIndex, time.Now().Add(1*time.Minute))
-			atomic.AddUint64(&g.subnetCacheSize, 1)
-			return nil
-		}
-
-		if ifi.Flags&net.FlagLoopback != 0 {
-			// negative cache loopback interfaces
-			g.subnetCache.Add(r.IfIndex, nil)
-			atomic.AddUint64(&g.subnetCacheSize, 1)
-			return nil
-		}
-
-		atomic.AddUint64(&g.subnetLookups, 1)
 		var s network.Subnet
-		if s, err = g.subnetForHwAddrFunc(ifi.HardwareAddr); err != nil {
-			atomic.AddUint64(&g.subnetLookupErrors, 1)
-			log.Errorf("error getting subnet info for interface index %d: %s", r.IfIndex, err)
+		var err error
+		err = util.WithRootNS(g.procRoot, func() error {
+			var ifi *net.Interface
+			ifi, err = net.InterfaceByIndex(r.IfIndex)
+			if err != nil {
+				log.Errorf("error getting interface for interface index %d: %s", r.IfIndex, err)
+				// negative cache for 1 minute
+				g.subnetCache.Add(r.IfIndex, time.Now().Add(1*time.Minute))
+				g.subnetCacheSize.Inc()
+				return err
+			}
 
-			// cache an empty result so that we don't keep hitting the
-			// ec2 metadata endpoint for this interface
-			g.subnetCache.Add(r.IfIndex, nil)
-			atomic.AddUint64(&g.subnetCacheSize, 1)
+			if ifi.Flags&net.FlagLoopback != 0 {
+				// negative cache loopback interfaces
+				g.subnetCache.Add(r.IfIndex, nil)
+				g.subnetCacheSize.Inc()
+				return err
+			}
+
+			g.subnetLookups.Inc()
+			if s, err = g.subnetForHwAddrFunc(ifi.HardwareAddr); err != nil {
+				g.subnetLookupErrors.Inc()
+				log.Errorf("error getting subnet info for interface index %d: %s", r.IfIndex, err)
+
+				// cache an empty result so that we don't keep hitting the
+				// ec2 metadata endpoint for this interface
+				g.subnetCache.Add(r.IfIndex, nil)
+				g.subnetCacheSize.Inc()
+				return err
+			}
+
+			return nil
+		})
+
+		if err != nil {
 			return nil
 		}
 
 		via := &network.Via{Subnet: s}
 		g.subnetCache.Add(r.IfIndex, via)
-		atomic.AddUint64(&g.subnetCacheSize, 1)
+		g.subnetCacheSize.Inc()
 		v = via
 	} else if v == nil {
 		return nil
@@ -154,7 +163,7 @@ func (g *gatewayLookup) Lookup(cs *network.ConnectionStats) *network.Via {
 	case time.Time:
 		if time.Now().After(cv) {
 			g.subnetCache.Remove(r.IfIndex)
-			atomic.AddUint64(&g.subnetCacheSize, ^uint64(0))
+			g.subnetCacheSize.Dec()
 		}
 		return nil
 	case *network.Via:
@@ -165,14 +174,18 @@ func (g *gatewayLookup) Lookup(cs *network.ConnectionStats) *network.Via {
 }
 
 func (g *gatewayLookup) GetStats() map[string]interface{} {
-	report := g.statsReporter.Report()
+	if g == nil {
+		return make(map[string]interface{})
+	}
+
+	report := atomicstats.Report(g)
 	report["route_cache"] = g.routeCache.GetStats()
 	return report
 }
 
 func (g *gatewayLookup) purge() {
 	g.subnetCache.Purge()
-	atomic.StoreUint64(&g.subnetCacheSize, 0)
+	g.subnetCacheSize.Store(0)
 }
 
 func ec2SubnetForHardwareAddr(hwAddr net.HardwareAddr) (network.Subnet, error) {

@@ -22,10 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilserror "k8s.io/apimachinery/pkg/util/errors"
 
+	"github.com/DataDog/watermarkpodautoscaler/api/v1alpha1"
+
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/custommetrics"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/watermarkpodautoscaler/api/v1alpha1"
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 	extraQueryCharacters = 16
 )
 
+// DatadogClient abstracts the dependency on the Datadog api
 type DatadogClient interface {
 	QueryMetrics(from, to int64, query string) ([]datadog.Series, error)
 	GetRateLimitStats() map[string]datadog.RateLimit

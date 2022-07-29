@@ -8,16 +8,18 @@ package ad
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers/names"
 	"github.com/DataDog/datadog-agent/pkg/logs/config"
 	"github.com/DataDog/datadog-agent/pkg/logs/schedulers"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	sourcesPkg "github.com/DataDog/datadog-agent/pkg/logs/sources"
 )
 
 func setup() (scheduler *Scheduler, spy *schedulers.MockSourceManager) {
-	scheduler = New().(*Scheduler)
+	scheduler = New(nil).(*Scheduler)
 	spy = &schedulers.MockSourceManager{}
 	scheduler.mgr = spy
 	return scheduler, spy
@@ -41,7 +43,7 @@ func TestScheduleConfigCreatesNewSource(t *testing.T) {
 	logSource := spy.Events[0].Source
 	assert.Equal(t, config.DockerType, logSource.Name)
 	// We use the docker socket, not sourceType here
-	assert.Equal(t, config.SourceType(""), logSource.GetSourceType())
+	assert.Equal(t, sourcesPkg.SourceType(""), logSource.GetSourceType())
 	assert.Equal(t, "foo", logSource.Config.Service)
 	assert.Equal(t, "bar", logSource.Config.Source)
 	assert.Equal(t, config.DockerType, logSource.Config.Type)
@@ -67,7 +69,7 @@ func TestScheduleConfigCreatesNewSourceServiceFallback(t *testing.T) {
 	logSource := spy.Events[0].Source
 	assert.Equal(t, config.DockerType, logSource.Name)
 	// We use the docker socket, not sourceType here
-	assert.Equal(t, config.SourceType(""), logSource.GetSourceType())
+	assert.Equal(t, sourcesPkg.SourceType(""), logSource.GetSourceType())
 	assert.Equal(t, "foo", logSource.Config.Service)
 	assert.Equal(t, "bar", logSource.Config.Source)
 	assert.Equal(t, config.DockerType, logSource.Config.Type)
@@ -93,7 +95,7 @@ func TestScheduleConfigCreatesNewSourceServiceOverride(t *testing.T) {
 	logSource := spy.Events[0].Source
 	assert.Equal(t, config.DockerType, logSource.Name)
 	// We use the docker socket, not sourceType here
-	assert.Equal(t, config.SourceType(""), logSource.GetSourceType())
+	assert.Equal(t, sourcesPkg.SourceType(""), logSource.GetSourceType())
 	assert.Equal(t, "baz", logSource.Config.Service)
 	assert.Equal(t, "bar", logSource.Config.Source)
 	assert.Equal(t, config.DockerType, logSource.Config.Type)
@@ -141,7 +143,7 @@ func TestUnscheduleConfigRemovesSource(t *testing.T) {
 
 	// We need to have a source to remove
 	sources, _ := scheduler.toSources(configSource)
-	scheduler.sourcesByServiceID[sources[0].Config.Identifier] = sources[0]
+	spy.Sources = sources
 
 	scheduler.Unschedule([]integration.Config{configSource})
 
@@ -150,7 +152,7 @@ func TestUnscheduleConfigRemovesSource(t *testing.T) {
 	logSource := spy.Events[0].Source
 	assert.Equal(t, config.DockerType, logSource.Name)
 	// We use the docker socket, not sourceType here
-	assert.Equal(t, config.SourceType(""), logSource.GetSourceType())
+	assert.Equal(t, sourcesPkg.SourceType(""), logSource.GetSourceType())
 	assert.Equal(t, "foo", logSource.Config.Service)
 	assert.Equal(t, "bar", logSource.Config.Source)
 	assert.Equal(t, config.DockerType, logSource.Config.Type)

@@ -1,9 +1,13 @@
 provisioner:
   name: chef_solo
   product_name: chef
-  # allow overriding of chef version since we need >= 15 for arm64 testing
+  # There is no arm64 distribution of Chef 14 for Debian. Use the Ubuntu package instead
+  <% if ENV['KITCHEN_PLATFORM'] == "debian" && ENV['KITCHEN_ARCH'] == "arm64" %>
+  download_url: https://packages.chef.io/files/stable/chef/14.15.6/ubuntu/18.04/chef_14.15.6-1_arm64.deb
+  product_version: 14.15.6
+  <% else %>
   product_version: <%= ENV['CHEF_VERSION'] ||= '14.12.9' %>
-  chef_license: accept
+  <% end %>
   install_strategy: always
   # the following settings make it possible to do a reboot during setup
   # (necessary for FIPS tests which reboot to enable FIPS mode)
@@ -14,7 +18,7 @@ provisioner:
 
 driver:
   name: ec2
-  aws_ssh_key_id: <%= ENV['KITCHEN_EC2_SSH_ID'] %>
+  aws_ssh_key_id: <%= ENV['KITCHEN_EC2_SSH_KEY_ID'] %>
   security_group_ids: <%= [ENV['KITCHEN_EC2_SG_IDS']] || ["sg-7fedd80a","sg-46506837"] %>
   region: <%= ENV['KITCHEN_EC2_REGION'] ||= "us-east-1" %>
   instance_type: <%= ENV['KITCHEN_EC2_INSTANCE_TYPE'] ||= 't3.xlarge' %>
@@ -61,12 +65,18 @@ platforms:
         end
       end
 
+      # Check if we should use allow RSA key usage via user_data
+      allow_rsa_key_platforms = ["ubuntu-22-04"]
+      allow_rsa_key = allow_rsa_key_platforms.any? { |p| platform_name.include?(p) }
+
       vm_username = ENV['VM_USERNAME'] ? ENV['VM_USERNAME'] : "datadog"
       vm_password = ENV['SERVER_PASSWORD']
 
 %>
 
 - name: <%= platform_name %>
+  attributes:
+    color_idx: <%= idx %>
   driver:
     <% if windows %>
     connection_timeout: 20
@@ -82,6 +92,12 @@ platforms:
           volume_type: gp2
           volume_size: 40
           delete_on_termination: true
+    <% if allow_rsa_key %>
+    user_data: |
+      #!/bin/sh
+      echo PubkeyAcceptedKeyTypes=+ssh-rsa >> /etc/ssh/sshd_config
+      service ssh reload
+    <% end %>
 
   transport:
     <% if windows %>
@@ -94,6 +110,5 @@ platforms:
     <% if sles15 %>
     username: ec2-user
     <% end %>
-    ssh_key: <%= ENV['KITCHEN_EC2_SSH_KEY'] %>
 
 <% end %>

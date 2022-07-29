@@ -7,12 +7,11 @@ package eval
 
 import (
 	"container/list"
+	"errors"
 	"net"
 	"reflect"
 	"syscall"
 	"unsafe"
-
-	"github.com/pkg/errors"
 )
 
 var legacyFields = map[Field]Field{
@@ -103,10 +102,10 @@ type testMkdir struct {
 }
 
 type testNetwork struct {
-	ip    net.IP
-	ips   []net.IP
-	cidr  *net.IPNet
-	cidrs []*net.IPNet
+	ip    net.IPNet
+	ips   []net.IPNet
+	cidr  net.IPNet
+	cidrs []net.IPNet
 }
 
 type testEvent struct {
@@ -178,8 +177,8 @@ func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, erro
 	case "network.ip":
 
 		return &CIDREvaluator{
-			EvalFnc: func(ctx *Context) *FieldValue {
-				return NewIPFieldValue((*testEvent)(ctx.Object).network.ip, nil)
+			EvalFnc: func(ctx *Context) net.IPNet {
+				return (*testEvent)(ctx.Object).network.ip
 			},
 			Field: field,
 		}, nil
@@ -187,26 +186,29 @@ func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, erro
 	case "network.cidr":
 
 		return &CIDREvaluator{
-			EvalFnc: func(ctx *Context) *FieldValue {
-				return NewIPFieldValue(nil, (*testEvent)(ctx.Object).network.cidr)
+			EvalFnc: func(ctx *Context) net.IPNet {
+				return (*testEvent)(ctx.Object).network.cidr
 			},
 			Field: field,
 		}, nil
 
 	case "network.ips":
 
-		return &CIDRValuesEvaluator{
-			EvalFnc: func(ctx *Context) *CIDRValues {
-				return NewCIDRValues((*testEvent)(ctx.Object).network.ips, nil)
+		return &CIDRArrayEvaluator{
+			EvalFnc: func(ctx *Context) []net.IPNet {
+				var ipnets []net.IPNet
+				for _, ip := range (*testEvent)(ctx.Object).network.ips {
+					ipnets = append(ipnets, ip)
+				}
+				return ipnets
 			},
-			Field: field,
 		}, nil
 
 	case "network.cidrs":
 
-		return &CIDRValuesEvaluator{
-			EvalFnc: func(ctx *Context) *CIDRValues {
-				return NewCIDRValues(nil, (*testEvent)(ctx.Object).network.cidrs)
+		return &CIDRArrayEvaluator{
+			EvalFnc: func(ctx *Context) []net.IPNet {
+				return (*testEvent)(ctx.Object).network.cidrs
 			},
 			Field: field,
 		}, nil
@@ -397,23 +399,23 @@ func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, erro
 			},
 			Field: field,
 			OpOverrides: &OpOverrides{
-				StringValuesContains: func(a *StringEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+				StringValuesContains: func(a *StringEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return (*testEvent)(ctx.Object).process.orNameValues()
 						},
 					}
 
-					return StringValuesContains(a, &evaluator, opts, state)
+					return StringValuesContains(a, &evaluator, state)
 				},
-				StringEquals: func(a *StringEvaluator, b *StringEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+				StringEquals: func(a *StringEvaluator, b *StringEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return (*testEvent)(ctx.Object).process.orNameValues()
 						},
 					}
 
-					return StringValuesContains(a, &evaluator, opts, state)
+					return StringValuesContains(a, &evaluator, state)
 				},
 			},
 		}, nil
@@ -432,23 +434,23 @@ func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, erro
 			},
 			Field: field,
 			OpOverrides: &OpOverrides{
-				StringArrayContains: func(a *StringEvaluator, b *StringArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+				StringArrayContains: func(a *StringEvaluator, b *StringArrayEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return (*testEvent)(ctx.Object).process.orArrayValues()
 						},
 					}
 
-					return StringArrayMatches(b, &evaluator, opts, state)
+					return StringArrayMatches(b, &evaluator, state)
 				},
-				StringArrayMatches: func(a *StringArrayEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+				StringArrayMatches: func(a *StringArrayEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 					evaluator := StringValuesEvaluator{
 						EvalFnc: func(ctx *Context) *StringValues {
 							return (*testEvent)(ctx.Object).process.orArrayValues()
 						},
 					}
 
-					return StringArrayMatches(a, &evaluator, opts, state)
+					return StringArrayMatches(a, &evaluator, state)
 				},
 			},
 		}, nil
@@ -491,6 +493,8 @@ func (m *testModel) GetEvaluator(field Field, regID RegisterID) (Evaluator, erro
 
 	return nil, &ErrFieldNotFound{Field: field}
 }
+
+func (e *testEvent) Init() {}
 
 func (e *testEvent) GetFieldValue(field Field) (interface{}, error) {
 	switch field {
@@ -669,21 +673,21 @@ func (e *testEvent) SetFieldValue(field Field, value interface{}) error {
 
 	case "network.ip":
 
-		e.network.ip = value.(net.IP)
+		e.network.ip = value.(net.IPNet)
 		return nil
 
 	case "network.ips":
 
-		e.network.ips = value.([]net.IP)
+		e.network.ips = value.([]net.IPNet)
 
 	case "network.cidr":
 
-		e.network.cidr = value.(*net.IPNet)
+		e.network.cidr = value.(net.IPNet)
 		return nil
 
 	case "network.cidrs":
 
-		e.network.cidrs = value.([]*net.IPNet)
+		e.network.cidrs = value.([]net.IPNet)
 		return nil
 
 	case "process.name":

@@ -10,7 +10,9 @@ package tests
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -24,7 +26,6 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/oliveagle/jsonpath"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/gocapability/capability"
 
@@ -62,6 +63,11 @@ func TestProcess(t *testing.T) {
 }
 
 func TestProcessContext(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ruleDefs := []*rules.RuleDefinition{
 		{
 			ID:         "test_rule_inode",
@@ -119,6 +125,26 @@ func TestProcessContext(t *testing.T) {
 			ID:         "test_rule_ancestors_glob",
 			Expression: `exec.file.name == "ls" && exec.argv == "glob" && process.ancestors.file.path =~ "/usr/**"`,
 		},
+		{
+			ID:         "test_self_exec",
+			Expression: `exec.file.name == "syscall_tester" && exec.argv0 == "selfexec123" && process.comm == "exe"`,
+		},
+		{
+			ID:         "test_rule_ctx_1",
+			Expression: fmt.Sprintf(`open.file.path == "{{.Root}}/test-process-ctx-1" && process.file.name == "%s"`, path.Base(executable)),
+		},
+		{
+			ID:         "test_rule_ctx_2",
+			Expression: `open.file.path == "{{.Root}}/test-process-ctx-2" && process.file.name != ""`,
+		},
+		{
+			ID:         "test_rule_ctx_3",
+			Expression: fmt.Sprintf(`open.file.path == "{{.Root}}/test-process-ctx-3" && process.file.path == "%s"`, executable),
+		},
+		{
+			ID:         "test_rule_ctx_4",
+			Expression: `open.file.path == "{{.Root}}/test-process-ctx-4" && process.file.path != ""`,
+		},
 	}
 
 	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
@@ -126,6 +152,11 @@ func TestProcessContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer test.Close()
+
+	syscallTester, err := loadSyscallTester(t, test, "syscall_tester")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("exec-time", func(t *testing.T) {
 		testFile, _, err := test.Path("test-exec-time-1")
@@ -163,13 +194,9 @@ func TestProcessContext(t *testing.T) {
 			os.Remove(testFile)
 
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_exec_time_2")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	t.Run("inode", func(t *testing.T) {
@@ -198,14 +225,14 @@ func TestProcessContext(t *testing.T) {
 
 	test.Run(t, "args-envs", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
 		args := []string{"-al", "--password", "secret", "--custom", "secret"}
-		envs := []string{"LD_LIBRARY_PATH=/tmp/lib"}
+		envs := []string{"LD_LIBRARY_PATH=/tmp/lib", "DD_API_KEY=dd-api-key"}
 
 		test.WaitSignal(t, func() error {
 			cmd := cmdFunc("ls", args, envs)
 			// we need to ignore the error because "--password" is not a valid option for ls
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			argv0, err := event.GetFieldValue("exec.argv0")
 			if err != nil {
 				t.Errorf("not able to get argv0")
@@ -239,7 +266,7 @@ func TestProcessContext(t *testing.T) {
 
 			contains = func(s string) bool {
 				for _, env := range envs.([]string) {
-					if s == env {
+					if strings.Contains(env, s) {
 						return true
 					}
 				}
@@ -257,14 +284,10 @@ func TestProcessContext(t *testing.T) {
 				t.Error("args not serialized")
 			}
 
-			if strings.Contains(str, "secret") || strings.Contains(str, "/tmp/lib") {
+			if strings.Contains(str, "secret") || strings.Contains(str, "dd-api-key") {
 				t.Error("secret or env values exposed")
 			}
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	test.Run(t, "envp", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -275,13 +298,9 @@ func TestProcessContext(t *testing.T) {
 			cmd := cmdFunc("ls", args, envs)
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_rule_envp", rule.ID, "wrong rule triggered")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	t.Run("argv", func(t *testing.T) {
@@ -290,9 +309,9 @@ func TestProcessContext(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			cmd := exec.Command(lsExecutable, "-ll")
 			return cmd.Run()
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_rule_argv")
-		})
+		}))
 	})
 
 	t.Run("args-flags", func(t *testing.T) {
@@ -301,9 +320,9 @@ func TestProcessContext(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			cmd := exec.Command(lsExecutable, "-ls", "--escape")
 			return cmd.Run()
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_rule_args_flags")
-		})
+		}))
 	})
 
 	t.Run("args-options", func(t *testing.T) {
@@ -312,9 +331,9 @@ func TestProcessContext(t *testing.T) {
 		test.WaitSignal(t, func() error {
 			cmd := exec.Command(lsExecutable, "--block-size", "123")
 			return cmd.Run()
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_rule_args_options")
-		})
+		}))
 	})
 
 	test.Run(t, "args-overflow", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -333,7 +352,7 @@ func TestProcessContext(t *testing.T) {
 			// we need to ignore the error because the string of "a" generates a "File name too long" error
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			args, err := event.GetFieldValue("exec.args")
 			if err != nil {
 				t.Errorf("not able to get args")
@@ -341,6 +360,7 @@ func TestProcessContext(t *testing.T) {
 
 			argv := strings.Split(args.(string), " ")
 			assert.Equal(t, 2, len(argv), "incorrect number of args: %s", argv)
+			assert.Equal(t, 254, len(argv[1]), "wrong arg length")
 			assert.Equal(t, true, strings.HasSuffix(argv[1], "..."), "args not truncated")
 
 			argv0, err := event.GetFieldValue("exec.argv0")
@@ -348,12 +368,17 @@ func TestProcessContext(t *testing.T) {
 				t.Errorf("not able to get argv0")
 			}
 			assert.Equal(t, "ls", argv0, "incorrect argv0: %s", argv0)
-		})
+		}))
+
+		var arg string
+		for i := 0; i != 300; i++ {
+			arg += "a"
+		}
 
 		// number of args overflow
 		nArgs, args := 200, []string{"-al"}
 		for i := 0; i != nArgs; i++ {
-			args = append(args, "aaa")
+			args = append(args, arg)
 		}
 
 		test.WaitSignal(t, func() error {
@@ -361,17 +386,14 @@ func TestProcessContext(t *testing.T) {
 			// we need to ignore the error because the string of "a" generates a "File name too long" error
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			args, err := event.GetFieldValue("exec.args")
 			if err != nil {
 				t.Errorf("not able to get args")
 			}
 
 			argv := strings.Split(args.(string), " ")
-			n := len(argv)
-			if n == 0 || n > nArgs {
-				t.Errorf("incorrect number of args %d: %s", n, args.(string))
-			}
+			assert.Equal(t, 159, len(argv), "incorrect number of args: %s", argv)
 
 			truncated, err := event.GetFieldValue("exec.args_truncated")
 			if err != nil {
@@ -380,11 +402,7 @@ func TestProcessContext(t *testing.T) {
 			if !truncated.(bool) {
 				t.Errorf("arg not truncated: %s", args.(string))
 			}
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	t.Run("tty", func(t *testing.T) {
@@ -435,7 +453,7 @@ func TestProcessContext(t *testing.T) {
 			}
 			return nil
 
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertFieldEqual(t, event, "process.file.path", executable)
 
 			if name, _ := event.GetFieldValue("process.tty_name"); !strings.HasPrefix(name.(string), "pts") {
@@ -451,7 +469,7 @@ func TestProcessContext(t *testing.T) {
 			if !strings.Contains(str, "pts") {
 				t.Error("tty not serialized")
 			}
-		})
+		}))
 	})
 
 	test.Run(t, "ancestors", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -472,14 +490,10 @@ func TestProcessContext(t *testing.T) {
 				return fmt.Errorf("%s: %w", out, err)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_rule_ancestors")
 			assert.Equal(t, "sh", event.ProcessContext.Ancestor.Comm)
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	test.Run(t, "pid1", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -500,13 +514,9 @@ func TestProcessContext(t *testing.T) {
 				return fmt.Errorf("%s: %w", out, err)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_rule_pid1", rule.ID, "wrong rule triggered")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	test.Run(t, "service-tag", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -528,16 +538,12 @@ func TestProcessContext(t *testing.T) {
 				return fmt.Errorf("%s: %w", out, err)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_rule_inode", rule.ID, "wrong rule triggered")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
 
 			service := event.GetProcessServiceTag()
 			assert.Equal(t, service, "myservice")
-		})
+		}))
 	})
 
 	test.Run(t, "ancestors-args", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -555,13 +561,9 @@ func TestProcessContext(t *testing.T) {
 				return fmt.Errorf("%s: %w", out, err)
 			}
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_rule_ancestors_args", rule.ID, "wrong rule triggered")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
-		})
+		}))
 	})
 
 	test.Run(t, "args-envs-dedup", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
@@ -571,12 +573,8 @@ func TestProcessContext(t *testing.T) {
 			cmd := cmdFunc(shell, args, envs)
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "test_rule_args_envs_dedup", rule.ID, "wrong rule triggered")
-
-			if !validateExecSchema(t, event) {
-				t.Error(event.String())
-			}
 
 			var data interface{}
 			serialized := event.String()
@@ -599,7 +597,7 @@ func TestProcessContext(t *testing.T) {
 			if json, err := jsonpath.JsonPathLookup(data, "$.process.ancestors[1].envs"); err != nil {
 				t.Errorf("should have envs, got %+v (%s)", json, spew.Sdump(data))
 			}
-		})
+		}))
 	})
 
 	t.Run("ancestors-glob", func(t *testing.T) {
@@ -609,8 +607,83 @@ func TestProcessContext(t *testing.T) {
 			cmd := exec.Command(lsExecutable, "glob")
 			_ = cmd.Run()
 			return nil
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_rule_ancestors_glob")
+		}))
+	})
+
+	test.Run(t, "self-exec", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		args := []string{"self-exec", "selfexec123", "abc"}
+		envs := []string{}
+
+		test.WaitSignal(t, func() error {
+			cmd := cmdFunc(syscallTester, args, envs)
+			_, _ = cmd.CombinedOutput()
+
+			return nil
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assertTriggeredRule(t, rule, "test_self_exec")
+		}))
+	})
+
+	testProcessContextRule := func(t *testing.T, ruleID, filename string) {
+		test.Run(t, ruleID, func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+			testFile, _, err := test.Path(filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			test.WaitSignal(t, func() error {
+				f, err := os.Create(testFile)
+				if err != nil {
+					return err
+				}
+				f.Close()
+				return os.Remove(testFile)
+			}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+				assert.Equal(t, ruleID, rule.ID, "wrong rule triggered")
+			}))
+		})
+	}
+
+	testProcessContextRule(t, "test_rule_ctx_1", "test-process-ctx-1")
+	testProcessContextRule(t, "test_rule_ctx_2", "test-process-ctx-2")
+	testProcessContextRule(t, "test_rule_ctx_3", "test-process-ctx-3")
+	testProcessContextRule(t, "test_rule_ctx_4", "test-process-ctx-4")
+}
+
+func TestProcessEnvsWithValue(t *testing.T) {
+	lsExec := which(t, "ls")
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_ldpreload_from_tmp_with_envs",
+			Expression: fmt.Sprintf(`exec.file.path == "%s" && exec.envs in [~"LD_PRELOAD=*/tmp/*"]`, lsExec),
+		},
+	}
+
+	opts := testOpts{
+		envsWithValue: []string{"LD_PRELOAD"},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	t.Run("ldpreload", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{}
+			envp := []string{"LD_PRELOAD=/tmp/dyn.so"}
+
+			cmd := exec.Command(lsExec, args...)
+			cmd.Env = envp
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			assertTriggeredRule(t, rule, "test_ldpreload_from_tmp_with_envs")
+			assertFieldEqual(t, event, "exec.file.path", lsExec)
+			assertFieldStringArrayIndexedOneOf(t, event, "exec.envs", 0, []string{"LD_PRELOAD=/tmp/dyn.so"})
 		})
 	})
 }
@@ -638,13 +711,9 @@ func TestProcessExecCTime(t *testing.T) {
 
 		cmd := exec.Command(testFile, "/tmp/test")
 		return cmd.Run()
-	}, func(event *sprobe.Event, rule *rules.Rule) {
+	}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 		assert.Equal(t, "test_exec_ctime", rule.ID, "wrong rule triggered")
-
-		if !validateExecSchema(t, event) {
-			t.Error(event.String())
-		}
-	})
+	}))
 }
 
 func TestProcessPIDVariable(t *testing.T) {
@@ -685,7 +754,7 @@ func TestProcessMutableVariable(t *testing.T) {
 		}, {
 			Set: &rules.SetDefinition{
 				Name:  "var2",
-				Value: "off",
+				Value: "disabled",
 				Scope: "process",
 			},
 		}, {
@@ -717,7 +786,7 @@ func TestProcessMutableVariable(t *testing.T) {
 		Actions: []rules.ActionDefinition{{
 			Set: &rules.SetDefinition{
 				Name:  "var2",
-				Value: "on",
+				Value: "enabled",
 				Scope: "process",
 			},
 		}, {
@@ -732,7 +801,7 @@ func TestProcessMutableVariable(t *testing.T) {
 		ID: "test_rule_test_mutable_vars",
 		Expression: `open.file.path == "{{.Root}}/test-open-3"` +
 			`&& ${process.var1} == true` +
-			`&& ${process.var2} == "on"` +
+			`&& ${process.var2} == "enabled"` +
 			`&& "aaa" in ${process.var3}` +
 			`&& "bbb" in ${process.var3}` +
 			`&& process.file.name == "${var4}"` +
@@ -798,11 +867,11 @@ func TestProcessExec(t *testing.T) {
 	test.WaitSignal(t, func() error {
 		cmd := exec.Command("sh", "-c", executable+" /dev/null")
 		return cmd.Run()
-	}, func(event *sprobe.Event, rule *rules.Rule) {
+	}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 		assertFieldEqual(t, event, "exec.file.path", executable)
 		// TODO: use `process.ancestors[0].file.name` directly when this feature is reintroduced
 		assertFieldStringArrayIndexedOneOf(t, event, "process.ancestors.file.name", 0, []string{"sh", "bash", "dash"})
-	})
+	}))
 }
 
 func TestProcessMetadata(t *testing.T) {
@@ -829,7 +898,6 @@ func TestProcessMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(testFile)
 
 	f, err := os.OpenFile(testFile, os.O_WRONLY, 0)
 	if err != nil {
@@ -862,7 +930,7 @@ func TestProcessMetadata(t *testing.T) {
 			}
 			_, err := syscall.ForkExec(testFile, []string{}, attr)
 			return err
-		}, func(event *sprobe.Event, rule *rules.Rule) {
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
 			assert.Equal(t, "exec", event.GetType(), "wrong event type")
 			assert.Equal(t, 1001, int(event.Exec.Credentials.UID), "wrong uid")
 			assert.Equal(t, 1001, int(event.Exec.Credentials.EUID), "wrong euid")
@@ -870,7 +938,7 @@ func TestProcessMetadata(t *testing.T) {
 			assert.Equal(t, 2001, int(event.Exec.Credentials.GID), "wrong gid")
 			assert.Equal(t, 2001, int(event.Exec.Credentials.EGID), "wrong egid")
 			assert.Equal(t, 2001, int(event.Exec.Credentials.FSGID), "wrong fsgid")
-		})
+		}))
 	})
 }
 
@@ -903,6 +971,8 @@ func TestProcessExecExit(t *testing.T) {
 				}
 			}
 		case model.ExitEventType:
+			// assert that exit time >= exec time
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
 			if execPid != 0 && int(event.ProcessContext.Pid) == execPid {
 				return true
 			}
@@ -1143,4 +1213,402 @@ func parseCapIntoSet(capabilities uint64, flag capability.CapType, c capability.
 			c.Set(flag, capability.Cap(math.Log2(float64(v))))
 		}
 	}
+}
+
+func TestProcessIsThread(t *testing.T) {
+	const openTriggerFilename = "test-isthread"
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_process_fork_is_thread",
+			Expression: fmt.Sprintf(`open.file.name == "%s" && process.file.name == "syscall_tester" && process.ancestors.file.name == "syscall_tester" && process.is_thread`, openTriggerFilename),
+		},
+		{
+			ID:         "test_process_exec_is_not_thread",
+			Expression: fmt.Sprintf(`open.file.name == "%s" && process.file.name == "syscall_tester" && process.ancestors.file.name == "syscall_tester" && !process.is_thread`, openTriggerFilename),
+		},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	syscallTester, err := loadSyscallTester(t, test, "syscall_tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("fork-isthread", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"fork", openTriggerFilename}
+			cmd := exec.Command(syscallTester, args...)
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			assertTriggeredRule(t, rule, "test_process_fork_is_thread")
+			assert.Equal(t, openTriggerFilename, event.Open.File.BasenameStr, "wrong opened file basename")
+			assert.Equal(t, "syscall_tester", event.ProcessContext.FileEvent.BasenameStr, "wrong process file basename")
+			assert.Equal(t, "syscall_tester", event.ProcessContext.Ancestor.ProcessContext.FileEvent.BasenameStr, "wrong parent process file basename")
+			assert.True(t, event.ProcessContext.IsThread, "process should be marked as being a thread")
+		})
+	})
+
+	t.Run("exec-isnotthread", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"fork", "exec", openTriggerFilename}
+			cmd := exec.Command(syscallTester, args...)
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			assertTriggeredRule(t, rule, "test_process_exec_is_not_thread")
+			assert.Equal(t, openTriggerFilename, event.Open.File.BasenameStr, "wrong opened file basename")
+			assert.Equal(t, "syscall_tester", event.ProcessContext.FileEvent.BasenameStr, "wrong process file basename")
+			assert.Equal(t, "syscall_tester", event.ProcessContext.Ancestor.ProcessContext.FileEvent.BasenameStr, "wrong parent process file basename")
+			assert.False(t, event.ProcessContext.IsThread, "process should be marked as not being a thread")
+		})
+	})
+}
+
+func TestProcessExit(t *testing.T) {
+	sleepExec := which(t, "sleep")
+	timeoutExec := which(t, "timeout")
+
+	const envpExitSleep = "TESTPROCESSEXITSLEEP=1"
+	const envpExitSleepTime = "TESTPROCESSEXITSLEEPTIME=1"
+
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_exit_ok",
+			Expression: fmt.Sprintf(`exit.cause == EXITED && exit.code == 0 && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleep),
+		},
+		{
+			ID:         "test_exit_error",
+			Expression: fmt.Sprintf(`exit.cause == EXITED && exit.code == 1 && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleep),
+		},
+		{
+			ID:         "test_exit_coredump",
+			Expression: fmt.Sprintf(`exit.cause == COREDUMPED && exit.code == SIGQUIT && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleep),
+		},
+		{
+			ID:         "test_exit_signal",
+			Expression: fmt.Sprintf(`exit.cause == SIGNALED && exit.code == SIGKILL && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleep),
+		},
+		{
+			ID:         "test_exit_time_1",
+			Expression: fmt.Sprintf(`exit.cause == EXITED && exit.code == 0 && process.created_at < 2s && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleepTime),
+		},
+		{
+			ID:         "test_exit_time_2",
+			Expression: fmt.Sprintf(`exit.cause == EXITED && exit.code == 0 && process.created_at > 2s && process.file.path == "%s" && process.envp in ["%s"]`, sleepExec, envpExitSleepTime),
+		},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	t.Run("exit-ok", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"0"}
+			envp := []string{envpExitSleep}
+
+			cmd := exec.Command(sleepExec, args...)
+			cmd.Env = envp
+			return cmd.Run()
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_ok")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitExited), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(0), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+
+	t.Run("exit-error", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{} // sleep with no argument should exit with return code 1
+			envp := []string{envpExitSleep}
+
+			cmd := exec.Command(sleepExec, args...)
+			cmd.Env = envp
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_error")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitExited), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(1), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+
+	t.Run("exit-coredumped", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"--preserve-status", "--signal=SIGQUIT", "0.1", sleepExec, "1"}
+			envp := []string{envpExitSleep}
+
+			cmd := exec.Command(timeoutExec, args...)
+			cmd.Env = envp
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_coredump")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitCoreDumped), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(syscall.SIGQUIT), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+
+	t.Run("exit-signaled", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"--preserve-status", "--signal=SIGKILL", "0.1", sleepExec, "1"}
+			envp := []string{envpExitSleep}
+
+			cmd := exec.Command(timeoutExec, args...)
+			cmd.Env = envp
+			_ = cmd.Run()
+			return nil
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_signal")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitSignaled), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(syscall.SIGKILL), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+
+	t.Run("exit-time-1", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"--preserve-status", "--signal=SIGKILL", "1", sleepExec, "0.1"}
+			envp := []string{envpExitSleepTime}
+
+			cmd := exec.Command(timeoutExec, args...)
+			cmd.Env = envp
+			return cmd.Run()
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_time_1")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitExited), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(0), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+
+	t.Run("exit-time-2", func(t *testing.T) {
+		test.WaitSignal(t, func() error {
+			args := []string{"--preserve-status", "--signal=SIGKILL", "3", sleepExec, "2.1"}
+			envp := []string{envpExitSleepTime}
+
+			cmd := exec.Command(timeoutExec, args...)
+			cmd.Env = envp
+			return cmd.Run()
+		}, func(event *sprobe.Event, rule *rules.Rule) {
+			if !validateExitSchema(t, event) {
+				t.Error(event.String())
+			}
+			assertTriggeredRule(t, rule, "test_exit_time_2")
+			assertFieldEqual(t, event, "exit.file.path", sleepExec)
+			assert.Equal(t, uint32(model.ExitExited), event.Exit.Cause, "wrong exit cause")
+			assert.Equal(t, uint32(0), event.Exit.Code, "wrong exit code")
+			assert.False(t, event.ProcessCacheEntry.ExitTime.Before(event.ProcessCacheEntry.ExecTime), "exit time < exec time")
+		})
+	})
+}
+
+func TestProcessBusybox(t *testing.T) {
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_busybox_1",
+			Expression: `exec.file.path == "/usr/bin/whoami"`,
+		},
+		{
+			ID:         "test_busybox_2",
+			Expression: `exec.file.path == "/bin/sync"`,
+		},
+		{
+			ID:         "test_busybox_3",
+			Expression: `exec.file.name == "df"`,
+		},
+		{
+			ID:         "test_busybox_4",
+			Expression: `open.file.path == "/tmp/busybox-test" && process.file.name == "touch"`,
+		},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	wrapper, err := newDockerCmdWrapper(test.Root())
+	if err != nil {
+		t.Skip("docker no available")
+		return
+	}
+	wrapper.SetImage("alpine")
+
+	wrapper.Run(t, "busybox-1", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		test.WaitSignal(t, func() error {
+			cmd := cmdFunc("/usr/bin/whoami", nil, nil)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("%s: %w", out, err)
+			}
+			return nil
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assert.Equal(t, "test_busybox_1", rule.ID, "wrong rule triggered")
+		}))
+	})
+
+	wrapper.Run(t, "busybox-2", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		test.WaitSignal(t, func() error {
+			cmd := cmdFunc("/bin/sync", nil, nil)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("%s: %w", out, err)
+			}
+			return nil
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assert.Equal(t, "test_busybox_2", rule.ID, "wrong rule triggered")
+		}))
+	})
+
+	wrapper.Run(t, "busybox-3", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		test.WaitSignal(t, func() error {
+			cmd := cmdFunc("/bin/df", nil, nil)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("%s: %w", out, err)
+			}
+			return nil
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assert.Equal(t, "test_busybox_3", rule.ID, "wrong rule triggered")
+		}))
+	})
+
+	wrapper.Run(t, "busybox-4", func(t *testing.T, kind wrapperType, cmdFunc func(cmd string, args []string, envs []string) *exec.Cmd) {
+		test.WaitSignal(t, func() error {
+			cmd := cmdFunc("/bin/touch", []string{"/tmp/busybox-test"}, nil)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("%s: %w", out, err)
+			}
+			return nil
+		}, validateExecEvent(t, func(event *sprobe.Event, rule *rules.Rule) {
+			assert.Equal(t, "test_busybox_4", rule.ID, "wrong rule triggered")
+		}))
+	})
+}
+
+func TestProcessResolution(t *testing.T) {
+	ruleDefs := []*rules.RuleDefinition{
+		{
+			ID:         "test_resolution",
+			Expression: `open.file.path == "/tmp/test-process-resolution"`,
+		},
+	}
+
+	test, err := newTestModule(t, nil, ruleDefs, testOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test.Close()
+
+	syscallTester, err := loadSyscallTester(t, test, "syscall_tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cmd *exec.Cmd
+	var stdin io.WriteCloser
+	defer func() {
+		if cmd != nil {
+			if stdin != nil {
+				stdin.Close()
+			}
+
+			if err := cmd.Wait(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+
+	test.WaitSignal(t, func() error {
+		var err error
+
+		args := []string{"multi-open", "/tmp/test-process-resolution", "/tmp/test-process-resolution"}
+
+		cmd := exec.Command(syscallTester, args...)
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = io.WriteString(stdin, "\n")
+
+		return err
+	}, func(event *sprobe.Event, rule *rules.Rule) {
+		assert.Equal(t, "test_resolution", rule.ID, "wrong rule triggered")
+
+		value, err := event.GetFieldValue("process.pid")
+		if err != nil {
+			t.Errorf("not able to get pid")
+		}
+		pid := uint32(value.(int))
+
+		resolvers := test.probe.GetResolvers()
+
+		// compare only few fields as the hierarchy fields(pointers, etc) are modified by the resolution function calls
+		equals := func(t *testing.T, entry1, entry2 *model.ProcessCacheEntry) {
+			t.Helper()
+
+			assert.Equal(t, entry1.FileEvent.PathnameStr, entry2.FileEvent.PathnameStr)
+			assert.Equal(t, entry1.Pid, entry2.Pid)
+			assert.Equal(t, entry1.PPid, entry2.PPid)
+			assert.Equal(t, entry1.ContainerID, entry2.ContainerID)
+		}
+
+		cacheEntry := resolvers.ProcessResolver.ResolveFromCache(pid, pid)
+		if cacheEntry == nil {
+			t.Errorf("not able to resolve the entry")
+		}
+
+		mapsEntry := resolvers.ProcessResolver.ResolveFromKernelMaps(pid, pid)
+		if mapsEntry == nil {
+			t.Errorf("not able to resolve the entry")
+		}
+
+		equals(t, cacheEntry, mapsEntry)
+
+		procEntry := resolvers.ProcessResolver.ResolveFromProcfs(pid)
+		if procEntry == nil {
+			t.Errorf("not able to resolve the entry")
+		}
+
+		equals(t, cacheEntry, procEntry)
+
+		if _, err = io.WriteString(stdin, "\n"); err != nil {
+			t.Error(err)
+		}
+	})
 }

@@ -13,11 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/DataDog/viper"
+
 	aconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/profiling"
 	"github.com/DataDog/datadog-agent/pkg/version"
-	"github.com/DataDog/viper"
 )
 
 // ModuleName is a typed alias for string, used only for module names
@@ -213,7 +214,7 @@ func load(configPath string) (*Config, error) {
 		log.Info("system_probe_config.enable_oom_kill detected, will enable system-probe with OOM Kill check")
 		c.EnabledModules[OOMKillProbeModule] = struct{}{}
 	}
-	if cfg.GetBool("runtime_security_config.enabled") || cfg.GetBool("runtime_security_config.fim_enabled") {
+	if cfg.GetBool("runtime_security_config.enabled") || cfg.GetBool("runtime_security_config.fim_enabled") || cfg.GetBool("runtime_security_config.event_monitoring.enabled") {
 		log.Info("runtime_security_config.enabled or runtime_security_config.fim_enabled detected, enabling system-probe")
 		c.EnabledModules[SecurityRuntimeModule] = struct{}{}
 	}

@@ -19,8 +19,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/cloudfoundry-community/go-cfclient"
+
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 
 	"code.cloudfoundry.org/bbs/models"
 )
@@ -131,10 +132,12 @@ type DesiredLRP struct {
 	CustomTags         []string
 }
 
+// CFClient defines a structure that implements the official go cf-client and implements methods that are not supported yet
 type CFClient struct {
 	*cfclient.Client
 }
 
+// CFApplication represents a Cloud Foundry application regardless of the CAPI version
 type CFApplication struct {
 	GUID           string
 	Name           string
@@ -153,6 +156,7 @@ type CFApplication struct {
 	Sidecars       []CFSidecar
 }
 
+// CFSidecar defines a Cloud Foundry Sidecar
 type CFSidecar struct {
 	Name string
 	GUID string
@@ -163,6 +167,21 @@ type listSidecarsResponse struct {
 	Resources  []CFSidecar         `json:"resources"`
 }
 
+type isolationSegmentRelationshipResponse struct {
+	Data []struct {
+		GUID string `json:"guid"`
+	} `json:"data"`
+	Links struct {
+		Self struct {
+			Href string `json:"href"`
+		} `json:"self"`
+		Related struct {
+			Href string `json:"href"`
+		} `json:"related"`
+	} `json:"links"`
+}
+
+// CFOrgQuota defines a Cloud Foundry Organization quota
 type CFOrgQuota struct {
 	GUID        string
 	MemoryLimit int
@@ -301,6 +320,13 @@ func DesiredLRPFromBBSModel(bbsLRP *models.DesiredLRP, includeList, excludeList 
 					customTags = append(customTags, fmt.Sprintf("%s:%d", SidecarCountTagKey, len(sidecars)))
 				} else {
 					customTags = append(customTags, fmt.Sprintf("%s:%s", SidecarPresentTagKey, "false"))
+				}
+				if segment, err := ccCache.GetIsolationSegmentForOrg(orgGUID); err == nil {
+					customTags = append(customTags, fmt.Sprintf("%s:%s", SegmentIDTagKey, segment.GUID))
+					customTags = append(customTags, fmt.Sprintf("%s:%s", SegmentNameTagKey, segment.Name))
+				} else if segment, err := ccCache.GetIsolationSegmentForSpace(spaceGUID); err == nil {
+					customTags = append(customTags, fmt.Sprintf("%s:%s", SegmentIDTagKey, segment.GUID))
+					customTags = append(customTags, fmt.Sprintf("%s:%s", SegmentNameTagKey, segment.Name))
 				}
 			}
 		}
@@ -531,6 +557,7 @@ func (a *CFApplication) extractDataFromV3Org(data *cfclient.V3Organization) {
 	}
 }
 
+// NewCFClient returns a new Cloud Foundry client instance given a config
 func NewCFClient(config *cfclient.Config) (client *CFClient, err error) {
 	cfc, err := cfclient.NewClient(config)
 	if err != nil {
@@ -540,6 +567,7 @@ func NewCFClient(config *cfclient.Config) (client *CFClient, err error) {
 	return client, nil
 }
 
+// ListSidecarsByApp returns a list of sidecars for the given application GUID
 func (c *CFClient) ListSidecarsByApp(query url.Values, appGUID string) ([]CFSidecar, error) {
 	var sidecars []CFSidecar
 
@@ -575,4 +603,46 @@ func (c *CFClient) ListSidecarsByApp(query url.Values, appGUID string) ([]CFSide
 		}
 	}
 	return sidecars, nil
+}
+
+func (c *CFClient) getIsolationSegmentRelationship(resource, guid string) (string, error) {
+	requestURL := "/v3/isolation_segments/" + guid + "/relationships/" + resource
+	r := c.NewRequest("GET", requestURL)
+
+	resp, err := c.DoRequest(r)
+	if err != nil {
+		return "", fmt.Errorf("Error requesting isolation segment %s: %s", resource, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Error listing isolation segment %s, response code: %d", resource, resp.StatusCode)
+	}
+
+	defer resp.Body.Close()
+	resBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("Error reading isolation segment %s response: %s", resource, err)
+	}
+
+	var data isolationSegmentRelationshipResponse
+	err = json.Unmarshal(resBody, &data)
+	if err != nil {
+		return "", fmt.Errorf("Error unmarshalling isolation segment %s response: %s", resource, err)
+	}
+
+	if len(data.Data) == 0 {
+		return "", nil
+	}
+
+	return data.Data[0].GUID, nil
+}
+
+// GetIsolationSegmentSpaceGUID returns an isolation segment GUID given a space GUID
+func (c *CFClient) GetIsolationSegmentSpaceGUID(guid string) (string, error) {
+	return c.getIsolationSegmentRelationship("spaces", guid)
+}
+
+// GetIsolationSegmentOrganizationGUID return an isolation segment GUID given an organization GUID
+func (c *CFClient) GetIsolationSegmentOrganizationGUID(guid string) (string, error) {
+	return c.getIsolationSegmentRelationship("organizations", guid)
 }

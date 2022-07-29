@@ -15,8 +15,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"go.uber.org/atomic"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	"github.com/DataDog/datadog-agent/pkg/aggregator/ckey"
@@ -30,6 +32,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -178,13 +181,37 @@ type metricStat struct {
 
 type dsdServerDebug struct {
 	sync.Mutex
-	// Enabled is an atomic int used as a boolean
-	Enabled uint64                         `json:"enabled"`
+	Enabled *atomic.Bool
 	Stats   map[ckey.ContextKey]metricStat `json:"stats"`
 	// counting number of metrics processed last X seconds
 	metricsCounts metricsCountBuckets
 	// keyGen is used to generate hashes of the metrics received by dogstatsd
 	keyGen *ckey.KeyGenerator
+
+	// clock is used to keep a consistent time state within the debug server whether
+	// we use a real clock in production code or a mock clock for unit testing
+	clock clock.Clock
+}
+
+// newDSDServerDebug creates a new instance of a dsdServerDebug
+func newDSDServerDebug() *dsdServerDebug {
+	return newDSDServerDebugWithClock(clock.New())
+}
+
+// newDSDServerDebugWithClock creates a new instance of a dsdServerDebug with a specific clock
+// It is used to create a dsdServerDebug with a real clock for production code and with a mock clock for testing code
+func newDSDServerDebugWithClock(clock clock.Clock) *dsdServerDebug {
+	return &dsdServerDebug{
+		Enabled: atomic.NewBool(false),
+		Stats:   make(map[ckey.ContextKey]metricStat),
+		metricsCounts: metricsCountBuckets{
+			counts:     [5]uint64{0, 0, 0, 0, 0},
+			metricChan: make(chan struct{}),
+			closeChan:  make(chan struct{}),
+		},
+		keyGen: ckey.NewKeyGenerator(),
+		clock:  clock,
+	}
 }
 
 // metricsCountBuckets is counting the amount of metrics received for the last 5 seconds.
@@ -203,7 +230,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 	once.Do(initLatencyTelemetry)
 
 	var stats *util.Stats
-	if config.Datadog.GetBool("dogstatsd_stats_enable") == true {
+	if config.Datadog.GetBool("dogstatsd_stats_enable") {
 		buff := config.Datadog.GetInt("dogstatsd_stats_buffer")
 		s, err := util.NewStats(uint32(buff))
 		if err != nil {
@@ -213,10 +240,10 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 		dogstatsdExpvars.Set("PacketsLastSecond", &dogstatsdPacketsLastSec)
 	}
 
-	var metricsStatsEnabled uint64 // we're using an uint64 for its atomic capacity
-	if config.Datadog.GetBool("dogstatsd_metrics_stats_enable") == true {
+	metricsStatsEnabled := false
+	if config.Datadog.GetBool("dogstatsd_metrics_stats_enable") {
 		log.Info("Dogstatsd: metrics statistics will be stored.")
-		metricsStatsEnabled = 1
+		metricsStatsEnabled = true
 	}
 
 	packetsChannel := make(chan packets.Packets, config.Datadog.GetInt("dogstatsd_queue_size"))
@@ -275,7 +302,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 	metricPrefixBlacklist := config.Datadog.GetStringSlice("statsd_metric_namespace_blacklist")
 	metricBlocklist := config.Datadog.GetStringSlice("statsd_metric_blocklist")
 
-	defaultHostname, err := util.GetHostname(context.TODO())
+	defaultHostname, err := hostname.Get(context.TODO())
 	if err != nil {
 		log.Errorf("Dogstatsd: unable to determine default hostname: %s", err.Error())
 	}
@@ -335,19 +362,11 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 		eolTerminationNamedPipe:   eolTerminationNamedPipe,
 		entityIDPrecedenceEnabled: entityIDPrecedenceEnabled,
 		disableVerboseLogs:        config.Datadog.GetBool("dogstatsd_disable_verbose_logs"),
-		Debug: &dsdServerDebug{
-			Stats: make(map[ckey.ContextKey]metricStat),
-			metricsCounts: metricsCountBuckets{
-				counts:     [5]uint64{0, 0, 0, 0, 0},
-				metricChan: make(chan struct{}),
-				closeChan:  make(chan struct{}),
-			},
-			keyGen: ckey.NewKeyGenerator(),
-		},
-		TCapture:           capture,
-		UdsListenerRunning: udsListenerRunning,
-		cachedTlmOriginIds: make(map[string]cachedTagsOriginMap),
-		ServerlessMode:     serverless,
+		Debug:                     newDSDServerDebug(),
+		TCapture:                  capture,
+		UdsListenerRunning:        udsListenerRunning,
+		cachedTlmOriginIds:        make(map[string]cachedTagsOriginMap),
+		ServerlessMode:            serverless,
 	}
 
 	// packets forwarding
@@ -369,12 +388,12 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 	// start the workers processing the packets read on the socket
 	// ----------------------
 
-	s.handleMessages(serverless)
+	s.handleMessages()
 
 	// start the debug loop
 	// ----------------------
 
-	if metricsStatsEnabled == 1 {
+	if metricsStatsEnabled {
 		s.EnableMetricsStats()
 	}
 
@@ -397,7 +416,7 @@ func NewServer(demultiplexer aggregator.Demultiplexer, serverless bool) (*Server
 	return s, nil
 }
 
-func (s *Server) handleMessages(serverless bool) {
+func (s *Server) handleMessages() {
 	if s.Statistics != nil {
 		go s.Statistics.Process()
 		go s.Statistics.Update(&dogstatsdPacketsLastSec)
@@ -555,7 +574,7 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*packe
 				var err error
 				samples = samples[0:0]
 
-				debugEnabled := atomic.LoadUint64(&s.Debug.Enabled) == 1
+				debugEnabled := s.Debug.Enabled.Load()
 
 				samples, err = s.parseMetricMessage(samples, parser, message, packet.Origin, debugEnabled)
 				if err != nil {
@@ -718,7 +737,7 @@ func (s *Server) Stop() {
 //
 // It can help troubleshooting clients with bad behaviors.
 func (s *Server) storeMetricStats(sample metrics.MetricSample) {
-	now := time.Now()
+	now := s.Debug.clock.Now()
 	s.Debug.Lock()
 	defer s.Debug.Unlock()
 
@@ -749,27 +768,27 @@ func (s *Server) EnableMetricsStats() {
 	defer s.Debug.Unlock()
 
 	// already enabled?
-	if atomic.LoadUint64(&s.Debug.Enabled) == 1 {
+	if s.Debug.Enabled.Load() {
 		return
 	}
 
-	atomic.StoreUint64(&s.Debug.Enabled, 1)
+	s.Debug.Enabled.Store(true)
 	go func() {
-		ticker := time.NewTicker(time.Millisecond * 100)
+		ticker := s.Debug.clock.Ticker(time.Millisecond * 100)
 		var closed bool
 		log.Debug("Starting the DogStatsD debug loop.")
 		for {
 			select {
 			case <-ticker.C:
-				sec := time.Now().Truncate(time.Second)
+				sec := s.Debug.clock.Now().Truncate(time.Second)
 				if sec.After(s.Debug.metricsCounts.currentSec) {
 					s.Debug.metricsCounts.currentSec = sec
-
 					if s.hasSpike() {
 						log.Warnf("A burst of metrics has been detected by DogStatSd: here is the last 5 seconds count of metrics: %v", s.Debug.metricsCounts.counts)
 					}
 
 					s.Debug.metricsCounts.bucketIdx++
+
 					if s.Debug.metricsCounts.bucketIdx >= len(s.Debug.metricsCounts.counts) {
 						s.Debug.metricsCounts.bucketIdx = 0
 					}
@@ -801,10 +820,8 @@ func (s *Server) hasSpike() bool {
 		sum += v
 	}
 	sum -= s.Debug.metricsCounts.counts[s.Debug.metricsCounts.bucketIdx]
-	if s.Debug.metricsCounts.counts[s.Debug.metricsCounts.bucketIdx] > sum {
-		return true
-	}
-	return false
+
+	return s.Debug.metricsCounts.counts[s.Debug.metricsCounts.bucketIdx] > sum
 }
 
 // DisableMetricsStats disables the debug mode of the DogStatsD server and
@@ -813,8 +830,8 @@ func (s *Server) DisableMetricsStats() {
 	s.Debug.Lock()
 	defer s.Debug.Unlock()
 
-	if atomic.LoadUint64(&s.Debug.Enabled) == 1 {
-		atomic.StoreUint64(&s.Debug.Enabled, 0)
+	if s.Debug.Enabled.Load() {
+		s.Debug.Enabled.Store(false)
 		s.Debug.metricsCounts.closeChan <- struct{}{}
 	}
 

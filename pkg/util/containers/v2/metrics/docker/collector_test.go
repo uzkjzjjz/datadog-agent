@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/DataDog/datadog-agent/pkg/util/containers/v2/metrics/provider"
@@ -114,4 +116,48 @@ func TestGetContainerIDForPID(t *testing.T) {
 	cID2, err = collector.GetContainerIDForPID(200, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, "cID2", cID2)
+}
+
+func Test_fillStatsFromSpec(t *testing.T) {
+	tests := []struct {
+		name          string
+		spec          *types.ContainerJSON
+		expectedStats *provider.ContainerStats
+	}{
+		{
+			name: "Empty HostConfig",
+			spec: &types.ContainerJSON{
+				ContainerJSONBase: &types.ContainerJSONBase{
+					HostConfig: &container.HostConfig{},
+				},
+			},
+			expectedStats: &provider.ContainerStats{
+				Memory: &provider.ContainerMemStats{},
+			},
+		},
+		{
+			name: "Memory Limit set",
+			spec: &types.ContainerJSON{
+				ContainerJSONBase: &types.ContainerJSONBase{
+					HostConfig: &container.HostConfig{
+						Resources: container.Resources{
+							Memory: 500,
+						},
+					},
+				},
+			},
+			expectedStats: &provider.ContainerStats{
+				Memory: &provider.ContainerMemStats{
+					Limit: pointer.Float64Ptr(500),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			containerStats := &provider.ContainerStats{Memory: &provider.ContainerMemStats{}}
+			fillStatsFromSpec(containerStats, tt.spec)
+			assert.Equal(t, "", cmp.Diff(*tt.expectedStats, *containerStats))
+		})
+	}
 }

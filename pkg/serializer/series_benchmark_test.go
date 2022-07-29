@@ -12,13 +12,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/DataDog/datadog-agent/pkg/forwarder"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 	metricsserializer "github.com/DataDog/datadog-agent/pkg/serializer/internal/metrics"
 	"github.com/DataDog/datadog-agent/pkg/serializer/internal/stream"
 	"github.com/DataDog/datadog-agent/pkg/serializer/marshaler"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
-	"github.com/stretchr/testify/require"
 )
 
 func generateData(points int, items int, tags int) metrics.Series {
@@ -75,13 +76,13 @@ func BenchmarkSeries(b *testing.B) {
 	}
 	bufferContext := marshaler.DefaultBufferContext()
 	pb := func(series metrics.Series) (forwarder.Payloads, error) {
-		iterableSeries := &metricsserializer.IterableSeries{IterableSeries: metricsserializer.CreateIterableSeries(series)}
+		iterableSeries := &metricsserializer.IterableSeries{SerieSource: metricsserializer.CreateSerieSource(series)}
 		return iterableSeries.MarshalSplitCompress(bufferContext)
 	}
 
 	payloadBuilder := stream.NewJSONPayloadBuilder(true)
 	json := func(series metrics.Series) (forwarder.Payloads, error) {
-		iterableSeries := &metricsserializer.IterableSeries{IterableSeries: metricsserializer.CreateIterableSeries(series)}
+		iterableSeries := &metricsserializer.IterableSeries{SerieSource: metricsserializer.CreateSerieSource(series)}
 		return payloadBuilder.BuildWithOnErrItemTooBigPolicy(iterableSeries, stream.DropItemOnErrItemTooBig)
 	}
 

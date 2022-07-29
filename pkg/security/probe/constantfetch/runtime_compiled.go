@@ -20,10 +20,11 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/DataDog/datadog-go/v5/statsd"
+
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
 	"github.com/DataDog/datadog-agent/pkg/security/log"
-	"github.com/DataDog/datadog-go/v5/statsd"
 )
 
 type rcSymbolPair struct {
@@ -112,7 +113,7 @@ func (cf *RuntimeCompilationConstantFetcher) compileConstantFetcher(config *ebpf
 		cCode: cCode,
 	}
 	runtimeCompiler := runtime.NewRuntimeCompiler()
-	reader, err := runtimeCompiler.CompileObjectFile(config, additionalFlags, "constant_fetcher.c", provider)
+	reader, err := runtimeCompiler.CompileObjectFile(config, nil, "constant_fetcher.c", provider)
 
 	if cf.statsdClient != nil {
 		telemetry := runtimeCompiler.GetRCTelemetry()
@@ -168,15 +169,6 @@ func (cf *RuntimeCompilationConstantFetcher) FinishAndGetResults() (map[string]u
 
 	log.Infof("runtime compiled constants: %v", cf.result)
 	return cf.result, nil
-}
-
-var additionalFlags = []string{
-	"-D__KERNEL__",
-	"-fno-stack-protector",
-	"-fno-color-diagnostics",
-	"-fno-unwind-tables",
-	"-fno-asynchronous-unwind-tables",
-	"-fno-jump-tables",
 }
 
 type constantFetcherRCProvider struct {

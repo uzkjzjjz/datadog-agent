@@ -9,10 +9,11 @@ import (
 	"context"
 	"errors"
 	"sort"
-	"sync/atomic"
 	"time"
 
 	model "github.com/DataDog/agent-payload/v5/process"
+	"go.uber.org/atomic"
+
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/metadata/host"
 	"github.com/DataDog/datadog-agent/pkg/network/dns"
@@ -27,7 +28,9 @@ import (
 
 var (
 	// Connections is a singleton ConnectionsCheck.
-	Connections = &ConnectionsCheck{}
+	Connections = &ConnectionsCheck{
+		lastConnsByPID: &atomic.Value{},
+	}
 
 	// LocalResolver is a singleton LocalResolver
 	LocalResolver = &resolver.LocalResolver{}
@@ -46,7 +49,7 @@ type ConnectionsCheck struct {
 	notInitializedLogLimit *procutil.LogLimit
 	// store the last collection result by PID, currently used to populate network data for processes
 	// it's in format map[int32][]*model.Connections
-	lastConnsByPID atomic.Value
+	lastConnsByPID *atomic.Value
 }
 
 // Init initializes a ConnectionsCheck instance.
@@ -84,9 +87,12 @@ func (c *ConnectionsCheck) Name() string { return config.ConnectionsCheckName }
 // RealTime indicates if this check only runs in real-time mode.
 func (c *ConnectionsCheck) RealTime() bool { return false }
 
-// Run runs the ConnectionsCheck to collect the live TCP connections on the
-// system. Currently only linux systems are supported as eBPF is used to gather
-// this information. For each connection we'll return a `model.Connection`
+// ShouldSaveLastRun indicates if the output from the last run should be saved for use in flares
+func (c *ConnectionsCheck) ShouldSaveLastRun() bool { return false }
+
+// Run runs the ConnectionsCheck to collect the active network connections
+// and any closed network connections since the last Run.
+// For each connection we'll return a `model.Connection`
 // that will be bundled up into a `CollectorConnections`.
 // See agent.proto for the schema of the message and models.
 func (c *ConnectionsCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageBody, error) {
@@ -109,8 +115,11 @@ func (c *ConnectionsCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.
 	c.lastConnsByPID.Store(getConnectionsByPID(conns))
 
 	log.Debugf("collected connections in %s", time.Since(start))
-	return batchConnections(cfg, groupID, c.enrichConnections(conns.Conns), conns.Dns, c.networkID, conns.ConnTelemetryMap, conns.CompilationTelemetryByAsset, conns.Domains, conns.Routes, conns.AgentConfiguration), nil
+	return batchConnections(cfg, groupID, c.enrichConnections(conns.Conns), conns.Dns, c.networkID, conns.ConnTelemetryMap, conns.CompilationTelemetryByAsset, conns.Domains, conns.Routes, conns.Tags, conns.AgentConfiguration), nil
 }
+
+// Cleanup frees any resource held by the ConnectionsCheck before the agent exits
+func (c *ConnectionsCheck) Cleanup() {}
 
 func (c *ConnectionsCheck) getConnections() (*model.Connections, error) {
 	tu, err := net.GetRemoteSystemProbeUtil()
@@ -244,6 +253,7 @@ func batchConnections(
 	compilationTelemetry map[string]*model.RuntimeCompilationTelemetry,
 	domains []string,
 	routes []*model.Route,
+	tags []string,
 	agentCfg *model.AgentConfiguration,
 ) []model.MessageBody {
 	groupSize := groupSize(len(cxs), cfg.MaxConnsPerMessage)
@@ -270,6 +280,8 @@ func batchConnections(
 		namemap := make(map[string]int32)
 		namedb := make([]string, 0)
 
+		tagsEncoder := model.NewV2TagEncoder()
+
 		for _, c := range batchConns { // We only want to include DNS entries relevant to this batch of connections
 			if entries, ok := dns[c.Raddr.Ip]; ok {
 				if _, present := batchDNS[c.Raddr.Ip]; !present {
@@ -287,6 +299,18 @@ func batchConnections(
 			// in the namedb.  Each unique string should only occur once.
 			remapDNSStatsByDomain(c, namemap, &namedb, domains)
 			remapDNSStatsByDomainByQueryType(c, namemap, &namedb, domains)
+
+			// tags remap
+			if len(c.Tags) > 0 {
+				var tagsStr []string
+				for _, t := range c.Tags {
+					tagsStr = append(tagsStr, tags[t])
+				}
+				c.Tags = nil
+				c.TagsIdx = int32(tagsEncoder.Encode(tagsStr))
+			} else {
+				c.TagsIdx = -1
+			}
 
 		}
 
@@ -337,17 +361,18 @@ func batchConnections(
 			}
 		}
 		cc := &model.CollectorConnections{
-			AgentConfiguration:    agentCfg,
-			HostName:              cfg.HostName,
-			NetworkId:             networkID,
-			Connections:           batchConns,
-			GroupId:               groupID,
-			GroupSize:             groupSize,
-			ContainerForPid:       ctrIDForPID,
-			EncodedDomainDatabase: encodedNameDb,
-			EncodedDnsLookups:     mappedDNSLookups,
-			ContainerHostType:     cfg.ContainerHostType,
-			Routes:                batchRoutes,
+			AgentConfiguration:     agentCfg,
+			HostName:               cfg.HostName,
+			NetworkId:              networkID,
+			Connections:            batchConns,
+			GroupId:                groupID,
+			GroupSize:              groupSize,
+			ContainerForPid:        ctrIDForPID,
+			EncodedDomainDatabase:  encodedNameDb,
+			EncodedDnsLookups:      mappedDNSLookups,
+			ContainerHostType:      cfg.ContainerHostType,
+			Routes:                 batchRoutes,
+			EncodedConnectionsTags: tagsEncoder.Buffer(),
 		}
 
 		// Add OS telemetry

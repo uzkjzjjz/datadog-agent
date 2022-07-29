@@ -6,15 +6,16 @@
 package eval
 
 import (
+	"net"
 	"strings"
 )
 
 // OpOverrides defines operator override functions
 type OpOverrides struct {
-	StringEquals         func(a *StringEvaluator, b *StringEvaluator, opts *Opts, state *State) (*BoolEvaluator, error)
-	StringValuesContains func(a *StringEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error)
-	StringArrayContains  func(a *StringEvaluator, b *StringArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error)
-	StringArrayMatches   func(a *StringArrayEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error)
+	StringEquals         func(a *StringEvaluator, b *StringEvaluator, state *State) (*BoolEvaluator, error)
+	StringValuesContains func(a *StringEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error)
+	StringArrayContains  func(a *StringEvaluator, b *StringArrayEvaluator, state *State) (*BoolEvaluator, error)
+	StringArrayMatches   func(a *StringArrayEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error)
 }
 
 // return whether a arithmetic operation is deterministic
@@ -32,7 +33,7 @@ func isArithmDeterministic(a Evaluator, b Evaluator, state *State) bool {
 }
 
 // IntNot - ^int operator
-func IntNot(a *IntEvaluator, opts *Opts, state *State) *IntEvaluator {
+func IntNot(a *IntEvaluator, state *State) *IntEvaluator {
 	isDc := a.IsDeterministicFor(state.field)
 
 	if a.EvalFnc != nil {
@@ -57,7 +58,7 @@ func IntNot(a *IntEvaluator, opts *Opts, state *State) *IntEvaluator {
 }
 
 // StringEquals evaluates string
-func StringEquals(a *StringEvaluator, b *StringEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func StringEquals(a *StringEvaluator, b *StringEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	// default comparison
@@ -157,7 +158,7 @@ func StringEquals(a *StringEvaluator, b *StringEvaluator, opts *Opts, state *Sta
 }
 
 // Not - !true operator
-func Not(a *BoolEvaluator, opts *Opts, state *State) *BoolEvaluator {
+func Not(a *BoolEvaluator, state *State) *BoolEvaluator {
 	isDc := a.IsDeterministicFor(state.field)
 
 	if a.EvalFnc != nil {
@@ -186,7 +187,7 @@ func Not(a *BoolEvaluator, opts *Opts, state *State) *BoolEvaluator {
 }
 
 // Minus - -int operator
-func Minus(a *IntEvaluator, opts *Opts, state *State) *IntEvaluator {
+func Minus(a *IntEvaluator, state *State) *IntEvaluator {
 	isDc := a.IsDeterministicFor(state.field)
 
 	if a.EvalFnc != nil {
@@ -211,7 +212,7 @@ func Minus(a *IntEvaluator, opts *Opts, state *State) *IntEvaluator {
 }
 
 // StringArrayContains evaluates array of strings against a value
-func StringArrayContains(a *StringEvaluator, b *StringArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func StringArrayContains(a *StringEvaluator, b *StringArrayEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	op := func(a string, b []string, cmp func(a, b string) bool) bool {
@@ -312,7 +313,7 @@ func StringArrayContains(a *StringEvaluator, b *StringArrayEvaluator, opts *Opts
 }
 
 // StringValuesContains evaluates a string against values
-func StringValuesContains(a *StringEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func StringValuesContains(a *StringEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	if err := b.Compile(a.StringCmpOpts); err != nil {
@@ -381,7 +382,7 @@ func StringValuesContains(a *StringEvaluator, b *StringValuesEvaluator, opts *Op
 }
 
 // StringArrayMatches weak comparison, a least one element of a should be in b. a can't contain regexp
-func StringArrayMatches(a *StringArrayEvaluator, b *StringValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func StringArrayMatches(a *StringArrayEvaluator, b *StringValuesEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	if err := b.Compile(a.StringCmpOpts); err != nil {
@@ -457,7 +458,7 @@ func StringArrayMatches(a *StringArrayEvaluator, b *StringValuesEvaluator, opts 
 }
 
 // IntArrayMatches weak comparison, a least one element of a should be in b
-func IntArrayMatches(a *IntArrayEvaluator, b *IntArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func IntArrayMatches(a *IntArrayEvaluator, b *IntArrayEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	arrayOp := func(a []int, b []int) bool {
@@ -531,7 +532,7 @@ func IntArrayMatches(a *IntArrayEvaluator, b *IntArrayEvaluator, opts *Opts, sta
 }
 
 // ArrayBoolContains evaluates array of bool against a value
-func ArrayBoolContains(a *BoolEvaluator, b *BoolArrayEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func ArrayBoolContains(a *BoolEvaluator, b *BoolArrayEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	arrayOp := func(a bool, b []bool) bool {
@@ -608,18 +609,15 @@ func ArrayBoolContains(a *BoolEvaluator, b *BoolArrayEvaluator, opts *Opts, stat
 }
 
 // CIDREquals evaluates CIDR ranges
-func CIDREquals(a *CIDREvaluator, b *CIDREvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
+func CIDREquals(a *CIDREvaluator, b *CIDREvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
-
-	op := func(as IPMatcher, bs IPMatcher) bool {
-		return as.Matches(bs)
-	}
 
 	if a.EvalFnc != nil && b.EvalFnc != nil {
 		ea, eb := a.EvalFnc, b.EvalFnc
 
 		evalFnc := func(ctx *Context) bool {
-			return op(ea(ctx).IPMatcher, eb(ctx).IPMatcher)
+			a, b := ea(ctx), eb(ctx)
+			return IPNetsMatch(&a, &b)
 		}
 
 		return &BoolEvaluator{
@@ -630,26 +628,27 @@ func CIDREquals(a *CIDREvaluator, b *CIDREvaluator, opts *Opts, state *State) (*
 	}
 
 	if a.EvalFnc == nil && b.EvalFnc == nil {
-		ea, eb := a.cidrMatcher, b.cidrMatcher
+		ea, eb := a.Value, b.Value
 
 		return &BoolEvaluator{
-			Value:           op(ea, eb),
+			Value:           IPNetsMatch(&ea, &eb),
 			Weight:          a.Weight + b.Weight,
 			isDeterministic: isDc,
 		}, nil
 	}
 
 	if a.EvalFnc != nil {
-		ea, eb := a.EvalFnc, b.cidrMatcher
+		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
-			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: b.ValueType, IPMatcher: b.cidrMatcher}); err != nil {
+			if err := state.UpdateFieldValues(a.Field, FieldValue{Value: eb, Type: b.ValueType}); err != nil {
 				return nil, err
 			}
 		}
 
 		evalFnc := func(ctx *Context) bool {
-			return op(ea(ctx).IPMatcher, eb)
+			a := ea(ctx)
+			return IPNetsMatch(&a, &eb)
 		}
 
 		return &BoolEvaluator{
@@ -659,79 +658,17 @@ func CIDREquals(a *CIDREvaluator, b *CIDREvaluator, opts *Opts, state *State) (*
 		}, nil
 	}
 
-	ea, eb := a.cidrMatcher, b.EvalFnc
+	ea, eb := a.Value, b.EvalFnc
 
 	if b.Field != "" {
-		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: a.ValueType, IPMatcher: a.cidrMatcher}); err != nil {
+		if err := state.UpdateFieldValues(b.Field, FieldValue{Value: ea, Type: a.ValueType}); err != nil {
 			return nil, err
 		}
 	}
 
 	evalFnc := func(ctx *Context) bool {
-		return op(ea, eb(ctx).IPMatcher)
-	}
-
-	return &BoolEvaluator{
-		EvalFnc:         evalFnc,
-		Weight:          b.Weight,
-		isDeterministic: isDc,
-	}, nil
-}
-
-// CIDRValuesContainsWithOpFunction evaluates a CIDR against a list of CIDRs
-func CIDRValuesContainsWithOpFunction(a *CIDREvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State, arrayOp func(a IPMatcher, b *CIDRValues) bool) (*BoolEvaluator, error) {
-	isDc := isArithmDeterministic(a, b, state)
-
-	if a.EvalFnc != nil && b.EvalFnc != nil {
-		ea, eb := a.EvalFnc, b.EvalFnc
-
-		evalFnc := func(ctx *Context) bool {
-			return arrayOp(ea(ctx).IPMatcher, eb(ctx))
-		}
-
-		return &BoolEvaluator{
-			EvalFnc:         evalFnc,
-			Weight:          a.Weight + b.Weight,
-			isDeterministic: isDc,
-		}, nil
-	}
-
-	if a.EvalFnc == nil && b.EvalFnc == nil {
-		ea, eb := a.cidrMatcher, b.Values
-
-		return &BoolEvaluator{
-			Value:           arrayOp(ea, &eb),
-			Weight:          a.Weight + InArrayWeight*len(eb.fieldValues),
-			isDeterministic: isDc,
-		}, nil
-	}
-
-	if a.EvalFnc != nil {
-		ea, eb := a.EvalFnc, b.Values
-
-		if a.Field != "" {
-			for _, value := range eb.fieldValues {
-				if err := state.UpdateFieldValues(a.Field, value); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		evalFnc := func(ctx *Context) bool {
-			return arrayOp(ea(ctx).IPMatcher, &eb)
-		}
-
-		return &BoolEvaluator{
-			EvalFnc:         evalFnc,
-			Weight:          a.Weight + InArrayWeight*len(eb.fieldValues),
-			isDeterministic: isDc,
-		}, nil
-	}
-
-	ea, eb := a.cidrMatcher, b.EvalFnc
-
-	evalFnc := func(ctx *Context) bool {
-		return arrayOp(ea, eb(ctx))
+		b := eb(ctx)
+		return IPNetsMatch(&ea, &b)
 	}
 
 	return &BoolEvaluator{
@@ -742,32 +679,15 @@ func CIDRValuesContainsWithOpFunction(a *CIDREvaluator, b *CIDRValuesEvaluator, 
 }
 
 // CIDRValuesContains evaluates a CIDR against a list of CIDRs
-func CIDRValuesContains(a *CIDREvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
-	arrayOp := func(a IPMatcher, b *CIDRValues) bool {
-		return b.Matches(a)
-	}
-
-	return CIDRValuesContainsWithOpFunction(a, b, opts, state, arrayOp)
-}
-
-// AllCIDRValuesContains evaluates a CIDR against a list of CIDRs
-func AllCIDRValuesContains(a *CIDREvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
-	arrayOp := func(a IPMatcher, b *CIDRValues) bool {
-		return b.MatchesAll(a)
-	}
-
-	return CIDRValuesContainsWithOpFunction(a, b, opts, state, arrayOp)
-}
-
-// CIDRValuesMatchesWithOpFunction compares a and b following the provided arrayOp
-func CIDRValuesMatchesWithOpFunction(a *CIDRValuesEvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State, arrayOp func(a *CIDRValues, b *CIDRValues) bool) (*BoolEvaluator, error) {
+func CIDRValuesContains(a *CIDREvaluator, b *CIDRValuesEvaluator, state *State) (*BoolEvaluator, error) {
 	isDc := isArithmDeterministic(a, b, state)
 
 	if a.EvalFnc != nil && b.EvalFnc != nil {
 		ea, eb := a.EvalFnc, b.EvalFnc
 
 		evalFnc := func(ctx *Context) bool {
-			return arrayOp(ea(ctx), eb(ctx))
+			a := ea(ctx)
+			return eb(ctx).Contains(&a)
 		}
 
 		return &BoolEvaluator{
@@ -778,17 +698,17 @@ func CIDRValuesMatchesWithOpFunction(a *CIDRValuesEvaluator, b *CIDRValuesEvalua
 	}
 
 	if a.EvalFnc == nil && b.EvalFnc == nil {
-		ea, eb := a.Values, b.Values
+		ea, eb := a.Value, b.Value
 
 		return &BoolEvaluator{
-			Value:           arrayOp(&ea, &eb),
-			Weight:          a.Weight + InArrayWeight*len(eb.fieldValues),
+			Value:           eb.Contains(&ea),
+			Weight:          a.Weight + InArrayWeight*len(eb.ipnets),
 			isDeterministic: isDc,
 		}, nil
 	}
 
 	if a.EvalFnc != nil {
-		ea, eb := a.EvalFnc, b.Values
+		ea, eb := a.EvalFnc, b.Value
 
 		if a.Field != "" {
 			for _, value := range eb.fieldValues {
@@ -799,7 +719,8 @@ func CIDRValuesMatchesWithOpFunction(a *CIDRValuesEvaluator, b *CIDRValuesEvalua
 		}
 
 		evalFnc := func(ctx *Context) bool {
-			return arrayOp(ea(ctx), &eb)
+			ipnet := ea(ctx)
+			return eb.Contains(&ipnet)
 		}
 
 		return &BoolEvaluator{
@@ -809,7 +730,159 @@ func CIDRValuesMatchesWithOpFunction(a *CIDRValuesEvaluator, b *CIDRValuesEvalua
 		}, nil
 	}
 
-	ea, eb := a.Values, b.EvalFnc
+	ea, eb := a.Value, b.EvalFnc
+
+	evalFnc := func(ctx *Context) bool {
+		return eb(ctx).Contains(&ea)
+	}
+
+	return &BoolEvaluator{
+		EvalFnc:         evalFnc,
+		Weight:          b.Weight,
+		isDeterministic: isDc,
+	}, nil
+}
+
+func cidrArrayMatches(a *CIDRArrayEvaluator, b *CIDRValuesEvaluator, state *State, arrayOp func(a *CIDRValues, b []net.IPNet) bool) (*BoolEvaluator, error) {
+	isDc := isArithmDeterministic(a, b, state)
+
+	if a.EvalFnc != nil && b.EvalFnc != nil {
+		ea, eb := a.EvalFnc, b.EvalFnc
+
+		evalFnc := func(ctx *Context) bool {
+			return arrayOp(eb(ctx), ea(ctx))
+		}
+
+		return &BoolEvaluator{
+			EvalFnc:         evalFnc,
+			Weight:          a.Weight + b.Weight,
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	if a.EvalFnc == nil && b.EvalFnc == nil {
+		ea, eb := a.Value, b.Value
+
+		return &BoolEvaluator{
+			Value:           arrayOp(&eb, ea),
+			Weight:          a.Weight + InArrayWeight*len(eb.fieldValues),
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	if a.EvalFnc != nil {
+		ea, eb := a.EvalFnc, b.Value
+
+		if a.Field != "" {
+			for _, value := range eb.fieldValues {
+				if err := state.UpdateFieldValues(a.Field, value); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		evalFnc := func(ctx *Context) bool {
+			return arrayOp(&eb, ea(ctx))
+		}
+
+		return &BoolEvaluator{
+			EvalFnc:         evalFnc,
+			Weight:          a.Weight + InArrayWeight*len(eb.fieldValues),
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	ea, eb := a.Value, b.EvalFnc
+
+	evalFnc := func(ctx *Context) bool {
+		return arrayOp(eb(ctx), ea)
+	}
+
+	return &BoolEvaluator{
+		EvalFnc:         evalFnc,
+		Weight:          b.Weight,
+		isDeterministic: isDc,
+	}, nil
+}
+
+// CIDRArrayMatches weak comparison, at least one element of a should be in b.
+func CIDRArrayMatches(a *CIDRArrayEvaluator, b *CIDRValuesEvaluator, state *State) (*BoolEvaluator, error) {
+	op := func(values *CIDRValues, ipnets []net.IPNet) bool {
+		return values.Match(ipnets)
+	}
+	return cidrArrayMatches(a, b, state, op)
+}
+
+// CIDRArrayMatchesAll ensures that all values from a and b match.
+func CIDRArrayMatchesAll(a *CIDRArrayEvaluator, b *CIDRValuesEvaluator, state *State) (*BoolEvaluator, error) {
+	op := func(values *CIDRValues, ipnets []net.IPNet) bool {
+		return values.MatchAll(ipnets)
+	}
+	return cidrArrayMatches(a, b, state, op)
+}
+
+// CIDRArrayContains evaluates a CIDR against a list of CIDRs
+func CIDRArrayContains(a *CIDREvaluator, b *CIDRArrayEvaluator, state *State) (*BoolEvaluator, error) {
+	isDc := isArithmDeterministic(a, b, state)
+
+	arrayOp := func(a *net.IPNet, b []net.IPNet) bool {
+		for _, n := range b {
+			if IPNetsMatch(a, &n) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if a.EvalFnc != nil && b.EvalFnc != nil {
+		ea, eb := a.EvalFnc, b.EvalFnc
+
+		evalFnc := func(ctx *Context) bool {
+			a := ea(ctx)
+			return arrayOp(&a, eb(ctx))
+		}
+
+		return &BoolEvaluator{
+			EvalFnc:         evalFnc,
+			Weight:          a.Weight + b.Weight,
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	if a.EvalFnc == nil && b.EvalFnc == nil {
+		ea, eb := a.Value, b.Value
+
+		return &BoolEvaluator{
+			Value:           arrayOp(&ea, eb),
+			Weight:          a.Weight + InArrayWeight*len(eb),
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	if a.EvalFnc != nil {
+		ea, eb := a.EvalFnc, b.Value
+
+		if a.Field != "" {
+			for _, value := range eb {
+				if err := state.UpdateFieldValues(a.Field, FieldValue{Type: IPNetValueType, Value: value}); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		evalFnc := func(ctx *Context) bool {
+			ipnet := ea(ctx)
+			return arrayOp(&ipnet, eb)
+		}
+
+		return &BoolEvaluator{
+			EvalFnc:         evalFnc,
+			Weight:          a.Weight + InArrayWeight*len(eb),
+			isDeterministic: isDc,
+		}, nil
+	}
+
+	ea, eb := a.Value, b.EvalFnc
 
 	evalFnc := func(ctx *Context) bool {
 		return arrayOp(&ea, eb(ctx))
@@ -820,30 +893,4 @@ func CIDRValuesMatchesWithOpFunction(a *CIDRValuesEvaluator, b *CIDRValuesEvalua
 		Weight:          b.Weight,
 		isDeterministic: isDc,
 	}, nil
-}
-
-// CIDRValuesMatches weak comparison, at least one element of a should be in b.
-func CIDRValuesMatches(a *CIDRValuesEvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
-	arrayOp := func(a *CIDRValues, b *CIDRValues) bool {
-		for _, as := range a.GetFieldValues() {
-			if b.Matches(as.IPMatcher) {
-				return true
-			}
-		}
-		return false
-	}
-	return CIDRValuesMatchesWithOpFunction(a, b, opts, state, arrayOp)
-}
-
-// AllCIDRValuesMatches ensures that all values from a and b match.
-func AllCIDRValuesMatches(a *CIDRValuesEvaluator, b *CIDRValuesEvaluator, opts *Opts, state *State) (*BoolEvaluator, error) {
-	arrayOp := func(a *CIDRValues, b *CIDRValues) bool {
-		for _, as := range a.GetFieldValues() {
-			if !b.MatchesAll(as.IPMatcher) {
-				return false
-			}
-		}
-		return true
-	}
-	return CIDRValuesMatchesWithOpFunction(a, b, opts, state, arrayOp)
 }

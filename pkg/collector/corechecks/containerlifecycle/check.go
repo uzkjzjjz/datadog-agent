@@ -58,7 +58,7 @@ func (c *Check) Configure(config, initConfig integration.Data, source string) er
 
 	var err error
 
-	err = c.CommonConfigure(config, source)
+	err = c.CommonConfigure(initConfig, config, source)
 	if err != nil {
 		return err
 	}
@@ -97,6 +97,7 @@ func (c *Check) Run() error {
 		workloadmeta.NewFilter(
 			[]workloadmeta.Kind{workloadmeta.KindContainer},
 			workloadmeta.SourceRuntime,
+			workloadmeta.EventTypeUnset,
 		),
 	)
 
@@ -106,6 +107,7 @@ func (c *Check) Run() error {
 		workloadmeta.NewFilter(
 			[]workloadmeta.Kind{workloadmeta.KindKubernetesPod},
 			workloadmeta.SourceNodeOrchestrator,
+			workloadmeta.EventTypeUnset,
 		),
 	)
 

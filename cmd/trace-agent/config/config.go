@@ -10,6 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -20,6 +22,8 @@ import (
 
 	"github.com/DataDog/datadog-agent/cmd/trace-agent/internal/osutil"
 	coreconfig "github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/config/remote"
+	"github.com/DataDog/datadog-agent/pkg/config/remote/data"
 	"github.com/DataDog/datadog-agent/pkg/otlp"
 	"github.com/DataDog/datadog-agent/pkg/proto/pbgo"
 	"github.com/DataDog/datadog-agent/pkg/tagger"
@@ -37,6 +41,14 @@ import (
 const (
 	// apiEndpointPrefix is the URL prefix prepended to the default site value from YamlAgentConfig.
 	apiEndpointPrefix = "https://trace.agent."
+	// rcClientName is the default name for remote configuration clients in the trace agent
+	rcClientName = "trace-agent"
+)
+
+const (
+	// rcClientPollInterval is the default poll interval for remote configuration clients. 1 second ensures that
+	// clients remain up to date without paying too much of a performance cost (polls that contain no updates are cheap)
+	rcClientPollInterval = time.Second * 1
 )
 
 // LoadConfigFile returns a new configuration based on the given path. The path must not necessarily exist
@@ -62,9 +74,6 @@ func prepareConfig(path string) (*config.AgentConfig, error) {
 	cfg.LogFilePath = DefaultLogFilePath
 	cfg.DDAgentBin = defaultDDAgentBin
 	cfg.AgentVersion = version.AgentVersion
-	if p := coreconfig.GetProxies(); p != nil {
-		cfg.Proxy = httputils.GetProxyTransportFunc(p)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	orch := fargate.GetOrchestrator(ctx)
 	cancel()
@@ -76,9 +85,13 @@ func prepareConfig(path string) (*config.AgentConfig, error) {
 	if _, err := coreconfig.Load(); err != nil {
 		return cfg, err
 	}
+	if p := coreconfig.GetProxies(); p != nil {
+		cfg.Proxy = httputils.GetProxyTransportFunc(p)
+	}
 	cfg.ConfigPath = path
 	if coreconfig.Datadog.GetBool("remote_configuration.enabled") && coreconfig.Datadog.GetBool("remote_configuration.apm_sampling.enabled") {
-		if client, err := newRemoteClient(); err != nil {
+		client, err := remote.NewClient(rcClientName, version.AgentVersion, []data.Product{data.ProductAPMSampling}, rcClientPollInterval)
+		if err != nil {
 			log.Errorf("Error when subscribing to remote config management %v", err)
 		} else {
 			cfg.RemoteSamplingClient = client
@@ -121,14 +134,19 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 	if coreconfig.Datadog.IsSet("hostname") {
 		c.Hostname = coreconfig.Datadog.GetString("hostname")
 	}
-	if coreconfig.Datadog.IsSet("log_level") {
-		c.LogLevel = coreconfig.Datadog.GetString("log_level")
-	}
 	if coreconfig.Datadog.IsSet("dogstatsd_port") {
 		c.StatsdPort = coreconfig.Datadog.GetInt("dogstatsd_port")
 	}
 
-	c.Endpoints[0].Host = coreconfig.GetMainEndpoint(apiEndpointPrefix, "apm_config.apm_dd_url")
+	if coreconfig.Datadog.GetBool("vector.traces.enabled") {
+		if host := coreconfig.Datadog.GetString("vector.traces.url"); host == "" {
+			log.Error("vector.traces.enabled but vector.traces.url is empty.")
+		} else {
+			c.Endpoints[0].Host = host
+		}
+	} else {
+		c.Endpoints[0].Host = coreconfig.GetMainEndpoint(apiEndpointPrefix, "apm_config.apm_dd_url")
+	}
 	c.Endpoints = appendEndpoints(c.Endpoints, "apm_config.additional_endpoints")
 
 	if coreconfig.Datadog.IsSet("proxy.no_proxy") {
@@ -202,7 +220,16 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 		c.ErrorTPS = coreconfig.Datadog.GetFloat64("apm_config.errors_per_second")
 	}
 	if coreconfig.Datadog.IsSet("apm_config.disable_rare_sampler") {
-		c.DisableRareSampler = coreconfig.Datadog.GetBool("apm_config.disable_rare_sampler")
+		c.RareSamplerDisabled = coreconfig.Datadog.GetBool("apm_config.disable_rare_sampler")
+	}
+	if coreconfig.Datadog.IsSet("apm_config.rare_sampler.tps") {
+		c.RareSamplerTPS = coreconfig.Datadog.GetInt("apm_config.rare_sampler.tps")
+	}
+	if coreconfig.Datadog.IsSet("apm_config.rare_sampler.cooldown") {
+		c.RareSamplerCooldownPeriod = coreconfig.Datadog.GetDuration("apm_config.rare_sampler.cooldown")
+	}
+	if coreconfig.Datadog.IsSet("apm_config.rare_sampler.cardinality") {
+		c.RareSamplerCardinality = coreconfig.Datadog.GetInt("apm_config.rare_sampler.cardinality")
 	}
 
 	if coreconfig.Datadog.IsSet("apm_config.max_remote_traces_per_second") {
@@ -255,9 +282,11 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 		grpcPort = coreconfig.Datadog.GetInt(coreconfig.OTLPTracePort)
 	}
 	c.OTLPReceiver = &config.OTLP{
-		BindHost:        c.ReceiverHost,
-		GRPCPort:        grpcPort,
-		MaxRequestBytes: c.MaxRequestBytes,
+		BindHost:               c.ReceiverHost,
+		GRPCPort:               grpcPort,
+		MaxRequestBytes:        c.MaxRequestBytes,
+		SpanNameRemappings:     coreconfig.Datadog.GetStringMapString("otlp_config.traces.span_name_remappings"),
+		SpanNameAsResourceName: coreconfig.Datadog.GetBool("otlp_config.traces.span_name_as_resource_name"),
 	}
 
 	if coreconfig.Datadog.GetBool("apm_config.telemetry.enabled") {
@@ -367,7 +396,7 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 		return err
 	}
 
-	if strings.ToLower(c.LogLevel) == "debug" && !coreconfig.Datadog.IsSet("apm_config.log_throttling") {
+	if strings.ToLower(coreconfig.Datadog.GetString("log_level")) == "debug" && !coreconfig.Datadog.IsSet("apm_config.log_throttling") {
 		// if we are in "debug mode" and log throttling behavior was not
 		// set by the user, disable it
 		c.LogThrottling = false
@@ -400,6 +429,21 @@ func applyDatadogConfig(c *config.AgentConfig) error {
 	if k := "apm_config.debugger_api_key"; coreconfig.Datadog.IsSet(k) {
 		c.DebuggerProxy.APIKey = coreconfig.Datadog.GetString(k)
 	}
+	if k := "evp_proxy_config.enabled"; coreconfig.Datadog.IsSet(k) {
+		c.EVPProxy.Enabled = coreconfig.Datadog.GetBool(k)
+	}
+	if k := "evp_proxy_config.dd_url"; coreconfig.Datadog.IsSet(k) {
+		c.EVPProxy.DDURL = coreconfig.Datadog.GetString(k)
+	}
+	if k := "evp_proxy_config.api_key"; coreconfig.Datadog.IsSet(k) {
+		c.EVPProxy.APIKey = coreconfig.Datadog.GetString(k)
+	}
+	if k := "evp_proxy_config.additional_endpoints"; coreconfig.Datadog.IsSet(k) {
+		c.EVPProxy.AdditionalEndpoints = coreconfig.Datadog.GetStringMapStringSlice(k)
+	}
+	if k := "evp_proxy_config.max_payload_size"; coreconfig.Datadog.IsSet(k) {
+		c.EVPProxy.MaxPayloadSize = coreconfig.Datadog.GetInt64(k)
+	}
 	return nil
 }
 
@@ -410,9 +454,6 @@ func loadDeprecatedValues(c *config.AgentConfig) error {
 	cfg := coreconfig.Datadog
 	if cfg.IsSet("apm_config.api_key") {
 		c.Endpoints[0].APIKey = coreconfig.SanitizeAPIKey(coreconfig.Datadog.GetString("apm_config.api_key"))
-	}
-	if cfg.IsSet("apm_config.log_level") {
-		c.LogLevel = coreconfig.Datadog.GetString("apm_config.log_level")
 	}
 	if cfg.IsSet("apm_config.log_throttling") {
 		c.LogThrottling = cfg.GetBool("apm_config.log_throttling")
@@ -596,4 +637,39 @@ func acquireHostnameFallback(c *config.AgentConfig) error {
 	}
 	log.Debugf("Acquired hostname from core agent (%s): %q.", c.DDAgentBin, c.Hostname)
 	return nil
+}
+
+// SetHandler returns handler for runtime configuration changes.
+func SetHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			httpError(w, http.StatusMethodNotAllowed, fmt.Errorf("%s method not allowed, only %s", req.Method, http.MethodPost))
+			return
+		}
+		for key, values := range req.URL.Query() {
+			if len(values) == 0 {
+				continue
+			}
+			value := html.UnescapeString(values[len(values)-1])
+			switch key {
+			case "log_level":
+				lvl := strings.ToLower(value)
+				if lvl == "warning" {
+					lvl = "warn"
+				}
+				if err := coreconfig.ChangeLogLevel(lvl); err != nil {
+					httpError(w, http.StatusInternalServerError, err)
+					return
+				}
+				coreconfig.Datadog.Set("log_level", lvl)
+				log.Infof("Switched log level to %s", lvl)
+			default:
+				log.Infof("Unsupported config change requested (key: %q).", key)
+			}
+		}
+	})
+}
+
+func httpError(w http.ResponseWriter, status int, err error) {
+	http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), status)
 }

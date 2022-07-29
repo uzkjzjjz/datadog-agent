@@ -11,7 +11,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/scheduler"
 	"github.com/DataDog/datadog-agent/pkg/collector"
-	"github.com/DataDog/datadog-agent/pkg/logs"
 	"github.com/DataDog/datadog-agent/pkg/tagger"
 	"github.com/DataDog/datadog-agent/pkg/tagger/local"
 	"github.com/DataDog/datadog-agent/pkg/util/flavor"
@@ -39,14 +38,6 @@ func LoadComponents(ctx context.Context, confdPath string) {
 	// NOTICE: this will also setup the Python environment, if available
 	Coll = collector.NewCollector(GetPythonPaths()...)
 
-	// creating the meta scheduler
-	metaScheduler := scheduler.NewMetaScheduler()
-
-	// registering the check scheduler
-	metaScheduler.Register("check", collector.InitCheckScheduler(Coll))
-
-	logs.SetADMetaScheduler(metaScheduler)
-
 	// setup autodiscovery
 	confSearchPaths := []string{
 		confdPath,
@@ -56,5 +47,5 @@ func LoadComponents(ctx context.Context, confdPath string) {
 
 	// setup autodiscovery. must be done after the tagger is initialized
 	// because of subscription to metadata store.
-	AC = setupAutoDiscovery(confSearchPaths, metaScheduler)
+	AC = setupAutoDiscovery(confSearchPaths, scheduler.NewMetaScheduler())
 }

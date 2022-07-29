@@ -361,7 +361,6 @@ func (c *safeConfig) ReadInConfig() error {
 	c.Lock()
 	err := c.Viper.ReadInConfig()
 	c.Unlock()
-	promoteExperimentalOTLP(c) // TODO(gbbr): remove after 7.35.0 is released
 	return err
 }
 
@@ -394,6 +393,16 @@ func (c *safeConfig) AllSettings() map[string]interface{} {
 	// AllSettings returns a fresh map, so the caller may do with it
 	// as they please without holding the lock.
 	return c.Viper.AllSettings()
+}
+
+// AllSettingsWithoutDefault wraps Viper for concurrent access
+func (c *safeConfig) AllSettingsWithoutDefault() map[string]interface{} {
+	c.Lock()
+	defer c.Unlock()
+
+	// AllSettingsWithoutDefault returns a fresh map, so the caller may do with it
+	// as they please without holding the lock.
+	return c.Viper.AllSettingsWithoutDefault()
 }
 
 // AddConfigPath wraps Viper for concurrent access

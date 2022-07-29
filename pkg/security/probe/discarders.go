@@ -9,6 +9,7 @@
 package probe
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -18,7 +19,6 @@ import (
 
 	manager "github.com/DataDog/ebpf-manager"
 	lib "github.com/cilium/ebpf"
-	"github.com/pkg/errors"
 
 	"github.com/DataDog/datadog-agent/pkg/security/ebpf"
 	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
@@ -41,7 +41,14 @@ const (
 	maxParentDiscarderDepth = 3
 
 	// allEventTypes is a mask to match all the events
-	allEventTypes = 0xffffffffffffffff
+	allEventTypes = math.MaxUint32
+
+	// inode/mountid that won't be resubmitted
+	maxRecentlyAddedCacheSize = uint64(64)
+
+	// Map names for discarder stats. Discarder stats includes counts of discarders added and events discarded. Look up "multiple buffering" for more details about why there's two buffers.
+	frontBufferDiscarderStatsMapName = "discarder_stats_fb"
+	backBufferDiscarderStatsMapName  = "discarder_stats_bb"
 )
 
 var (
@@ -56,6 +63,9 @@ var (
 			Value: uint64(maxParentDiscarderDepth),
 		},*/
 	}
+
+	// recentlyAddedTimeout do not add twice the same discarder in 2sec
+	recentlyAddedTimeout = uint64(2 * time.Second.Nanoseconds())
 )
 
 // Discarder represents a discarder which is basically the field that we know for sure
@@ -134,10 +144,41 @@ func newPidDiscarders(m *lib.Map, erpc *ERPC) *pidDiscarders {
 	return &pidDiscarders{Map: m, erpc: erpc, req: ERPCRequest{OP: DiscardPidOp}}
 }
 
-type inodeDiscarder struct {
+type inodeDiscarderMapEntry struct {
 	PathKey PathKey
 	IsLeaf  uint32
 	Padding uint32
+}
+
+type inodeDiscarderEntry struct {
+	Inode     uint64
+	MountID   uint32
+	Timestamp uint64
+}
+
+type inodeDiscarderParams struct {
+	DiscarderParams discarderParams
+	Revision        uint32
+}
+
+type pidDiscarderParams struct {
+	DiscarderParams discarderParams
+}
+
+type discarderParams struct {
+	EventMask  uint64
+	Timestamps [model.LastDiscarderEventType - model.FirstDiscarderEventType]uint64
+	ExpireAt   uint64
+	IsRetained uint32
+}
+
+type discarderStats struct {
+	DiscardersAdded uint64
+	EventDiscarded  uint64
+}
+
+func recentlyAddedIndex(mountID uint32, inode uint64) uint64 {
+	return (uint64(mountID)<<32 | inode) % maxRecentlyAddedCacheSize
 }
 
 // inodeDiscarders is used to issue eRPC discarder requests
@@ -151,6 +192,8 @@ type inodeDiscarders struct {
 
 	// parentDiscarderFncs holds parent discarder functions per depth
 	parentDiscarderFncs [maxParentDiscarderDepth]map[eval.Field]func(dirname string) (bool, error)
+
+	recentlyAddedEntries [maxRecentlyAddedCacheSize]inodeDiscarderEntry
 }
 
 func newDiscarderRequest() *ERPCRequest {
@@ -168,6 +211,26 @@ func newInodeDiscarders(inodesMap, revisionsMap *lib.Map, erpc *ERPC, dentryReso
 	id.initParentDiscarderFncs()
 
 	return id, nil
+}
+
+func (id *inodeDiscarders) isRecentlyAdded(mountID uint32, inode uint64, timestamp uint64) bool {
+	entry := id.recentlyAddedEntries[recentlyAddedIndex(mountID, inode)]
+
+	var delta uint64
+	if timestamp > entry.Timestamp {
+		delta = timestamp - entry.Timestamp
+	} else {
+		delta = entry.Timestamp - timestamp
+	}
+
+	return entry.MountID == mountID && entry.Inode == inode && delta < recentlyAddedTimeout
+}
+
+func (id *inodeDiscarders) recentlyAdded(mountID uint32, inode uint64, timestamp uint64) {
+	entry := &id.recentlyAddedEntries[recentlyAddedIndex(mountID, inode)]
+	entry.MountID = mountID
+	entry.Inode = inode
+	entry.Timestamp = timestamp
 }
 
 func (id *inodeDiscarders) discardInode(req *ERPCRequest, eventType model.EventType, mountID uint32, inode uint64, isLeaf bool) error {
@@ -393,7 +456,7 @@ func (id *inodeDiscarders) isParentPathDiscarder(rs *rules.RuleSet, eventType mo
 	return true, nil
 }
 
-func (id *inodeDiscarders) discardParentInode(req *ERPCRequest, rs *rules.RuleSet, eventType model.EventType, field eval.Field, filename string, mountID uint32, inode uint64, pathID uint32) (bool, uint32, uint64, error) {
+func (id *inodeDiscarders) discardParentInode(req *ERPCRequest, rs *rules.RuleSet, eventType model.EventType, field eval.Field, filename string, mountID uint32, inode uint64, pathID uint32, timestamp uint64) (bool, uint32, uint64, error) {
 	var discarderDepth int
 	var isDiscarder bool
 	var err error
@@ -420,9 +483,16 @@ func (id *inodeDiscarders) discardParentInode(req *ERPCRequest, rs *rules.RuleSe
 		mountID, inode = parentMountID, parentInode
 	}
 
+	// do not insert multiple time the same discarder
+	if id.isRecentlyAdded(mountID, inode, timestamp) {
+		return false, 0, 0, nil
+	}
+
 	if err := id.discardInode(req, eventType, mountID, inode, false); err != nil {
 		return false, 0, 0, err
 	}
+
+	id.recentlyAdded(mountID, inode, timestamp)
 
 	return true, mountID, inode, nil
 }
@@ -454,7 +524,7 @@ func filenameDiscarderWrapper(eventType model.EventType, handler onDiscarderHand
 				return nil
 			}
 
-			isDiscarded, _, parentInode, err := probe.inodeDiscarders.discardParentInode(probe.discarderReq, rs, eventType, field, filename, mountID, inode, pathID)
+			isDiscarded, _, parentInode, err := probe.inodeDiscarders.discardParentInode(probe.discarderReq, rs, eventType, field, filename, mountID, inode, pathID, event.TimestampRaw)
 			if !isDiscarded && !isDeleted {
 				if _, ok := err.(*ErrInvalidKeyPath); !ok {
 					if !IsFakeInode(inode) {
@@ -469,7 +539,7 @@ func filenameDiscarderWrapper(eventType model.EventType, handler onDiscarderHand
 			}
 
 			if err != nil {
-				err = errors.Wrapf(err, "unable to set inode discarders for `%s` for event `%s`, inode: %d", filename, eventType, parentInode)
+				err = fmt.Errorf("unable to set inode discarders for `%s` for event `%s`, inode: %d: %w", filename, eventType, parentInode, err)
 			}
 
 			return err
@@ -627,4 +697,5 @@ func init() {
 	allDiscarderHandlers["load_module"] = processDiscarderWrapper(model.LoadModuleEventType, nil)
 	allDiscarderHandlers["unload_module"] = processDiscarderWrapper(model.UnloadModuleEventType, nil)
 	allDiscarderHandlers["signal"] = processDiscarderWrapper(model.SignalEventType, nil)
+	allDiscarderHandlers["bind"] = processDiscarderWrapper(model.BindEventType, nil)
 }

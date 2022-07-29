@@ -12,20 +12,20 @@ import (
 	"fmt"
 
 	"sync"
-	"time"
+
+	manager "github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	filterpkg "github.com/DataDog/datadog-agent/pkg/network/filter"
-	manager "github.com/DataDog/ebpf-manager"
-	"github.com/cilium/ebpf"
 )
 
 // HTTPMonitorStats is used for holding two kinds of stats:
 // * requestsStats which are the http data stats
 // * telemetry which are telemetry stats
 type HTTPMonitorStats struct {
-	requestStats map[Key]RequestStats
+	requestStats map[Key]*RequestStats
 	telemetry    telemetry
 }
 
@@ -63,7 +63,7 @@ func NewMonitor(c *config.Config, offsets []manager.ConstantEditor, sockFD *ebpf
 		return nil, fmt.Errorf("error initializing http ebpf program: %s", err)
 	}
 
-	filter, _ := mgr.GetProbe(manager.ProbeIdentificationPair{EBPFSection: httpSocketFilter, EBPFFuncName: "socket__http_filter"})
+	filter, _ := mgr.GetProbe(manager.ProbeIdentificationPair{EBPFSection: httpSocketFilter, EBPFFuncName: "socket__http_filter", UID: probeUID})
 	if filter == nil {
 		return nil, fmt.Errorf("error retrieving socket filter")
 	}
@@ -124,8 +124,6 @@ func (m *Monitor) Start() error {
 	m.eventLoopWG.Add(1)
 	go func() {
 		defer m.eventLoopWG.Done()
-		report := time.NewTicker(30 * time.Second)
-		defer report.Stop()
 		for {
 			select {
 			case dataEvent, ok := <-m.batchCompletionHandler.DataChannel:
@@ -137,6 +135,7 @@ func (m *Monitor) Start() error {
 				notification := toHTTPNotification(dataEvent.Data)
 				transactions, err := m.batchManager.GetTransactionsFrom(notification)
 				m.process(transactions, err)
+				dataEvent.Done()
 			case _, ok := <-m.batchCompletionHandler.LostChannel:
 				if !ok {
 					return
@@ -161,9 +160,6 @@ func (m *Monitor) Start() error {
 					requestStats: m.statkeeper.GetAndResetAllStats(),
 					telemetry:    delta,
 				}
-			case <-report.C:
-				transactions := m.batchManager.GetPendingTransactions()
-				m.process(transactions, nil)
 			}
 		}
 	}()
@@ -173,7 +169,7 @@ func (m *Monitor) Start() error {
 
 // GetHTTPStats returns a map of HTTP stats stored in the following format:
 // [source, dest tuple, request path] -> RequestStats object
-func (m *Monitor) GetHTTPStats() map[Key]RequestStats {
+func (m *Monitor) GetHTTPStats() map[Key]*RequestStats {
 	if m == nil {
 		return nil
 	}
@@ -193,18 +189,19 @@ func (m *Monitor) GetHTTPStats() map[Key]RequestStats {
 }
 
 func (m *Monitor) GetStats() map[string]interface{} {
+	empty := map[string]interface{}{}
 	if m == nil {
-		return nil
+		return empty
 	}
 
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	if m.stopped {
-		return nil
+		return empty
 	}
 
 	if m.telemetrySnapshot == nil {
-		return nil
+		return empty
 	}
 
 	return m.telemetrySnapshot.report()

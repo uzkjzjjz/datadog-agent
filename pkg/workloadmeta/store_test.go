@@ -9,8 +9,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/DataDog/datadog-agent/pkg/errors"
 	"gotest.tools/assert"
+
+	"github.com/DataDog/datadog-agent/pkg/errors"
 )
 
 const (
@@ -152,7 +153,7 @@ func TestSubscribe(t *testing.T) {
 			// that don't match the filter at all should not
 			// generate an event.
 			name:   "receive events for entities in the store pre-subscription with filter",
-			filter: NewFilter(nil, fooSource),
+			filter: NewFilter(nil, fooSource, EventTypeAll),
 			preEvents: []CollectorEvent{
 				// set container with two sources, delete one source
 				{
@@ -314,7 +315,7 @@ func TestSubscribe(t *testing.T) {
 			// unsetting from only one (that matches the filter)
 			// correctly generates an unset event
 			name:   "sets and unsets an entity with source filters",
-			filter: NewFilter(nil, fooSource),
+			filter: NewFilter(nil, fooSource, EventTypeAll),
 			postEvents: [][]CollectorEvent{
 				{
 					{
@@ -486,6 +487,69 @@ func TestSubscribe(t *testing.T) {
 			},
 			expected: []EventBundle{},
 		},
+		{
+			name:   "filters by event type",
+			filter: NewFilter(nil, SourceAll, EventTypeUnset),
+			postEvents: [][]CollectorEvent{
+				{
+					{
+						Type:   EventTypeSet,
+						Source: fooSource,
+						Entity: fooContainer,
+					},
+				},
+				{
+					{
+						Type:   EventTypeUnset,
+						Source: fooSource,
+						Entity: fooContainer,
+					},
+				},
+			},
+			expected: []EventBundle{
+				{
+					Events: []Event{
+						{
+							Type:   EventTypeUnset,
+							Entity: fooContainer,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:      "sets unchanged entity twice",
+			preEvents: []CollectorEvent{},
+			postEvents: [][]CollectorEvent{
+				{
+					{
+						Type:   EventTypeSet,
+						Source: fooSource,
+						Entity: fooContainer,
+					},
+					{
+						Type:   EventTypeSet,
+						Source: fooSource,
+						// DeepCopy to ensure we're not
+						// just comparing pointers, as
+						// collectors return a freshly
+						// built object every time
+						Entity: fooContainer.DeepCopy(),
+					},
+				},
+			},
+			filter: nil,
+			expected: []EventBundle{
+				{
+					Events: []Event{
+						{
+							Type:   EventTypeSet,
+							Entity: fooContainer,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -523,6 +587,90 @@ func TestSubscribe(t *testing.T) {
 			assert.DeepEqual(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestListContainers(t *testing.T) {
+	container := &Container{
+		EntityID: EntityID{
+			Kind: KindContainer,
+			ID:   "abc",
+		},
+	}
+
+	tests := []struct {
+		name               string
+		preEvents          []CollectorEvent
+		expectedContainers []*Container
+	}{
+		{
+			name: "some containers stored",
+			preEvents: []CollectorEvent{
+				{
+					Type:   EventTypeSet,
+					Source: fooSource,
+					Entity: container,
+				},
+			},
+			expectedContainers: []*Container{container},
+		},
+		{
+			name:               "no containers stored",
+			preEvents:          nil,
+			expectedContainers: []*Container{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testStore := newTestStore()
+			testStore.handleEvents(test.preEvents)
+
+			containers := testStore.ListContainers()
+
+			assert.DeepEqual(t, test.expectedContainers, containers)
+		})
+	}
+}
+
+func TestListContainersWithFilter(t *testing.T) {
+	runningContainer := &Container{
+		EntityID: EntityID{
+			Kind: KindContainer,
+			ID:   "1",
+		},
+		State: ContainerState{
+			Running: true,
+		},
+	}
+
+	nonRunningContainer := &Container{
+		EntityID: EntityID{
+			Kind: KindContainer,
+			ID:   "2",
+		},
+		State: ContainerState{
+			Running: false,
+		},
+	}
+
+	testStore := newTestStore()
+
+	testStore.handleEvents([]CollectorEvent{
+		{
+			Type:   EventTypeSet,
+			Source: fooSource,
+			Entity: runningContainer,
+		},
+		{
+			Type:   EventTypeSet,
+			Source: fooSource,
+			Entity: nonRunningContainer,
+		},
+	})
+
+	runningContainers := testStore.ListContainersWithFilter(GetRunningContainers)
+
+	assert.DeepEqual(t, []*Container{runningContainer}, runningContainers)
 }
 
 func newTestStore() *store {

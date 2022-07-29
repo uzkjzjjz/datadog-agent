@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0.
+// This product includes software developed at Datadog (https://www.datadoghq.com/).
+// Copyright 2022-present Datadog, Inc.
+
 package utils
 
 import (
@@ -49,9 +54,9 @@ func ExtractTemplatesFromPodAnnotations(entityName string, annotations map[strin
 // (ad.datadoghq.com/redis.checks) JSON string into []integration.Config.
 func parseChecksJSON(adIdentifier string, checksJSON string) ([]integration.Config, error) {
 	var namedChecks map[string]struct {
-		Name       string            `json:"name"`
-		InitConfig *integration.Data `json:"init_config"`
-		Instances  []interface{}     `json:"instances"`
+		Name       string          `json:"name"`
+		InitConfig json.RawMessage `json:"init_config"`
+		Instances  []interface{}   `json:"instances"`
 	}
 
 	err := json.Unmarshal([]byte(checksJSON), &namedChecks)
@@ -65,16 +70,13 @@ func parseChecksJSON(adIdentifier string, checksJSON string) ([]integration.Conf
 			name = config.Name
 		}
 
-		var initConfig integration.Data
-		if config.InitConfig != nil {
-			initConfig = *config.InitConfig
-		} else {
-			initConfig = integration.Data("{}")
+		if len(config.InitConfig) == 0 {
+			config.InitConfig = json.RawMessage("{}")
 		}
 
 		c := integration.Config{
 			Name:          name,
-			InitConfig:    initConfig,
+			InitConfig:    integration.Data(config.InitConfig),
 			ADIdentifiers: []string{adIdentifier},
 		}
 

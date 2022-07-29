@@ -18,9 +18,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/trace/testutil"
 	"github.com/DataDog/viper"
 	yaml "gopkg.in/yaml.v2"
+
+	"github.com/DataDog/datadog-agent/pkg/trace/testutil"
 )
 
 // ErrNotInstalled is returned when the trace-agent can not be found in $PATH.
@@ -186,7 +187,9 @@ func (s *agentRunner) createConfigFile(conf []byte) (string, error) {
 	if !v.IsSet("apm_config.trace_writer.flush_period_seconds") {
 		v.Set("apm_config.trace_writer.flush_period_seconds", 0.1)
 	}
-	v.Set("log_level", "debug")
+	if !v.IsSet("log_level") {
+		v.Set("log_level", "debug")
+	}
 
 	// disable remote tagger to avoid running a core agent for testing
 	v.Set("apm_config.remote_tagger", false)

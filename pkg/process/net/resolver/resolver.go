@@ -10,6 +10,7 @@ import (
 	"time"
 
 	model "github.com/DataDog/agent-payload/v5/process"
+
 	procutil "github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
@@ -92,7 +93,7 @@ func (l *LocalResolver) Resolve(c *model.Connections) {
 		conn.Laddr.ContainerId = cid
 
 		ip := procutil.AddressFromString(conn.Laddr.Ip)
-		if ip == nil {
+		if ip.IsZero() {
 			continue
 		}
 
@@ -116,7 +117,7 @@ func (l *LocalResolver) Resolve(c *model.Connections) {
 		if conn.Raddr.ContainerId == "" {
 			raddr := translatedContainerRaddr(conn.Raddr, conn.IpTranslation, conn.Type)
 			ip := procutil.AddressFromString(raddr.Ip)
-			if ip == nil {
+			if ip.IsZero() {
 				continue
 			}
 
