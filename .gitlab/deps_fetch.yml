@@ -7,6 +7,10 @@
   - mkdir -p $GOPATH/pkg/mod && tar xzf modcache.tar.gz -C $GOPATH/pkg/mod
   - rm -f modcache.tar.gz
 
+.retrieve_linux_go_deps_zstd:
+  - mkdir -p $GOPATH/pkg/mod && tar --use-compress-program zstd -xf modcache.tar.zst -C $GOPATH/pkg/mod
+  - rm -f modcache.tar.zst
+
 .retrieve_linux_go_tools_deps:
   - mkdir -p $GOPATH/pkg/mod && tar xzf modcache_tools.tar.gz -C $GOPATH/pkg/mod
   - rm -f modcache_tools.tar.gz
