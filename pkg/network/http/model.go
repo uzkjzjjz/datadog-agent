@@ -118,6 +118,11 @@ func (batch *httpBatch) Transactions() []httpTX {
 	return (*(*[HTTPBatchSize]httpTX)(unsafe.Pointer(&batch.txs)))[:]
 }
 
+// IsComplete returns true when all batch slots are filled
+func (batch *httpBatch) IsComplete() bool {
+	return int(batch.pos) == HTTPBatchSize
+}
+
 // below is copied from pkg/trace/stats/statsraw.go
 // 10 bits precision (any value will be +/- 1/1024)
 const roundMask uint64 = 1 << 10

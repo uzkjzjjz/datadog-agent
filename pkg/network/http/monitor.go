@@ -90,7 +90,6 @@ func NewMonitor(c *config.Config, offsets []manager.ConstantEditor, sockFD *ebpf
 		return nil, err
 	}
 	statkeeper := newHTTPStatkeeper(c, telemetry)
-
 	handler := func(transactions []httpTX) {
 		if statkeeper != nil {
 			statkeeper.Process(transactions)
@@ -132,9 +131,8 @@ func (m *Monitor) Start() error {
 
 				// The notification we read from the perf ring tells us which HTTP batch of transactions is ready to be consumed
 				notification := toHTTPNotification(dataEvent.Data)
-				transactions, err := m.batchManager.GetTransactionsFrom(notification)
-				m.process(transactions, err)
 				dataEvent.Done()
+				m.batchManager.ProcessBatchAsync(notification, m.process)
 			case _, ok := <-m.batchCompletionHandler.LostChannel:
 				if !ok {
 					return
@@ -146,9 +144,7 @@ func (m *Monitor) Start() error {
 					return
 				}
 
-				transactions := m.batchManager.GetPendingTransactions()
-				m.process(transactions, nil)
-
+				m.batchManager.ProcessAllBatchesSync(m.process)
 				delta := m.telemetry.reset()
 
 				// For now, we still want to report the telemetry as it contains more information than what

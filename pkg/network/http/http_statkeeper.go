@@ -10,6 +10,7 @@ package http
 
 import (
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 )
 
 type httpStatKeeper struct {
+	mux sync.Mutex
+
 	stats      map[Key]*RequestStats
 	incomplete *incompleteBuffer
 	maxEntries int
@@ -51,6 +54,9 @@ func newHTTPStatkeeper(c *config.Config, telemetry *telemetry) *httpStatKeeper {
 }
 
 func (h *httpStatKeeper) Process(transactions []httpTX) {
+	h.mux.Lock()
+	defer h.mux.Unlock()
+
 	for i := range transactions {
 		tx := &transactions[i]
 		if tx.Incomplete() {
@@ -65,6 +71,9 @@ func (h *httpStatKeeper) Process(transactions []httpTX) {
 }
 
 func (h *httpStatKeeper) GetAndResetAllStats() map[Key]*RequestStats {
+	h.mux.Lock()
+	defer h.mux.Unlock()
+
 	for _, tx := range h.incomplete.Flush(time.Now()) {
 		h.add(tx)
 	}
