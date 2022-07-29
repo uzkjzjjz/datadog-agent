@@ -7,10 +7,6 @@
 #include "tracer-telemetry-maps.h"
 #include "bpf_helpers.h"
 
-/* This is a key/value store with the keys being a conn_tuple_t for send & recv calls
- * and the values being conn_stats_ts_t *.
- */
-BPF_HASH_MAP(conn_stats, conn_tuple_t, conn_stats_ts_t, 0)
 /* This is a key/value store with the keys being a conn_tuple_t (but without the PID being used)
  * and the values being a tcp_stats_t *.
  */
@@ -70,11 +66,6 @@ BPF_HASH_MAP(udp_port_bindings, port_binding_t, __u32, 0)
  */
 BPF_HASH_MAP(pending_bind, __u64, bind_syscall_args_t, 8192)
     
-/* This map is used for telemetry in kernelspace
- * only key 0 is used
- * value is a telemetry object
- */
-BPF_ARRAY_MAP(telemetry, telemetry_t, 1)
 // This map is used to to temporarily store function arguments (the struct sock*
 // mapped to the given fd_out) for do_sendfile function calls, so they can be
 // accessed by the corresponding kretprobe.

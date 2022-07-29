@@ -10,16 +10,12 @@
 #include "http.h"
 #include "classifier-telemetry.h"
 #include "bpf_endian.h"
+#include "map-defs.h"
 
 #include <uapi/linux/ptrace.h>
 
-struct bpf_map_def SEC("maps/proto_args") proto_args = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(__u32),
-    .value_size = sizeof(proto_args_t),
-    .max_entries = 1,
-};
-
+BPF_HASH_MAP(proto_args, __u32, proto_args_t, 1)
+    
 
 static __always_inline int is_valid_tls_app(u8 app) {
     return (app == TLS_CHANGE_CIPHER) || (app == TLS_ALERT) || (app == TLS_HANDSHAKE) || (app == TLS_APPLICATION_DATA);

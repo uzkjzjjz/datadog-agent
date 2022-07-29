@@ -8,18 +8,14 @@
 #include "ip.h"
 #include "tls.h"
 /* */
+#include "map-defs.h"
 
 #include "classifier-telemetry.h"
 
 #define PROTO_PROG_TLS 1
 #define PROG_INDX(indx) ((indx)-1)
-struct bpf_map_def SEC("maps/proto_progs") proto_progs = {
-    .type = BPF_MAP_TYPE_PROG_ARRAY,
-    .key_size = sizeof(u32),
-    .value_size = sizeof(u32),
-    .max_entries = 1,
-};
 
+BPF_PROG_ARRAY(proto_progs, 1)
 
 static __always_inline int fingerprint_proto(skb_info_t* skb_info, struct __sk_buff* skb) {
     if (is_tls(skb, skb_info->data_off))
@@ -48,7 +44,7 @@ int socket__classifier_filter(struct __sk_buff* skb) {
 
     normalize_tuple(tup);
     if (skb_info->tcp_flags & TCPHDR_FIN) {
-	    bpf_map_delete_elem(&proto_in_flight, tup);
+//	    bpf_map_delete_elem(&proto_in_flight, tup);
 	    return 0;
     }
 

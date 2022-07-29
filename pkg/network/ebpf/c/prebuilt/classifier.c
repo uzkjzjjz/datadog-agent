@@ -13,13 +13,8 @@
 
 #define PROTO_PROG_TLS 1
 #define PROG_INDX(indx) ((indx)-1)
-struct bpf_map_def SEC("maps/proto_progs") proto_progs = {
-    .type = BPF_MAP_TYPE_PROG_ARRAY,
-    .key_size = sizeof(u32),
-    .value_size = sizeof(u32),
-    .max_entries = 1,
-};
 
+BPF_PROG_ARRAY(proto_progs, 1)
 
 static __always_inline int fingerprint_proto(conn_tuple_t *tup, skb_info_t* skb_info, struct __sk_buff* skb) {
     if (is_tls(skb, skb_info->data_off))
