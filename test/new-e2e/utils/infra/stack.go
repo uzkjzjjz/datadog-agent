@@ -45,7 +45,7 @@ func (st *Stack) Up(ctx context.Context) (*auto.UpResult, error) {
 		return nil, err
 	}
 
-	result, err := st.stack.Up(ctx, optup.ProgressStreams(os.Stdout))
+	result, err := st.stack.Up(ctx, optup.ProgressStreams(os.Stdout), optup.Diff())
 	if err != nil {
 		return nil, err
 	}
