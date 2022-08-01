@@ -1,10 +1,17 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0.
+// This product includes software developed at Datadog (https://www.datadoghq.com/).
+// Copyright 2016-present Datadog, Inc.
+
+//go:build linux_bpf
+// +build linux_bpf
+
 package http
 
 import (
 	"fmt"
 	"unsafe"
 
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/cilium/ebpf"
 )
 
@@ -31,7 +38,6 @@ func (b *batchReader) Read(notification httpNotification, forcedRead bool) ([]ht
 
 	if !forcedRead && batch.IsDirty(notification) {
 		// This means the batch was overridden before we a got chance to read it
-		log.Debugf("http: late read on get_transactions_from. cpu=%d", int(key.cpu))
 		return nil, errLostBatch
 	}
 
