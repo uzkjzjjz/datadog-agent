@@ -16,6 +16,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,6 +96,9 @@ type APIClient struct {
 
 	// VPAClient holds kubernetes VerticalPodAutoscalers client
 	VPAClient vpa.Interface
+
+	// CRDClient holds kubernetes crds
+	CustomResourceDefinitionInformer externalversions.SharedInformerFactory
 
 	// timeoutSeconds defines the kubernetes client timeout
 	timeoutSeconds int64
@@ -207,6 +212,21 @@ func getKubeDynamicClient(timeout time.Duration) (dynamic.Interface, error) {
 	return dynamic.NewForConfig(clientConfig)
 }
 
+func getCustomResourceDefinitionInformer(timeout time.Duration) (externalversions.SharedInformerFactory, error) {
+	// default to 300s
+	resyncPeriodSeconds := time.Duration(config.Datadog.GetInt64("kubernetes_informers_resync_period"))
+	clientConfig, err := getClientConfig(timeout)
+	if err != nil {
+		return nil, err
+	}
+	cs, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: make that proper (i.e. when we have different versions)
+	return externalversions.NewSharedInformerFactory(cs, resyncPeriodSeconds*time.Second), nil
+}
+
 func getKubeDiscoveryClient(timeout time.Duration) (discovery.DiscoveryInterface, error) {
 	clientConfig, err := getClientConfig(timeout)
 	if err != nil {
@@ -293,6 +313,12 @@ func (c *APIClient) connect() error {
 	c.DynamicCl, err = getKubeDynamicClient(time.Duration(c.timeoutSeconds) * time.Second)
 	if err != nil {
 		log.Infof("Could not get apiserver dynamic client: %v", err)
+		return err
+	}
+
+	c.CustomResourceDefinitionInformer, err = getCustomResourceDefinitionInformer(time.Duration(c.timeoutSeconds) * time.Second)
+	if err != nil {
+		log.Infof("Could not get crd dynamic client: %v", err)
 		return err
 	}
 

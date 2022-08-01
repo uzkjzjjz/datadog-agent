@@ -56,6 +56,8 @@ const (
 	K8sIngress
 	// K8sCR represents a Kubernetes Custom Resource
 	K8sCR
+	// K8sCRD represents a Kubernetes Custom Resource
+	K8sCRD
 )
 
 // NodeTypes returns the current existing NodesTypes as a slice to iterate over.

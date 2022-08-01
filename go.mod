@@ -347,7 +347,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.3.1 // indirect
 	github.com/skydive-project/go-debouncer v1.0.0 // indirect
 	github.com/smira/go-ftp-protocol v0.0.0-20140829150050-066b75c2b70d // indirect
-	github.com/spf13/cast v1.5.0 // indirect
+	github.com/spf13/cast v1.5.0
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
@@ -394,7 +394,7 @@ require (
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
-	k8s.io/apiextensions-apiserver v0.23.8 // indirect
+	k8s.io/apiextensions-apiserver v0.23.8
 	k8s.io/component-base v0.23.8 // indirect
 	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30 // indirect

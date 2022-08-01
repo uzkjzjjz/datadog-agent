@@ -40,10 +40,9 @@ func NewCronJobCollector() *CronJobCollector {
 	}
 }
 
-// Informer returns the shared informer.
+// Informers returns the shared informer.
 func (c *CronJobCollector) Informers() map[string]cache.SharedInformer {
 	return map[string]cache.SharedInformer{c.metadata.Name: c.informer.Informer()}
-
 }
 
 // Init is used to initialize the collector.
