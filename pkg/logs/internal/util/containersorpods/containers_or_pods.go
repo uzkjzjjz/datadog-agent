@@ -121,7 +121,13 @@ func NewDecidedChooser(decision LogWhat) Chooser {
 
 // Wait implements Chooser#Wait.
 func (ch *chooser) Wait(ctx context.Context) LogWhat {
-	ch.start()
+	// No need to run ch.start() if context cancelled or has an error.
+	// If cancelled/done then potentially ch.start() has already run and
+	// ch.choice has a result.
+	if ctx.Err() == nil {
+		ch.start()
+	}
+
 	select {
 	case c := <-ch.choice:
 		// put the value back in the channel for the next querier
