@@ -109,9 +109,29 @@ func newEBPFProgram(c *config.Config, offsets []manager.ConstantEditor, sockFD *
 			},
 		},
 		Probes: []*manager.Probe{
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.TCPSendMsg), EBPFFuncName: "kprobe__tcp_sendmsg", UID: probeUID}, KProbeMaxActive: maxActive},
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.TCPSendMsgReturn), EBPFFuncName: "kretprobe__tcp_sendmsg", UID: probeUID}, KProbeMaxActive: maxActive},
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: httpSocketFilter, EBPFFuncName: "socket__http_filter", UID: probeUID}},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  string(probes.TCPSendMsg),
+					EBPFFuncName: "kprobe__tcp_sendmsg",
+					UID:          probeUID,
+				},
+				KProbeMaxActive: maxActive,
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  "kretprobe/sk_filter_trim_cap",
+					EBPFFuncName: "kretprobe__sk_filter_trim_cap",
+					UID:          probeUID,
+				},
+				KProbeMaxActive: maxActive,
+			},
+			{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  httpSocketFilter,
+					EBPFFuncName: "socket__http_filter",
+					UID:          probeUID,
+				},
+			},
 		},
 	}
 
@@ -165,8 +185,8 @@ func (e *ebpfProgram) Init() error {
 			},
 			&manager.ProbeSelector{
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
-					EBPFSection:  string(probes.TCPSendMsgReturn),
-					EBPFFuncName: "kretprobe__tcp_sendmsg",
+					EBPFSection:  "kretprobe/sk_filter_trim_cap",
+					EBPFFuncName: "kretprobe__sk_filter_trim_cap",
 					UID:          probeUID,
 				},
 			},
