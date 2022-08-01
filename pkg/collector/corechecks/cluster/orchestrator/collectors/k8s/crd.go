@@ -9,9 +9,6 @@
 package k8s
 
 import (
-	"sync/atomic"
-
-	model "github.com/DataDog/agent-payload/v5/process"
 	v1crd "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,47 +60,28 @@ func (c *CRDCollector) Metadata() *collectors.CollectorMetadata {
 
 // Run triggers the collection process.
 func (c *CRDCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.CollectorRunResult, error) {
-	var messages []model.MessageBody
-	var processed int
-	for _, lister := range c.listers { // TODO: or let each of the collection run in a go routine and join below
-		list, err := lister.List(labels.Everything())
-		if err != nil {
-			return nil, collectors.NewListingError(err)
-		}
+	list, err := c.lister.List(labels.Everything())
+	if err != nil {
+		return nil, collectors.NewListingError(err)
+	}
 
-		ctx := &processors.ProcessorContext{
-			APIClient:  rcfg.APIClient,
-			Cfg:        rcfg.Config,
-			ClusterID:  rcfg.ClusterID,
-			MsgGroupID: atomic.AddInt32(rcfg.MsgGroupRef, 1),
-			NodeType:   c.metadata.NodeType,
-		}
+	ctx := &processors.ProcessorContext{
+		APIClient:  rcfg.APIClient,
+		Cfg:        rcfg.Config,
+		ClusterID:  rcfg.ClusterID,
+		MsgGroupID: rcfg.MsgGroupRef.Inc(),
+		NodeType:   c.metadata.NodeType,
+	}
 
-		m, p := c.processor.Process(ctx, list)
+	messages, processed := c.processor.Process(ctx, list)
 
-		// This would happen when recovering from a processor panic. In the nominal
-		// case we would have a positive integer set at the very end of processing.
-		// If this is not the case then it means code execution stopped sooner.
-		// Panic recovery will log more information about the error so we can figure
-		// out the root cause.
-		if p == -1 {
-			return nil, collectors.ErrProcessingPanic
-		}
-
-		messages = append(messages, m...)
-		processed += p
-
-		// The cluster processor can return errors since it has to grab extra
-		// information from the API server during processing.
-		if err != nil {
-			return nil, collectors.NewProcessingError(err)
-		}
-
+	if processed == -1 {
+		return nil, collectors.ErrProcessingPanic
 	}
 
 	result := &collectors.CollectorRunResult{
 		Messages:           messages,
-		ResourcesListed:    len(c.listers),
+		ResourcesListed:    len(list),
 		ResourcesProcessed: processed,
 	}
 

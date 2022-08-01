@@ -10,6 +10,10 @@ package k8s
 
 import (
 	model "github.com/DataDog/agent-payload/v5/process"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/collectors"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors"
+	k8sProcessors "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors/k8s"
+	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 	"github.com/DataDog/datadog-agent/pkg/orchestrator/config"
 	"github.com/spf13/cast"
 	"k8s.io/apimachinery/pkg/labels"
@@ -17,12 +21,6 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"sync/atomic"
-
-	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/collectors"
-	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors"
-	k8sProcessors "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors/k8s"
-	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 
 	"k8s.io/client-go/dynamic/dynamicinformer"
 )
@@ -117,7 +115,7 @@ func (c *CRCollector) Run(rcfg *collectors.CollectorRunConfig) (*collectors.Coll
 			APIClient:  rcfg.APIClient,
 			Cfg:        rcfg.Config,
 			ClusterID:  rcfg.ClusterID,
-			MsgGroupID: atomic.AddInt32(rcfg.MsgGroupRef, 1),
+			MsgGroupID: rcfg.MsgGroupRef.Inc(),
 			NodeType:   c.metadata.NodeType,
 		}
 

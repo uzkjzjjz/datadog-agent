@@ -44,6 +44,7 @@ func NewCollectorInventory() *CollectorInventory {
 			k8sCollectors.NewStatefulSetCollector(),
 			k8sCollectors.NewUnassignedPodCollector(),
 			k8sCollectors.NewCRCollector(),
+			k8sCollectors.NewCRDCollector(),
 		},
 	}
 }
