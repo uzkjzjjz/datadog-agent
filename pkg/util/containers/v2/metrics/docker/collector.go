@@ -81,13 +81,18 @@ func (d *dockerCollector) GetContainerStats(containerNS, containerID string, cac
 	}
 	outStats := convertContainerStats(&stats.Stats)
 
+	// Try to collect the container's PIDs via Docker API, if we can't spec() will fill in the entry PID
+	outStats.PID.PIDs, err = d.pids(containerID)
+	if err != nil {
+		log.Debugf("Unable to collect container's PIDs, PID list will be incomplete, cid: %s, err: %v", containerID, err)
+	}
+
 	contSpec, err := d.spec(containerID)
 	if err == nil {
 		fillStatsFromSpec(outStats, contSpec)
 	} else {
 		log.Debugf("Unable to inspect container some metrics will be missing, cid: %s, err: %v", containerID, err)
 	}
-	outStats.PID.PIDs = d.pids(containerID)
 	return outStats, nil
 }
 
@@ -155,8 +160,8 @@ func (d *dockerCollector) stats(containerID string) (*types.StatsJSON, error) {
 	return stats, nil
 }
 
-// pids associated with container ID
-func (d *dockerCollector) pids(containerID string) []int {
+// pids returns a list of the specified container's PIDs
+func (d *dockerCollector) pids(containerID string) ([]int, error) {
 	return d.du.GetContainerPIDs(context.TODO(), containerID)
 }
 
