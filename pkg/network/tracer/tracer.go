@@ -387,7 +387,7 @@ func (t *Tracer) matchHTTPConnections(conns []network.ConnectionStats, httpStats
 		scratchConn.Type = network.TCP
 		trans := t.conntracker.GetTranslationForConn(scratchConn)
 		if trans != nil {
-			addHKey(http.NewKeyTuple(scratchConn.Source, scratchConn.Dest, scratchConn.SPort, scratchConn.DPort), hKey)
+			addHKey(http.NewKeyTuple(trans.ReplSrcIP, trans.ReplDstIP, trans.ReplSrcPort, trans.ReplDstPort), hKey)
 		}
 	}
 
