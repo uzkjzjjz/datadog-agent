@@ -73,7 +73,6 @@ func newEBPFProgram(c *config.Config) (*ebpfProgram, error) {
 		Probes: []*manager.Probe{
 			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.SocketClassifierFilter), EBPFFuncName: "socket__classifier_filter"}},
 			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.CgroupBPFRunFilterSkb), EBPFFuncName: "kprobe____cgroup_bpf_run_filter_skb"}},
-			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.CgroupBPFRunFilterSkbReturn), EBPFFuncName: "kretprobe____cgroup_bpf_run_filter_skb"}},
 		},
 	}
 
@@ -148,12 +147,6 @@ func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					EBPFSection:  string(probes.CgroupBPFRunFilterSkb),
 					EBPFFuncName: "kprobe____cgroup_bpf_run_filter_skb",
-				},
-			},
-			&manager.ProbeSelector{
-				ProbeIdentificationPair: manager.ProbeIdentificationPair{
-					EBPFSection:  string(probes.CgroupBPFRunFilterSkbReturn),
-					EBPFFuncName: "kretprobe____cgroup_bpf_run_filter_skb",
 				},
 			},
 		},

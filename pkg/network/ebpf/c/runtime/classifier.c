@@ -17,13 +17,8 @@
 
 BPF_PROG_ARRAY(proto_progs, 1)
 
-typedef struct {
-    conn_tuple_t tup;
-    struct sock* sk;
-} filter_args_t;
-
 // max entries of this array will be #cpus
-BPF_ARRAY_MAP(filter_args, filter_args_t, 0)
+BPF_ARRAY_MAP(filter_args, conn_tuple_t, 0)
 
 static __always_inline int fingerprint_proto(skb_info_t* skb_info, struct __sk_buff* skb) {
     if (is_tls(skb, skb_info->data_off))
@@ -43,41 +38,24 @@ static __always_inline void do_tail_call(void* ctx, int protocol) {
  * (saddr, daddr, sport, dport) tuple. */
 SEC("kprobe/__cgroup_bpf_run_filter_skb")
 int kprobe____cgroup_bpf_run_filter_skb(struct pt_regs *ctx) {
-    filter_args_t args;
-    __builtin_memset(&args, 0, sizeof(filter_args_t));
+    conn_tuple_t tup;
     struct sock* sk = (struct sock *)PT_REGS_PARM1(ctx);
     u32 cpu = bpf_get_smp_processor_id();
-
     if (sk == 0)
         return 0;
 
-    if (!read_conn_tuple(&args.tup, sk, 0, 0)) {
+    if (!read_conn_tuple(&tup, sk, 0, 0)) {
         return 0;
     }
-    args.sk = sk;
-    bpf_map_update_elem(&filter_args, &cpu, &args, BPF_ANY);
-
-    return 0;
-}
-
-SEC("kretprobe/__cgroup_bpf_run_filter_skb")
-int kretprobe____cgroup_bpf_run_filter_skb(struct pt_regs* ctx) {
-    u32 cpu = bpf_get_smp_processor_id();
-
-    filter_args_t *args = bpf_map_lookup_elem(&filter_args, &cpu);
-    if (args == 0)
-        return 0;
-
-    __builtin_memset(args, 0, sizeof(filter_args_t));
-    bpf_map_delete_elem(&filter_args, &cpu);
+    tup.netns = get_netns(&sk->sk_net);
+    bpf_map_update_elem(&filter_args, &cpu, &tup, BPF_ANY);
 
     return 0;
 }
 
 SEC("socket/classifier_filter")
 int socket__classifier_filter(struct __sk_buff* skb) {
-    struct net* n;
-    filter_args_t *fargs;
+    conn_tuple_t *intup;
     proto_args_t args;
     session_t new_session;
     skb_info_t* skb_info = &args.skb_info;
@@ -90,21 +68,22 @@ int socket__classifier_filter(struct __sk_buff* skb) {
     if (!read_conn_tuple_skb(skb, skb_info, tup))
         return 0;
 
+    intup = bpf_map_lookup_elem(&filter_args, &cpu);
+    if (intup == 0)
+        return 0;
+
+    if ((!intup->saddr_h || !intup->saddr_l) && (!intup->daddr_h || !intup->daddr_l) && !intup->sport && !intup->dport)
+        return 0;
+
     if (!(tup->metadata&CONN_TYPE_TCP))
         return 0;
 
-    fargs = bpf_map_lookup_elem(&filter_args, &cpu);
-    if (fargs == NULL)
-        return 0;
+    intup->metadata |= CONN_TYPE_TCP;
+    __builtin_memcpy(tup, intup, sizeof(conn_tuple_t));
+    
+    // 'delete' the tuple being passed in
+    __builtin_memset(intup, 0, sizeof(conn_tuple_t));
 
-    __builtin_memcpy(tup, &fargs->tup, sizeof(conn_tuple_t));
-    bpf_probe_read_kernel(&n, sizeof(struct net*), &fargs->sk->sk_net);
-    if (n == 0)
-        return 0;
-
-    log_info("sk_net: 0x%p\n", n); 
-
-    tup->netns = get_netns(n);
     normalize_tuple(tup);
     if (skb_info->tcp_flags & TCPHDR_FIN) {
 	    bpf_map_delete_elem(&proto_in_flight, tup);
