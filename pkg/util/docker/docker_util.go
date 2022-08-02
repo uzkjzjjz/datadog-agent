@@ -373,6 +373,9 @@ func (d *DockerUtil) GetContainerStats(ctx context.Context, containerID string) 
 // GetContainerPIDs returns a list of containerID's running PIDs
 func (d *DockerUtil) GetContainerPIDs(ctx context.Context, containerID string) ([]int, error) {
 
+	// Index into the returned [][]string slice for process IDs
+	const PidIdx = 1
+
 	// Docker API to collect PIDs associated with containerID
 	procs, err := d.cli.ContainerTop(ctx, containerID, nil)
 	if err != nil {
@@ -385,7 +388,7 @@ func (d *DockerUtil) GetContainerPIDs(ctx context.Context, containerID string) (
 	// Iterate returned Processes and pull out their PIDs
 	for idx, entry := range procs.Processes {
 		// Convert to ints
-		pid, sterr := strconv.Atoi(entry[1])
+		pid, sterr := strconv.Atoi(entry[PidIdx])
 		if sterr != nil {
 			log.Debugf("Unable to convert PID to int: %s", sterr)
 			continue
