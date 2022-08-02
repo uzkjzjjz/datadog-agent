@@ -29,6 +29,7 @@ const (
 	protoProgsMap    = "proto_progs"
 	protoInFlightMap = "proto_in_flight"
 	protoArgs        = "proto_args"
+	filterArgs       = "filter_args"
 	tlsProtoFilter   = "socket/proto_tls"
 )
 
@@ -67,9 +68,12 @@ func newEBPFProgram(c *config.Config) (*ebpfProgram, error) {
 			{Name: protoProgsMap},
 			{Name: protoInFlightMap},
 			{Name: protoArgs},
+			{Name: filterArgs},
 		},
 		Probes: []*manager.Probe{
 			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.SocketClassifierFilter), EBPFFuncName: "socket__classifier_filter"}},
+			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.CgroupBPFRunFilterSkb), EBPFFuncName: "kprobe____cgroup_bpf_run_filter_skb"}},
+			{ProbeIdentificationPair: manager.ProbeIdentificationPair{EBPFSection: string(probes.CgroupBPFRunFilterSkbReturn), EBPFFuncName: "kretprobe____cgroup_bpf_run_filter_skb"}},
 		},
 	}
 
@@ -90,6 +94,14 @@ func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 	}
 
 	return e.InitWithOptions(e.bytecode, manager.Options{
+		VerifierOptions: ebpf.CollectionOptions{
+			Programs: ebpf.ProgramOptions{
+				// LogSize is the size of the log buffer given to the verifier. Give it a big enough (2 * 1024 * 1024)
+				// value so that all our programs fit. If the verifier ever outputs a `no space left on device` error,
+				// we'll need to increase this value.
+				LogSize: 2097152,
+			},
+		},
 		RLimit: &unix.Rlimit{
 			Cur: math.MaxUint64,
 			Max: math.MaxUint64,
@@ -109,6 +121,11 @@ func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 				MaxEntries: uint32(len(cpus)),
 				EditorFlag: manager.EditMaxEntries,
 			},
+			filterArgs: {
+				Type:       ebpf.Array,
+				MaxEntries: uint32(len(cpus)),
+				EditorFlag: manager.EditMaxEntries,
+			},
 		},
 		TailCallRouter: []manager.TailCallRoute{
 			{
@@ -125,6 +142,18 @@ func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					EBPFSection:  string(probes.SocketClassifierFilter),
 					EBPFFuncName: "socket__classifier_filter",
+				},
+			},
+			&manager.ProbeSelector{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  string(probes.CgroupBPFRunFilterSkb),
+					EBPFFuncName: "kprobe____cgroup_bpf_run_filter_skb",
+				},
+			},
+			&manager.ProbeSelector{
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  string(probes.CgroupBPFRunFilterSkbReturn),
+					EBPFFuncName: "kretprobe____cgroup_bpf_run_filter_skb",
 				},
 			},
 		},

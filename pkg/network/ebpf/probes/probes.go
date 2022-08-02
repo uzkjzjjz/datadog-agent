@@ -130,6 +130,11 @@ const (
 
 	// SocketClassifierFilter is the socket probe for dns
 	SocketClassifierFilter ProbeName = "socket/classifier_filter"
+
+	// CgroupBPFRunFilterSkb is used to pass a reference of struct sock* to socket filters
+	CgroupBPFRunFilterSkb ProbeName = "kprobe/__cgroup_bpf_run_filter_skb"
+
+	CgroupBPFRunFilterSkbReturn ProbeName = "kretprobe/__cgroup_bpf_run_filter_skb"
 )
 
 // BPFMapName stores the name of the BPF maps storing statistics and other info
