@@ -360,51 +360,58 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 }
 
 func (t *Tracer) matchHTTPConnections(conns []network.ConnectionStats, httpStats map[http.Key]*http.RequestStats) (matched map[http.Key]*http.RequestStats) {
-	connsByKeyTuple := make(map[http.KeyTuple]struct{}, len(conns))
-	for _, c := range conns {
-		connsByKeyTuple[network.HTTPKeyTupleFromConn(c)] = struct{}{}
+	if len(httpStats) == 0 {
+		return httpStats
 	}
 
-	matched = make(map[http.Key]*http.RequestStats)
-	var scratchConn network.ConnectionStats
-	var orphans int
-	for httpKey, stats := range httpStats {
-		if _, ok := connsByKeyTuple[httpKey.KeyTuple]; ok {
-			matched[httpKey] = stats
-			continue
+	httpByKeyTuple := make(map[http.KeyTuple]map[http.Key]struct{}, len(httpStats))
+	addHKey := func(kt http.KeyTuple, hKey http.Key) {
+		if hkeys, ok := httpByKeyTuple[kt]; ok {
+			hkeys[hKey] = struct{}{}
+			return
 		}
 
-		scratchConn.Source = util.FromLowHigh(httpKey.DstIPLow, httpKey.DstIPHigh)
-		scratchConn.SPort = httpKey.DstPort
-		scratchConn.Dest = util.FromLowHigh(httpKey.SrcIPLow, httpKey.SrcIPHigh)
-		scratchConn.DPort = httpKey.SrcPort
+		httpByKeyTuple[kt] = map[http.Key]struct{}{hKey: struct{}{}}
+	}
+
+	var scratchConn network.ConnectionStats
+	for hKey := range httpStats {
+		addHKey(hKey.KeyTuple, hKey)
+		// assuming the key tuple is using NAT'ed addresses,
+		// do a reverse lookup in the conntrack table and
+		// add that key tuple as well
+		scratchConn.Source = util.FromLowHigh(hKey.DstIPLow, hKey.DstIPHigh)
+		scratchConn.SPort = hKey.DstPort
+		scratchConn.Dest = util.FromLowHigh(hKey.SrcIPLow, hKey.SrcIPHigh)
+		scratchConn.DPort = hKey.SrcPort
 		scratchConn.Type = network.TCP
 		trans := t.conntracker.GetTranslationForConn(scratchConn)
-
-		if trans == nil {
-			orphans++
-			continue
+		if trans != nil {
+			addHKey(http.NewKeyTuple(scratchConn.Source, scratchConn.Dest, scratchConn.SPort, scratchConn.DPort), hKey)
 		}
-
-		scratchConn.Source = trans.ReplSrcIP
-		scratchConn.SPort = trans.ReplSrcPort
-		scratchConn.Dest = trans.ReplDstIP
-		scratchConn.DPort = trans.ReplDstPort
-		scratchConn.Type = network.TCP
-		httpKey.KeyTuple = network.HTTPKeyTupleFromConn(scratchConn)
-		if _, ok := connsByKeyTuple[httpKey.KeyTuple]; !ok {
-			orphans++
-			continue
-		}
-
-		if s, ok := matched[httpKey]; ok {
-			s.CombineWith(stats)
-			continue
-		}
-
-		matched[httpKey] = stats
 	}
 
+	matched = make(map[http.Key]*http.RequestStats, len(httpStats))
+	addMatched := func(hKey http.Key, stats *http.RequestStats) {
+		if s, ok := matched[hKey]; ok {
+			s.CombineWith(stats)
+			return
+		}
+
+		matched[hKey] = stats
+	}
+
+	for _, c := range conns {
+		ktc := network.HTTPKeyTupleFromConn(c)
+		if hkeys, ok := httpByKeyTuple[ktc]; ok {
+			for hkey := range hkeys {
+				hkey.KeyTuple = ktc
+				addMatched(hkey, httpStats[hkey])
+			}
+		}
+	}
+
+	orphans := len(httpStats) - len(matched)
 	if orphans > 0 {
 		log.Debugf(
 			"detected orphan http aggreggations. this can be either caused by conntrack sampling or missed tcp close events. count=%d",
