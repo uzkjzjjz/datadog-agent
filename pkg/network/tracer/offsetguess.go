@@ -24,15 +24,17 @@ import (
 	"time"
 	"unsafe"
 
+	manager "github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
+	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
+
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/ebpf"
-	"github.com/DataDog/ebpf/manager"
-	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
+	"github.com/DataDog/datadog-agent/pkg/util/native"
 )
 
 const (
@@ -119,6 +121,24 @@ type fieldValues struct {
 	dportFl6 uint16
 }
 
+var offsetProbes = map[probes.ProbeName]string{
+	probes.TCPGetSockOpt:      "kprobe__tcp_getsockopt",
+	probes.SockGetSockOpt:     "kprobe__sock_common_getsockopt",
+	probes.TCPv6Connect:       "kprobe__tcp_v6_connect",
+	probes.IPMakeSkb:          "kprobe__ip_make_skb",
+	probes.IP6MakeSkb:         "kprobe__ip6_make_skb",
+	probes.IP6MakeSkbPre470:   "kprobe__ip6_make_skb__pre_4_7_0",
+	probes.TCPv6ConnectReturn: "kretprobe__tcp_v6_connect",
+}
+
+func idPair(name probes.ProbeName) manager.ProbeIdentificationPair {
+	return manager.ProbeIdentificationPair{
+		EBPFSection:  string(name),
+		EBPFFuncName: offsetProbes[name],
+		UID:          "offset",
+	}
+}
+
 func newOffsetManager() *manager.Manager {
 	return &manager.Manager{
 		Maps: []*manager.Map{
@@ -127,13 +147,13 @@ func newOffsetManager() *manager.Manager {
 		},
 		PerfMaps: []*manager.PerfMap{},
 		Probes: []*manager.Probe{
-			{Section: string(probes.TCPGetSockOpt)},
-			{Section: string(probes.SockGetSockOpt)},
-			{Section: string(probes.TCPv6Connect)},
-			{Section: string(probes.IPMakeSkb)},
-			{Section: string(probes.IP6MakeSkb)},
-			{Section: string(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$"},
-			{Section: string(probes.TCPv6ConnectReturn), KProbeMaxActive: 128},
+			{ProbeIdentificationPair: idPair(probes.TCPGetSockOpt)},
+			{ProbeIdentificationPair: idPair(probes.SockGetSockOpt)},
+			{ProbeIdentificationPair: idPair(probes.TCPv6Connect)},
+			{ProbeIdentificationPair: idPair(probes.IPMakeSkb)},
+			{ProbeIdentificationPair: idPair(probes.IP6MakeSkb)},
+			{ProbeIdentificationPair: idPair(probes.IP6MakeSkbPre470), MatchFuncName: "^ip6_make_skb$"},
+			{ProbeIdentificationPair: idPair(probes.TCPv6ConnectReturn), KProbeMaxActive: 128},
 		},
 	}
 }
@@ -147,7 +167,7 @@ func extractIPsAndPorts(conn net.Conn) (
 	if err != nil {
 		return
 	}
-	saddr = nativeEndian.Uint32(net.ParseIP(saddrStr).To4())
+	saddr = native.Endian.Uint32(net.ParseIP(saddrStr).To4())
 	sportn, err := strconv.Atoi(sportStr)
 	if err != nil {
 		return
@@ -158,7 +178,7 @@ func extractIPsAndPorts(conn net.Conn) (
 	if err != nil {
 		return
 	}
-	daddr = nativeEndian.Uint32(net.ParseIP(daddrStr).To4())
+	daddr = native.Endian.Uint32(net.ParseIP(daddrStr).To4())
 	dportn, err := strconv.Atoi(dportStr)
 	if err != nil {
 		return
@@ -234,16 +254,21 @@ func waitUntilStable(conn net.Conn, window time.Duration, attempts int) (*fieldV
 	return nil, errors.New("unstable TCP socket params")
 }
 
-func offsetGuessProbes(c *config.Config) (map[probes.ProbeName]struct{}, error) {
-	p := map[probes.ProbeName]struct{}{
-		probes.TCPGetSockOpt:  {},
-		probes.SockGetSockOpt: {},
-		probes.IPMakeSkb:      {},
+func enableProbe(enabled map[probes.ProbeName]string, name probes.ProbeName) {
+	if fn, ok := offsetProbes[name]; ok {
+		enabled[name] = fn
 	}
+}
+
+func offsetGuessProbes(c *config.Config) (map[probes.ProbeName]string, error) {
+	p := map[probes.ProbeName]string{}
+	enableProbe(p, probes.TCPGetSockOpt)
+	enableProbe(p, probes.SockGetSockOpt)
+	enableProbe(p, probes.IPMakeSkb)
 
 	if c.CollectIPv6Conns {
-		p[probes.TCPv6Connect] = struct{}{}
-		p[probes.TCPv6ConnectReturn] = struct{}{}
+		enableProbe(p, probes.TCPv6Connect)
+		enableProbe(p, probes.TCPv6ConnectReturn)
 
 		kv, err := kernel.HostVersion()
 		if err != nil {
@@ -251,11 +276,10 @@ func offsetGuessProbes(c *config.Config) (map[probes.ProbeName]struct{}, error) 
 		}
 
 		if kv < kernel.VersionCode(4, 7, 0) {
-			p[probes.IP6MakeSkbPre470] = struct{}{}
+			enableProbe(p, probes.IP6MakeSkbPre470)
 		} else {
-			p[probes.IP6MakeSkb] = struct{}{}
+			enableProbe(p, probes.IP6MakeSkb)
 		}
-
 	}
 	return p, nil
 }
@@ -280,7 +304,7 @@ func ownNetNS() (uint64, error) {
 func htons(a uint16) uint16 {
 	var arr [2]byte
 	binary.BigEndian.PutUint16(arr[:], a)
-	return nativeEndian.Uint16(arr[:])
+	return native.Endian.Uint16(arr[:])
 }
 
 func generateRandomIPv6Address() net.IP {
@@ -305,10 +329,10 @@ func uint32ArrayFromIPv6(ip net.IP) (addr [4]uint32, err error) {
 		return
 	}
 
-	addr[0] = nativeEndian.Uint32(buf[0:4])
-	addr[1] = nativeEndian.Uint32(buf[4:8])
-	addr[2] = nativeEndian.Uint32(buf[8:12])
-	addr[3] = nativeEndian.Uint32(buf[12:16])
+	addr[0] = native.Endian.Uint32(buf[0:4])
+	addr[1] = native.Endian.Uint32(buf[4:8])
+	addr[2] = native.Endian.Uint32(buf[8:12])
+	addr[3] = native.Endian.Uint32(buf[12:16])
 	return
 }
 

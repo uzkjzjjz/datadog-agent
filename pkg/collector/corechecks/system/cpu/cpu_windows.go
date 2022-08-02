@@ -7,6 +7,7 @@
 // https://github.com/shirou/gopsutil .  This code is licensed under the New BSD License
 // copyright WAKAYAMA Shirou, and the gopsutil contributors
 
+//go:build windows
 // +build windows
 
 package cpu
@@ -15,15 +16,14 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/DataDog/gohai/cpu"
+	"golang.org/x/sys/windows"
+
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/collector/check"
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/winutil/pdhutil"
-	"github.com/DataDog/gohai/cpu"
-	"golang.org/x/sys/windows"
-
-	"github.com/DataDog/datadog-agent/pkg/aggregator"
 )
 
 var (
@@ -49,7 +49,7 @@ type Check struct {
 
 // Run executes the check
 func (c *Check) Run() error {
-	sender, err := aggregator.GetSender(c.ID())
+	sender, err := c.GetSender()
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func getProcessorPDHCounter(counterName, instance string) (pdhutil.PdhSingleInst
 
 // Configure the CPU check doesn't need configuration
 func (c *Check) Configure(data integration.Data, initConfig integration.Data, source string) error {
-	if err := c.CommonConfigure(data, source); err != nil {
+	if err := c.CommonConfigure(initConfig, data, source); err != nil {
 		return err
 	}
 

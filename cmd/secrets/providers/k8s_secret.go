@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build secrets
 // +build secrets
 
 package providers
@@ -18,6 +19,7 @@ import (
 	s "github.com/DataDog/datadog-agent/pkg/secrets"
 )
 
+// ReadKubernetesSecret TODO <agent-core>
 func ReadKubernetesSecret(kubeClient kubernetes.Interface, path string) s.Secret {
 	splitName := strings.Split(path, "/")
 

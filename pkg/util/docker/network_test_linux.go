@@ -3,8 +3,8 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// +build docker
-// +build linux
+//go:build docker && linux
+// +build docker,linux
 
 package docker
 
@@ -22,6 +22,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/util/testutil"
 )
 
+// TestFindDockerNetworks tests findDockerNetworks
 func TestFindDockerNetworks(t *testing.T) {
 	dummyProcDir, err := testutil.NewTempFolder("test-find-docker-networks")
 	assert.Nil(t, err)
@@ -186,6 +187,7 @@ func TestFindDockerNetworks(t *testing.T) {
 	}
 }
 
+// TestParseContainerNetworkMode tests parseContainerNetworkMode
 func TestParseContainerNetworkMode(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -13,15 +13,15 @@ from time import sleep
 from invoke import Failure, task
 from invoke.exceptions import Exit
 
-from tasks.libs.common.color import color_message
-from tasks.libs.common.github_api import GithubAPI, get_github_token
-from tasks.libs.common.gitlab import Gitlab, get_gitlab_token
-from tasks.pipeline import run
-from tasks.utils import DEFAULT_BRANCH, get_version, nightly_entry_for, release_entry_for
-
+from .libs.common.color import color_message
+from .libs.common.github_api import GithubAPI, get_github_token
+from .libs.common.gitlab import Gitlab, get_gitlab_token
+from .libs.common.remote_api import APIError
 from .libs.common.user_interactions import yes_no_question
 from .libs.version import Version
 from .modules import DEFAULT_MODULES
+from .pipeline import run
+from .utils import DEFAULT_BRANCH, get_version, nightly_entry_for, release_entry_for
 
 # Generic version regex. Aims to match:
 # - X.Y.Z
@@ -33,7 +33,7 @@ VERSION_RE = re.compile(r'(v)?(\d+)[.](\d+)([.](\d+))?(-devel)?(-rc\.(\d+))?')
 REPOSITORY_NAME = "DataDog/datadog-agent"
 
 UNFREEZE_REPO_AGENT = "datadog-agent"
-UNFREEZE_REPOS = [UNFREEZE_REPO_AGENT, "omnibus-software", "omnibus-ruby"]
+UNFREEZE_REPOS = [UNFREEZE_REPO_AGENT, "omnibus-software", "omnibus-ruby", "datadog-agent-macos-build"]
 
 
 @task
@@ -139,7 +139,7 @@ def update_dca_changelog(ctx, new_version, agent_version):
     branching_point_agent = f"{agent_version_int[0]}.{agent_version_int[1]}.0-devel"
     previous_minor_branchoff = f"dca-{new_version_int[0]}.{new_version_int[1] - 1}.X"
     log_result = ctx.run(
-        f"git log {branching_point_agent}...remotes/origin/{previous_minor_branchoff} --name-only --oneline |             grep releasenotes-dca/notes/ || true"
+        f"git log {branching_point_agent}...remotes/origin/{previous_minor_branchoff} --name-only --oneline | grep releasenotes-dca/notes/ || true"
     )
     log_result = log_result.stdout.replace('\n', ' ').strip()
 
@@ -151,15 +151,17 @@ def update_dca_changelog(ctx, new_version, agent_version):
     current_branchoff = f"dca-{new_version_int[0]}.{new_version_int[1]}.X"
     # generate the new changelog. Specifying branch in case this is run outside the release branch that contains the tag.
     ctx.run(
-        f"reno --rel-notes-dir releasenotes-dca report             --ignore-cache             --branch {current_branchoff}             --version dca-{new_version}             --no-show-source > /tmp/new_changelog-dca.rst"
+        f"reno --rel-notes-dir releasenotes-dca report --ignore-cache --branch {current_branchoff} --version dca-{new_version} --no-show-source > /tmp/new_changelog-dca.rst"
     )
 
     # reseting git
     ctx.run("git reset --hard HEAD")
 
     # mac's `sed` has a different syntax for the "-i" paramter
-    sed_i_arg = "-i"
-    if sys.platform == 'darwin':
+    # GNU sed has a `--version` parameter while BSD sed does not, using that to do proper detection.
+    if ctx.run("sed --version", hide='both'):
+        sed_i_arg = "-i"
+    else:
         sed_i_arg = "-i ''"
     # remove the old header from the existing changelog
     ctx.run(f"sed {sed_i_arg} -e '1,4d' CHANGELOG-DCA.rst")
@@ -217,7 +219,7 @@ def update_changelog(ctx, new_version):
     if previous_minor == "7.15":
         previous_minor = "6.15"  # 7.15 is the first release in the 7.x series
     log_result = ctx.run(
-        f"git log {branching_point}...remotes/origin/{previous_minor}.x --name-only --oneline |             grep releasenotes/notes/ || true"
+        f"git log {branching_point}...remotes/origin/{previous_minor}.x --name-only --oneline | grep releasenotes/notes/ || true"
     )
     log_result = log_result.stdout.replace('\n', ' ').strip()
     if len(log_result) > 0:
@@ -225,15 +227,17 @@ def update_changelog(ctx, new_version):
 
     # generate the new changelog
     ctx.run(
-        f"reno report             --ignore-cache             --earliest-version {branching_point}             --version {new_version}             --no-show-source > /tmp/new_changelog.rst"
+        f"reno report --ignore-cache --earliest-version {branching_point} --version {new_version} --no-show-source > /tmp/new_changelog.rst"
     )
 
     # reseting git
     ctx.run("git reset --hard HEAD")
 
     # mac's `sed` has a different syntax for the "-i" paramter
-    sed_i_arg = "-i"
-    if sys.platform == 'darwin':
+    # GNU sed has a `--version` parameter while BSD sed does not, using that to do proper detection.
+    if ctx.run("sed --version", hide='both'):
+        sed_i_arg = "-i"
+    else:
         sed_i_arg = "-i ''"
     # check whether there is a v6 tag on the same v7 tag, if so add the v6 tag to the release title
     v6_tag = ""
@@ -849,15 +853,73 @@ def update_modules(ctx, agent_version, verify=True):
             ctx.run(f"go mod edit -require={dependency_mod.dependency_path(agent_version)} {module.go_mod_path()}")
 
 
+def __get_force_option(force: bool) -> str:
+    """Get flag to pass to git tag depending on if we want forcing or not."""
+    force_option = ""
+    if force:
+        print(color_message("--force option enabled. This will allow the task to overwrite existing tags.", "orange"))
+        result = yes_no_question("Please confirm the use of the --force option.", color="orange", default=False)
+        if result:
+            print("Continuing with the --force option.")
+            force_option = " --force"
+        else:
+            print("Continuing without the --force option.")
+    return force_option
+
+
+def __tag_single_module(ctx, module, agent_version, commit, push, force_option):
+    """Tag a given module."""
+    for tag in module.tag(agent_version):
+        ok = try_git_command(
+            ctx,
+            f"git tag -m {tag} {tag} {commit}{force_option}",
+        )
+        if not ok:
+            message = f"Could not create tag {tag}. Please rerun the task to retry creating the tags (you may need the --force option)"
+            raise Exit(color_message(message, "red"), code=1)
+        print(f"Created tag {tag}")
+        if push:
+            ctx.run(f"git push origin {tag}{force_option}")
+            print(f"Pushed tag {tag}")
+
+
 @task
-def tag_version(ctx, agent_version, commit="HEAD", verify=True, tag_modules=True, push=True, force=False):
+def tag_modules(ctx, agent_version, commit="HEAD", verify=True, push=True, force=False):
+    """
+    Create tags for Go nested modules for a given Datadog Agent version.
+    The version should be given as an Agent 7 version.
+
+    * --commit COMMIT will tag COMMIT with the tags (default HEAD)
+    * --verify checks for correctness on the Agent version (on by default).
+    * --push will push the tags to the origin remote (on by default).
+    * --force will allow the task to overwrite existing tags. Needed to move existing tags (off by default).
+
+    Examples:
+    inv -e release.tag-modules 7.27.0                 # Create tags and push them to origin
+    inv -e release.tag-modules 7.27.0-rc.3 --no-push  # Create tags locally; don't push them
+    inv -e release.tag-modules 7.29.0-rc.3 --force    # Create tags (overwriting existing tags with the same name), force-push them to origin
+
+    """
+    if verify:
+        check_version(agent_version)
+
+    force_option = __get_force_option(force)
+    for module in DEFAULT_MODULES.values():
+        # Skip main module; this is tagged at tag_version via __tag_single_module.
+        if module.should_tag and module.path != ".":
+            __tag_single_module(ctx, module, agent_version, commit, push, force_option)
+
+    print(f"Created module tags for version {agent_version}")
+
+
+@task
+def tag_version(ctx, agent_version, commit="HEAD", verify=True, push=True, force=False):
     """
     Create tags for a given Datadog Agent version.
     The version should be given as an Agent 7 version.
 
     * --commit COMMIT will tag COMMIT with the tags (default HEAD)
     * --verify checks for correctness on the Agent version (on by default).
-    * --tag_modules tags Go modules in addition to the agent repository
     * --push will push the tags to the origin remote (on by default).
     * --force will allow the task to overwrite existing tags. Needed to move existing tags (off by default).
 
@@ -869,32 +931,10 @@ def tag_version(ctx, agent_version, commit="HEAD", verify=True, tag_modules=True
     if verify:
         check_version(agent_version)
 
-    force_option = ""
-    if force:
-        print(color_message("--force option enabled. This will allow the task to overwrite existing tags.", "orange"))
-        result = yes_no_question("Please confirm the use of the --force option.", color="orange", default=False)
-        if result:
-            print("Continuing with the --force option.")
-            force_option = " --force"
-        else:
-            print("Continuing without the --force option.")
-
-    for module in DEFAULT_MODULES.values():
-        if (tag_modules or module.path == ".") and module.should_tag:
-            for tag in module.tag(agent_version):
-                ok = try_git_command(
-                    ctx,
-                    f"git tag -m {tag} {tag} {commit}{force_option}",
-                )
-                if not ok:
-                    message = f"Could not create tag {tag}. Please rerun the task to retry creating the tags (you may need the --force option)"
-                    raise Exit(color_message(message, "red"), code=1)
-                print(f"Created tag {tag}")
-                if push:
-                    ctx.run(f"git push origin {tag}{force_option}")
-                    print(f"Pushed tag {tag}")
-
-    print(f"Created all tags for version {agent_version}")
+    # Always tag the main module
+    force_option = __get_force_option(force)
+    __tag_single_module(ctx, DEFAULT_MODULES["."], agent_version, commit, push, force_option)
+    print(f"Created tags for version {agent_version}")
 
 
 def current_version(ctx, major_version) -> Version:
@@ -976,7 +1016,12 @@ def check_upstream_branch(github, branch):
     """
     Checks if the given branch already exists in the upstream repository
     """
-    github_branch = github.get_branch(branch)
+    try:
+        github_branch = github.get_branch(branch)
+    except APIError as e:
+        if e.status_code == 404:
+            return False
+        raise e
 
     # Return True if the branch exists
     return github_branch and github_branch.get('name', False)
@@ -1246,8 +1291,8 @@ Make sure that milestone is open before trying again.""",
     )
 
 
-@task(help={'redo': "Redo the tag & build for the last RC that was tagged, instead of creating tags for the next RC."})
-def build_rc(ctx, major_versions="6,7", patch_version=False, redo=False):
+@task
+def build_rc(ctx, major_versions="6,7", patch_version=False):
     """
     To be done after the PR created by release.create-rc is merged, with the same options
     as release.create-rc.
@@ -1263,11 +1308,7 @@ def build_rc(ctx, major_versions="6,7", patch_version=False, redo=False):
 
     # Get the version of the highest major: needed for tag_version and to know
     # which tag to target when creating the pipeline.
-    if redo:
-        # If redo is enabled, we're moving the current RC tag, so we keep the same version
-        new_version = current_version(ctx, max(list_major_versions))
-    else:
-        new_version = next_rc_version(ctx, max(list_major_versions), patch_version)
+    new_version = next_rc_version(ctx, max(list_major_versions), patch_version)
 
     # Get a string representation of the RC, eg. "6/7.32.0-rc.1"
     versions_string = f"{'/'.join([str(n) for n in list_major_versions[:-1]] + [str(new_version)])}"
@@ -1305,8 +1346,8 @@ def build_rc(ctx, major_versions="6,7", patch_version=False, redo=False):
     # tag_version only takes the highest version (Agent 7 currently), and creates
     # the tags for all supported versions
     # TODO: make it possible to do Agent 6-only or Agent 7-only tags?
-    # Note: if redo is enabled, then we need to set the --force option to move the tags.
-    tag_version(ctx, str(new_version), force=redo)
+    tag_version(ctx, str(new_version), force=False)
+    tag_modules(ctx, str(new_version), force=False)
 
     print(color_message(f"Waiting until the {new_version} tag appears in Gitlab", "bold"))
     gitlab_tag = None

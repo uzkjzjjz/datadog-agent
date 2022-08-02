@@ -16,25 +16,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"golang.org/x/sys/unix"
+
+	model "github.com/DataDog/agent-payload/v5/process"
+
+	"github.com/DataDog/nikos/types"
 
 	"github.com/DataDog/datadog-agent/pkg/ebpf"
-	"github.com/DataDog/datadog-agent/pkg/ebpf/compiler"
+	"github.com/DataDog/datadog-agent/pkg/metadata/host"
+	"github.com/DataDog/datadog-agent/pkg/process/statsd"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
-)
-
-var (
-	defaultFlags = []string{
-		"-DCONFIG_64BIT",
-		"-D__BPF_TRACING__",
-		`-DKBUILD_MODNAME="ddsysprobe"`,
-		"-Wno-unused-value",
-		"-Wno-pointer-sign",
-		"-Wno-compare-distinct-pointer-types",
-		"-Wunused",
-		"-Wall",
-		"-Werror",
-	}
+	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/DataDog/datadog-agent/pkg/version"
 )
 
 // CompilationResult enumerates runtime compilation success & failure modes
@@ -65,20 +59,15 @@ type RuntimeAsset struct {
 	filename string
 	hash     string
 
-	// Telemetry
-	compilationEnabled  bool
-	compilationResult   CompilationResult
-	compilationDuration time.Duration
-	headerFetchResult   kernel.HeaderFetchResult
+	runtimeCompiler *RuntimeCompiler
 }
 
 func NewRuntimeAsset(filename, hash string) *RuntimeAsset {
 	return &RuntimeAsset{
-		filename:           filename,
-		hash:               hash,
-		compilationEnabled: false,
-		compilationResult:  notAttempted,
-		headerFetchResult:  kernel.NotAttempted,
+		filename: filename,
+		hash:     hash,
+
+		runtimeCompiler: NewRuntimeCompiler(),
 	}
 }
 
@@ -107,89 +96,96 @@ func (a *RuntimeAsset) Verify(dir string) (io.Reader, string, error) {
 
 // Compile compiles the runtime asset if necessary and returns the resulting file.
 func (a *RuntimeAsset) Compile(config *ebpf.Config, cflags []string) (CompiledOutput, error) {
-	start := time.Now()
-	defer func() {
-		a.compilationDuration = time.Since(start)
-		a.compilationEnabled = true
-	}()
+	output, err := a.runtimeCompiler.CompileObjectFile(config, cflags, a.filename, a)
+	a.SubmitTelemetry()
+	return output, err
+}
 
-	kv, err := kernel.HostVersion()
+func (a *RuntimeAsset) GetInputReader(config *ebpf.Config, tm *RuntimeCompilationTelemetry) (io.Reader, error) {
+	inputReader, _, err := a.Verify(config.BPFDir)
 	if err != nil {
-		a.compilationResult = kernelVersionErr
-		return nil, fmt.Errorf("unable to get kernel version: %w", err)
-	}
-
-	inputReader, hash, err := a.Verify(config.BPFDir)
-	if err != nil {
-		a.compilationResult = verificationError
+		tm.compilationResult = verificationError
 		return nil, fmt.Errorf("error reading input file: %s", err)
 	}
 
-	if err := os.MkdirAll(config.RuntimeCompilerOutputDir, 0755); err != nil {
-		a.compilationResult = outputDirErr
-		return nil, fmt.Errorf("unable to create compiler output directory %s: %w", config.RuntimeCompilerOutputDir, err)
-	}
+	return inputReader, nil
+}
 
-	flags := make([]string, len(defaultFlags)+len(cflags))
-	copy(flags, defaultFlags)
-	copy(flags[len(defaultFlags):], cflags)
-	flagHash := hashFlags(flags)
-
+func (a *RuntimeAsset) GetOutputFilePath(config *ebpf.Config, uname *unix.Utsname, flagHash string, tm *RuntimeCompilationTelemetry) (string, error) {
 	// filename includes kernel version, input file hash, and cflags hash
 	// this ensures we re-compile when either of the input changes
 	baseName := strings.TrimSuffix(a.filename, filepath.Ext(a.filename))
-	outputFile := filepath.Join(config.RuntimeCompilerOutputDir, fmt.Sprintf("%s-%d-%s-%s.o", baseName, kv, hash, flagHash))
-	if _, err := os.Stat(outputFile); err != nil {
-		if !os.IsNotExist(err) {
-			a.compilationResult = outputFileErr
-			return nil, fmt.Errorf("error stat-ing output file %s: %w", outputFile, err)
-		}
-		dirs, res, err := kernel.GetKernelHeaders(config.KernelHeadersDirs, config.KernelHeadersDownloadDir, config.AptConfigDir, config.YumReposDir, config.ZypperReposDir)
-		a.headerFetchResult = res
-		if err != nil {
-			a.compilationResult = headerFetchErr
-			return nil, fmt.Errorf("unable to find kernel headers: %w", err)
-		}
-		comp, err := compiler.NewEBPFCompiler(dirs, config.BPFDebug)
-		if err != nil {
-			a.compilationResult = newCompilerErr
-			return nil, fmt.Errorf("failed to create compiler: %w", err)
-		}
-		defer comp.Close()
 
-		if err := comp.CompileToObjectFile(inputReader, outputFile, flags); err != nil {
-			a.compilationResult = compilationErr
-			return nil, fmt.Errorf("failed to compile runtime version of %s: %s", a.filename, err)
-		}
-		a.compilationResult = compilationSuccess
-	} else {
-		a.compilationResult = compiledOutputFound
-	}
-
-	out, err := os.Open(outputFile)
+	unameHash, err := UnameHash(uname)
 	if err != nil {
-		a.compilationResult = resultReadErr
+		return "", err
 	}
-	return out, err
+
+	outputFile := filepath.Join(config.RuntimeCompilerOutputDir, fmt.Sprintf("%s-%s-%s-%s.o", baseName, unameHash, a.hash, flagHash))
+	return outputFile, nil
 }
 
 func (a *RuntimeAsset) GetTelemetry() map[string]int64 {
-	stats := make(map[string]int64)
-	if a.compilationEnabled {
-		stats["runtime_compilation_enabled"] = 1
-		stats["runtime_compilation_result"] = int64(a.compilationResult)
-		stats["kernel_header_fetch_result"] = int64(a.headerFetchResult)
-		stats["runtime_compilation_duration"] = a.compilationDuration.Nanoseconds()
-	} else {
-		stats["runtime_compilation_enabled"] = 0
-	}
-	return stats
+	telemetry := a.runtimeCompiler.GetRCTelemetry()
+	return telemetry.GetTelemetry()
 }
 
-func hashFlags(flags []string) string {
-	h := sha256.New()
-	for _, f := range flags {
-		h.Write([]byte(f))
+func (a *RuntimeAsset) SubmitTelemetry() {
+	tm := a.runtimeCompiler.GetRCTelemetry()
+
+	if !tm.compilationEnabled {
+		return
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))
+
+	var platform string
+	if target, err := types.NewTarget(); err == nil {
+		// Prefer platform information from nikos over platform info from the host package, since this
+		// is what kernel header downloading uses
+		platform = strings.ToLower(target.Distro.Display)
+	} else {
+		log.Warnf("failed to retrieve host platform information from nikos: %s", err)
+		platform = host.GetStatusInformation().Platform
+	}
+
+	tags := []string{
+		fmt.Sprintf("asset:%s", a.filename),
+		fmt.Sprintf("agent_version:%s", version.AgentVersion),
+		fmt.Sprintf("platform:%s", platform),
+	}
+
+	if tm.compilationResult != notAttempted {
+		var resultTag string
+		if tm.compilationResult == compilationSuccess || tm.compilationResult == compiledOutputFound {
+			resultTag = "success"
+		} else {
+			resultTag = "failure"
+		}
+
+		rcTags := append(tags,
+			fmt.Sprintf("result:%s", resultTag),
+			fmt.Sprintf("reason:%s", model.RuntimeCompilationResult(tm.compilationResult).String()),
+		)
+
+		if err := statsd.Client.Count("datadog.system_probe.runtime_compilation.attempted", 1.0, rcTags, 1.0); err != nil {
+			log.Warnf("error submitting runtime compilation metric to statsd: %s", err)
+		}
+	}
+
+	if tm.headerFetchResult != kernel.NotAttempted {
+		var resultTag string
+		if tm.headerFetchResult <= kernel.DownloadSuccess {
+			resultTag = "success"
+		} else {
+			resultTag = "failure"
+		}
+
+		khdTags := append(tags,
+			fmt.Sprintf("result:%s", resultTag),
+			fmt.Sprintf("reason:%s", model.KernelHeaderFetchResult(tm.headerFetchResult).String()),
+		)
+
+		if err := statsd.Client.Count("datadog.system_probe.kernel_header_fetch.attempted", 1.0, khdTags, 1); err != nil {
+			log.Warnf("error submitting kernel header downloading metric to statsd: %s", err)
+		}
+	}
 }

@@ -13,18 +13,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/autodiscovery/common/utils"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/integration"
 	"github.com/DataDog/datadog-agent/pkg/autodiscovery/providers/names"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
+	"github.com/DataDog/datadog-agent/pkg/util"
 	"github.com/DataDog/datadog-agent/pkg/util/containers"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/workloadmeta"
 )
 
 const (
-	containerADLabelPrefix = "com.datadoghq.ad."
-	delayDuration          = 5 * time.Second
+	delayDuration = 5 * time.Second
 )
 
 // ContainerConfigProvider implements the ConfigProvider interface for container labels.
@@ -39,10 +40,10 @@ type ContainerConfigProvider struct {
 }
 
 // NewContainerConfigProvider creates a new ContainerConfigProvider
-func NewContainerConfigProvider(config config.ConfigurationProviders) (ConfigProvider, error) {
+func NewContainerConfigProvider(*config.ConfigurationProviders) (ConfigProvider, error) {
 	containerFilter, err := containers.NewAutodiscoveryFilter(containers.GlobalFilter)
 	if err != nil {
-		log.Warnf("Can't get container include/exclude filter, no filtering will be applied: %w", err)
+		log.Warnf("Can't get container include/exclude filter, no filtering will be applied: %v", err)
 	}
 
 	return &ContainerConfigProvider{
@@ -76,21 +77,27 @@ func (d *ContainerConfigProvider) listen() {
 	d.Lock()
 	d.streaming = true
 	health := health.RegisterLiveness("ad-containerprovider")
+	defer func() {
+		err := health.Deregister()
+		if err != nil {
+			log.Warnf("error de-registering health check: %s", err)
+		}
+	}()
 	d.Unlock()
 
-	workloadmetaEventsChannel := d.workloadmetaStore.Subscribe("ad-containerprovider", workloadmeta.NewFilter(
+	workloadmetaEventsChannel := d.workloadmetaStore.Subscribe("ad-containerprovider", workloadmeta.NormalPriority, workloadmeta.NewFilter(
 		[]workloadmeta.Kind{workloadmeta.KindContainer},
-		[]workloadmeta.Source{
-			workloadmeta.SourceDocker,
-			workloadmeta.SourceContainerd,
-			workloadmeta.SourceECSFargate,
-			workloadmeta.SourcePodman,
-		},
+		workloadmeta.SourceRuntime,
+		workloadmeta.EventTypeAll,
 	))
 
 	for {
 		select {
-		case evBundle := <-workloadmetaEventsChannel:
+		case evBundle, ok := <-workloadmetaEventsChannel:
+			if !ok {
+				return
+			}
+
 			d.processEvents(evBundle)
 
 		case <-health.C:
@@ -164,10 +171,14 @@ func (d *ContainerConfigProvider) generateConfigs() ([]integration.Config, error
 	var configs []integration.Config
 	for containerID, container := range d.containerCache {
 		containerEntityName := containers.BuildEntityName(string(container.Runtime), containerID)
-		c, errors := extractTemplatesFromMap(containerEntityName, container.Labels, containerADLabelPrefix)
+		c, errors := utils.ExtractTemplatesFromContainerLabels(containerEntityName, container.Labels)
 
 		for _, err := range errors {
 			log.Errorf("Can't parse template for container %s: %s", containerID, err)
+		}
+
+		if util.CcaInAD() {
+			c = utils.AddContainerCollectAllConfigs(c, containerEntityName)
 		}
 
 		for idx := range c {

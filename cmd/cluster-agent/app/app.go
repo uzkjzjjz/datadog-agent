@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubeapiserver
 // +build kubeapiserver
 
 package app
@@ -36,14 +37,15 @@ import (
 	admissionpkg "github.com/DataDog/datadog-agent/pkg/clusteragent/admission"
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/admission/mutate"
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/clusterchecks"
+	"github.com/DataDog/datadog-agent/pkg/collector"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/config/resolver"
 	"github.com/DataDog/datadog-agent/pkg/forwarder"
-	orchcfg "github.com/DataDog/datadog-agent/pkg/orchestrator/config"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/status/health"
 	"github.com/DataDog/datadog-agent/pkg/telemetry"
 	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
 	apicommon "github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver/common"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver/leaderelection"
@@ -55,7 +57,7 @@ import (
 // loggerName is the name of the cluster agent logger
 const loggerName config.LoggerName = "CLUSTER"
 
-// FIXME: move LoadComponents and StartAutoConfig in their own package so we don't import cmd/agent
+// FIXME: move LoadComponents and AC.LoadAndRun in their own package so we don't import cmd/agent
 var (
 	ClusterAgentCmd = &cobra.Command{
 		Use:   "datadog-cluster-agent [command]",
@@ -98,10 +100,9 @@ metadata for their metrics.`,
 		},
 	}
 
-	confPath              string
-	flagNoColor           bool
-	stopCh                chan struct{}
-	orchestratorForwarder *forwarder.DefaultForwarder
+	confPath    string
+	flagNoColor bool
+	stopCh      chan struct{}
 )
 
 func init() {
@@ -158,6 +159,9 @@ func start(cmd *cobra.Command, args []string) error {
 		log.Warnf("Can't initiliaze the runtime settings: %v", err)
 	}
 
+	// Setup Internal Profiling
+	common.SetupInternalProfiling()
+
 	if !config.Datadog.IsSet("api_key") {
 		log.Critical("no API key configured, exiting")
 		return nil
@@ -168,11 +172,15 @@ func start(cmd *cobra.Command, args []string) error {
 
 	// Expose the registered metrics via HTTP.
 	http.Handle("/metrics", telemetry.Handler())
+	metricsPort := config.Datadog.GetInt("metrics_port")
+	metricsServer := &http.Server{
+		Addr:    fmt.Sprintf("0.0.0.0:%d", metricsPort),
+		Handler: http.DefaultServeMux,
+	}
 	go func() {
-		port := config.Datadog.GetInt("metrics_port")
-		err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), nil)
+		err := metricsServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Errorf("Error creating telemetry server on port %v: %v", port, err)
+			log.Errorf("Error creating expvar server on port %v: %v", metricsPort, err)
 		}
 	}()
 
@@ -201,34 +209,29 @@ func start(cmd *cobra.Command, args []string) error {
 	log.Infof("Got APIClient connection")
 
 	// Get hostname as aggregator requires hostname
-	hostname, err := util.GetHostname(context.TODO())
+	hname, err := hostname.Get(context.TODO())
 	if err != nil {
 		return log.Errorf("Error while getting hostname, exiting: %v", err)
 	}
-	log.Infof("Hostname is: %s", hostname)
+	log.Infof("Hostname is: %s", hname)
 
 	// setup the forwarder
 	keysPerDomain, err := config.GetMultipleEndpoints()
 	if err != nil {
 		log.Error("Misconfiguration of agent endpoints: ", err)
 	}
-	forwarderOpts := forwarder.NewOptionsWithResolvers(resolver.NewSingleDomainResolvers(keysPerDomain))
+
 	// If a cluster-agent looses the connectivity to DataDog, we still want it to remain ready so that its endpoint remains in the service because:
 	// * It is still able to serve metrics to the WPA controller and
 	// * The metrics reported are reported as stale so that there is no "lie" about the accuracy of the reported metrics.
 	// Serving stale data is better than serving no data at all.
+	forwarderOpts := forwarder.NewOptionsWithResolvers(resolver.NewSingleDomainResolvers(keysPerDomain))
 	forwarderOpts.DisableAPIKeyChecking = true
-	f := forwarder.NewDefaultForwarder(forwarderOpts)
-	f.Start() //nolint:errcheck
-	// setup the orchestrator forwarder
-	orchestratorForwarder = orchcfg.NewOrchestratorForwarder()
-	if orchestratorForwarder != nil {
-		orchestratorForwarder.Start() //nolint:errcheck
-	}
-	s := serializer.NewSerializer(f, orchestratorForwarder)
-
-	aggregatorInstance := aggregator.InitAggregator(s, nil, hostname)
-	aggregatorInstance.AddAgentStartupTelemetry(fmt.Sprintf("%s - Datadog Cluster Agent", version.AgentVersion))
+	opts := aggregator.DefaultDemultiplexerOptions(forwarderOpts)
+	opts.UseEventPlatformForwarder = false
+	opts.UseContainerLifecycleForwarder = false
+	demux := aggregator.InitAndStartAgentDemultiplexer(opts, hname)
+	demux.AddAgentStartupTelemetry(fmt.Sprintf("%s - Datadog Cluster Agent", version.AgentVersion))
 
 	le, err := leaderelection.GetLeaderEngine()
 	if err != nil {
@@ -269,7 +272,7 @@ func start(cmd *cobra.Command, args []string) error {
 			log.Errorf("Failed to generate or retrieve the cluster ID")
 		}
 
-		clusterName := clustername.GetClusterName(context.TODO(), hostname)
+		clusterName := clustername.GetClusterName(context.TODO(), hname)
 		if clusterName == "" {
 			log.Warn("Failed to auto-detect a Kubernetes cluster name. We recommend you set it manually via the cluster_name config option")
 		}
@@ -281,9 +284,14 @@ func start(cmd *cobra.Command, args []string) error {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	// create and setup the Autoconfig instance
-	common.LoadComponents(config.Datadog.GetString("confd_path"))
+	common.LoadComponents(mainCtx, config.Datadog.GetString("confd_path"))
+
+	// Set up check collector
+	common.AC.AddScheduler("check", collector.InitCheckScheduler(common.Coll), true)
+	common.Coll.Start()
+
 	// start the autoconfig, this will immediately run any configured check
-	common.StartAutoConfig()
+	common.AC.LoadAndRun()
 
 	if config.Datadog.GetBool("cluster_checks.enabled") {
 		// Start the cluster check Autodiscovery
@@ -346,6 +354,7 @@ func start(cmd *cobra.Command, args []string) error {
 			server := admissioncmd.NewServer()
 			server.Register(config.Datadog.GetString("admission_controller.inject_config.endpoint"), mutate.InjectConfig, apiCl.DynamicCl)
 			server.Register(config.Datadog.GetString("admission_controller.inject_tags.endpoint"), mutate.InjectTags, apiCl.DynamicCl)
+			server.Register(config.Datadog.GetString("admission_controller.auto_instrumentation.endpoint"), mutate.InjectAutoInstrumentation, apiCl.DynamicCl)
 
 			// Start the k8s admission webhook server
 			wg.Add(1)
@@ -387,12 +396,9 @@ func start(cmd *cobra.Command, args []string) error {
 		close(stopCh)
 	}
 
-	// stopping forwarders
-	if f != nil {
-		f.Stop()
-	}
-	if orchestratorForwarder != nil {
-		orchestratorForwarder.Stop()
+	demux.Stop(true)
+	if err := metricsServer.Shutdown(context.Background()); err != nil {
+		log.Errorf("Error shutdowning metrics server on port %d: %v", metricsPort, err)
 	}
 
 	log.Info("See ya!")

@@ -2,6 +2,7 @@
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
+//go:build windows
 // +build windows
 
 package winutil
@@ -9,9 +10,10 @@ package winutil
 import (
 	"path/filepath"
 
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 func getDefaultProgramDataDir() (path string, err error) {

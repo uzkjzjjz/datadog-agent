@@ -13,8 +13,9 @@ import (
 	"runtime"
 	"strings"
 
+	manager "github.com/DataDog/ebpf-manager"
+
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/ebpf/manager"
 )
 
 var indirectSyscallPrefixes = map[string]string{

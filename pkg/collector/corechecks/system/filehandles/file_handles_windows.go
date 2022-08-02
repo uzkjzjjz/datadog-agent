@@ -2,6 +2,7 @@
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
+//go:build windows
 // +build windows
 
 package filehandles
@@ -12,8 +13,6 @@ import (
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/winutil/pdhutil"
-
-	"github.com/DataDog/datadog-agent/pkg/aggregator"
 )
 
 const fileHandlesCheckName = "file_handle"
@@ -26,7 +25,7 @@ type fhCheck struct {
 // Run executes the check
 func (c *fhCheck) Run() error {
 
-	sender, err := aggregator.GetSender(c.ID())
+	sender, err := c.GetSender()
 	if err != nil {
 		return err
 	}
@@ -45,7 +44,7 @@ func (c *fhCheck) Run() error {
 
 // The check doesn't need configuration
 func (c *fhCheck) Configure(data integration.Data, initConfig integration.Data, source string) (err error) {
-	if err := c.CommonConfigure(data, source); err != nil {
+	if err := c.CommonConfigure(initConfig, data, source); err != nil {
 		return err
 	}
 

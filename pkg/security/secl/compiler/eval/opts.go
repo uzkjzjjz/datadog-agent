@@ -5,11 +5,30 @@
 
 package eval
 
+// MacroStore represents a store of SECL Macros
+type MacroStore struct {
+	Macros map[MacroID]*Macro
+}
+
+// WithMacros set macros fields
+func (s *MacroStore) WithMacros(macros map[MacroID]*Macro) *MacroStore {
+	s.Macros = macros
+	return s
+}
+
+// AddMacro add a macro
+func (s *MacroStore) AddMacro(macro *Macro) *MacroStore {
+	if s.Macros == nil {
+		s.Macros = make(map[string]*Macro)
+	}
+	s.Macros[macro.ID] = macro
+	return s
+}
+
 // Opts are the options to be passed to the evaluator
 type Opts struct {
 	LegacyFields map[Field]Field
 	Constants    map[string]interface{}
-	Macros       map[MacroID]*Macro
 	Variables    map[string]VariableValue
 }
 
@@ -21,7 +40,12 @@ func (o *Opts) WithConstants(constants map[string]interface{}) *Opts {
 
 // WithVariables set variables
 func (o *Opts) WithVariables(variables map[string]VariableValue) *Opts {
-	o.Variables = variables
+	optsVariables := make(map[string]VariableValue, len(variables))
+	for name, value := range variables {
+		optsVariables[name] = value
+	}
+
+	o.Variables = optsVariables
 	return o
 }
 

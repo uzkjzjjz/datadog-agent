@@ -2,6 +2,7 @@
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
+//go:build !windows
 // +build !windows
 
 package cpu
@@ -9,8 +10,9 @@ package cpu
 import (
 	"testing"
 
+	"github.com/shirou/gopsutil/v3/load"
+
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
-	"github.com/shirou/gopsutil/load"
 )
 
 var (

@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build !windows
 // +build !windows
 
 package app
@@ -11,10 +12,11 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/pkg/api/util"
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/spf13/cobra"
 )
 
 var (

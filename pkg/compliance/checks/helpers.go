@@ -8,19 +8,21 @@ package checks
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/Masterminds/sprig"
+	yamlv2 "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/DataDog/datadog-agent/pkg/compliance"
 	"github.com/DataDog/datadog-agent/pkg/compliance/eval"
 	"github.com/DataDog/datadog-agent/pkg/compliance/event"
 	"github.com/DataDog/datadog-agent/pkg/util/jsonquery"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/Masterminds/sprig"
-	"gopkg.in/yaml.v3"
 )
 
 // getter applies jq query to get string value from json or yaml raw data
@@ -42,9 +44,12 @@ func parseYAMLContent(data []byte) (interface{}, error) {
 	var content interface{}
 
 	if err := yaml.Unmarshal(data, &content); err != nil {
-		return nil, err
+		if err := yamlv2.Unmarshal(data, &content); err != nil {
+			return nil, err
+		}
 	}
 
+	content = jsonquery.NormalizeYAMLForGoJQ(content)
 	return content, nil
 }
 
@@ -74,7 +79,7 @@ func readContent(filePath, parser string) (interface{}, error) {
 	}
 	defer f.Close()
 
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +136,7 @@ func queryValueFromFile(filePath string, query string, get getter) (string, erro
 	}
 	defer f.Close()
 
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}

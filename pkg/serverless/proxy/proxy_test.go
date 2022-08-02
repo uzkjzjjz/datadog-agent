@@ -16,23 +16,26 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/DataDog/datadog-agent/pkg/serverless/invocationlifecycle"
 )
 
 type testProcessorResponseValid struct{}
 
-func (tp *testProcessorResponseValid) OnInvokeStart(startDetails *InvocationStartDetails) {
+func (tp *testProcessorResponseValid) GetExecutionInfo() *invocationlifecycle.ExecutionStartInfo {
+	return nil
+}
+
+func (tp *testProcessorResponseValid) OnInvokeStart(startDetails *invocationlifecycle.InvocationStartDetails) {
 	if startDetails.StartTime.IsZero() {
 		panic("isZero")
 	}
-	if len(startDetails.InvokeHeaders) != 3 {
-		panic("headers")
-	}
-	if !strings.HasSuffix(startDetails.InvokeEventPayload, "ok") {
+	if !strings.HasSuffix(startDetails.InvokeEventRawPayload, "ok") {
 		panic("payload")
 	}
 }
 
-func (tp *testProcessorResponseValid) OnInvokeEnd(endDetails *InvocationEndDetails) {
+func (tp *testProcessorResponseValid) OnInvokeEnd(endDetails *invocationlifecycle.InvocationEndDetails) {
 	if endDetails.IsError != false {
 		panic("isError")
 	}
@@ -43,22 +46,23 @@ func (tp *testProcessorResponseValid) OnInvokeEnd(endDetails *InvocationEndDetai
 
 type testProcessorResponseError struct{}
 
-func (tp *testProcessorResponseError) OnInvokeStart(startDetails *InvocationStartDetails) {
+func (tp *testProcessorResponseError) OnInvokeStart(startDetails *invocationlifecycle.InvocationStartDetails) {
 	if startDetails.StartTime.IsZero() {
 		panic("isZero")
 	}
-	if len(startDetails.InvokeHeaders) != 3 {
-		panic("headers")
-	}
-	if !strings.HasSuffix(startDetails.InvokeEventPayload, "ok") {
+	if !strings.HasSuffix(startDetails.InvokeEventRawPayload, "ok") {
 		panic("payload")
 	}
 }
 
-func (tp *testProcessorResponseError) OnInvokeEnd(endDetails *InvocationEndDetails) {
+func (tp *testProcessorResponseError) OnInvokeEnd(endDetails *invocationlifecycle.InvocationEndDetails) {
 	if endDetails.IsError != true {
 		panic("isError")
 	}
+}
+
+func (tp *testProcessorResponseError) GetExecutionInfo() *invocationlifecycle.ExecutionStartInfo {
+	return nil
 }
 
 func TestStartTrue(t *testing.T) {
@@ -92,9 +96,11 @@ func TestProxyResponseValid(t *testing.T) {
 	resp, err := http.Get("http://127.0.0.1:5000/xxx/next")
 	assert.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
+	resp.Body.Close()
 	resp, err = http.Post("http://127.0.0.1:5000/xxx/response", "text/plain", strings.NewReader("bla bla bla"))
 	assert.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
+	resp.Body.Close()
 }
 
 func TestProxyResponseError(t *testing.T) {
@@ -117,9 +123,11 @@ func TestProxyResponseError(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	resp, err := http.Get("http://127.0.0.1:6000/xxx/next")
 	assert.Nil(t, err)
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	resp, err = http.Post("http://127.0.0.1:6000/xxx/error", "text/plain", strings.NewReader("bla bla bla"))
 	assert.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 
+	resp.Body.Close()
 }

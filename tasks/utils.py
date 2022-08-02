@@ -154,6 +154,8 @@ def get_build_flags(
     """
     gcflags = ""
     ldflags = get_version_ldflags(ctx, prefix, major_version=major_version)
+    # External linker flags; needs to be handled separately to avoid overrides
+    extldflags = ""
     env = {"GO111MODULE": "on"}
 
     if sys.platform == 'win32':
@@ -213,7 +215,8 @@ def get_build_flags(
 
     # if `static` was passed ignore setting rpath, even if `embedded_path` was passed as well
     if static:
-        ldflags += "-s -w -linkmode=external '-extldflags=-static' "
+        ldflags += "-s -w -linkmode=external "
+        extldflags += "-static "
     elif rtloader_lib:
         ldflags += f"-r {':'.join(rtloader_lib)} "
 
@@ -225,6 +228,14 @@ def get_build_flags(
             ldflags += "-linkmode internal "
     elif os.environ.get("NO_GO_OPT"):
         gcflags = "-N -l"
+
+    # On macOS work around https://github.com/golang/go/issues/38824
+    # as done in https://go-review.googlesource.com/c/go/+/372798
+    if sys.platform == "darwin":
+        extldflags += "-Wl,-bind_at_load "
+
+    if extldflags:
+        ldflags += f"'-extldflags={extldflags}' "
 
     return ldflags, gcflags, env
 
@@ -428,24 +439,6 @@ def generate_config(ctx, build_type, output_file, env=None):
     }
     cmd = "go run {go_file} {build_type} {template_file} {output_file}"
     return ctx.run(cmd.format(**args), env=env or {})
-
-
-def bundle_files(ctx, bindata_files, dir_prefix, go_dir, pkg, tag, split=True):
-    assets_cmd = (
-        "go run github.com/shuLhan/go-bindata/cmd/go-bindata -tags '{bundle_tag}' {split}"
-        + " -pkg {pkg} -prefix '{dir_prefix}' -modtime 1 -o '{go_dir}' '{bindata_files}'"
-    )
-    ctx.run(
-        assets_cmd.format(
-            dir_prefix=dir_prefix,
-            go_dir=go_dir,
-            bundle_tag=tag,
-            pkg=pkg,
-            split="-split" if split else "",
-            bindata_files="' '".join(bindata_files),
-        )
-    )
-    ctx.run(f"gofmt -w -s {go_dir}")
 
 
 ##

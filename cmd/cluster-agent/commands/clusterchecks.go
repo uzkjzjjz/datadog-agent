@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubeapiserver || clusterchecks
 // +build kubeapiserver clusterchecks
 
 package commands
@@ -26,6 +27,7 @@ var (
 	checkName string
 )
 
+// GetClusterChecksCobraCmd TODO <container-integrations>
 func GetClusterChecksCobraCmd(flagNoColor *bool, confPath *string, loggerName config.LoggerName) *cobra.Command {
 	clusterChecksCmd := &cobra.Command{
 		Use:   "clusterchecks",
@@ -60,6 +62,7 @@ func GetClusterChecksCobraCmd(flagNoColor *bool, confPath *string, loggerName co
 	return clusterChecksCmd
 }
 
+// RebalanceClusterChecksCobraCmd TODO <container-integrations>
 func RebalanceClusterChecksCobraCmd(flagNoColor *bool, confPath *string, loggerName config.LoggerName) *cobra.Command {
 	clusterChecksCmd := &cobra.Command{
 		Use:   "rebalance",

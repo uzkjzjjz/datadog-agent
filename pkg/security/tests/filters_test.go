@@ -3,21 +3,22 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build functionaltests
 // +build functionaltests
 
 package tests
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 	"unsafe"
-
-	"github.com/pkg/errors"
 
 	"github.com/DataDog/datadog-agent/pkg/security/probe"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
@@ -32,7 +33,7 @@ func openTestFile(test *testModule, testFile string, flags int) (int, error) {
 
 	if dir := filepath.Dir(testFile); dir != test.Root() {
 		if err := os.MkdirAll(dir, 0777); err != nil {
-			return 0, errors.Wrap(err, "failed to create directory")
+			return 0, fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
 
@@ -44,7 +45,7 @@ func openTestFile(test *testModule, testFile string, flags int) (int, error) {
 	return int(fd), nil
 }
 
-func TestOpenBasenameApproverFilterERPCDentryResolution(t *testing.T) {
+func TestOpenBasenameApproverFilter(t *testing.T) {
 	// generate a basename up to the current limit of the agent
 	var basename string
 	for i := 0; i < model.MaxSegmentLength; i++ {
@@ -55,7 +56,7 @@ func TestOpenBasenameApproverFilterERPCDentryResolution(t *testing.T) {
 		Expression: fmt.Sprintf(`open.file.path == "{{.Root}}/%s"`, basename),
 	}
 
-	test, err := newTestModule(t, nil, []*rules.RuleDefinition{rule}, testOpts{disableMapDentryResolution: true})
+	test, err := newTestModule(t, nil, []*rules.RuleDefinition{rule}, testOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,10 +77,7 @@ func TestOpenBasenameApproverFilterERPCDentryResolution(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd1); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd1)
 	}, testFile1); err != nil {
 		t.Fatal(err)
 	}
@@ -96,71 +94,7 @@ func TestOpenBasenameApproverFilterERPCDentryResolution(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd2); err != nil {
-			return err
-		}
-		return nil
-	}, testFile2); err == nil {
-		t.Fatal("shouldn't get an event")
-	}
-}
-
-func TestOpenBasenameApproverFilterMapDentryResolution(t *testing.T) {
-	// generate a basename up to the current limit of the agent
-	var basename string
-	for i := 0; i < model.MaxSegmentLength; i++ {
-		basename += "a"
-	}
-	rule := &rules.RuleDefinition{
-		ID:         "test_rule",
-		Expression: fmt.Sprintf(`open.file.path == "{{.Root}}/%s"`, basename),
-	}
-
-	test, err := newTestModule(t, nil, []*rules.RuleDefinition{rule}, testOpts{disableERPCDentryResolution: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer test.Close()
-
-	var fd1, fd2 int
-	var testFile1, testFile2 string
-
-	testFile1, _, err = test.Path(basename)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer os.Remove(testFile1)
-
-	if err := waitForOpenProbeEvent(test, func() error {
-		fd1, err = openTestFile(test, testFile1, syscall.O_CREAT)
-		if err != nil {
-			return err
-		}
-		if err = syscall.Close(fd1); err != nil {
-			return err
-		}
-		return nil
-	}, testFile1); err != nil {
-		t.Fatal(err)
-	}
-
-	testFile2, _, err = test.Path("test-oba-2")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer os.Remove(testFile2)
-
-	if err := waitForOpenProbeEvent(test, func() error {
-		fd2, err = openTestFile(test, testFile2, syscall.O_CREAT)
-		if err != nil {
-			return err
-		}
-		if err = syscall.Close(fd2); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd2)
 	}, testFile2); err == nil {
 		t.Fatal("shouldn't get an event")
 	}
@@ -199,20 +133,14 @@ func TestOpenLeafDiscarderFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, func(d *testDiscarder) bool {
 		e := d.event.(*probe.Event)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
 		v, _ := e.GetFieldValue("open.file.path")
-		if v == testFile {
-			return true
-		}
-		return false
+		return v == testFile
 	}); err != nil {
 		inode := getInode(t, testFile)
 		parentInode := getInode(t, path.Dir(testFile))
@@ -225,16 +153,13 @@ func TestOpenLeafDiscarderFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err == nil {
 		t.Fatal("shouldn't get an event")
 	}
 }
 
-func TestOpenParentDiscarderFilter(t *testing.T) {
+func testOpenParentDiscarderFilter(t *testing.T, parents ...string) {
 	// We need to write a rule with no approver on the file path, and that won't match the real opened file (so that
 	// a discarder is created).
 	rule := &rules.RuleDefinition{
@@ -251,7 +176,7 @@ func TestOpenParentDiscarderFilter(t *testing.T) {
 	var fd int
 	var testFile string
 
-	testFile, _, err = test.Path("a", "test-obd-2")
+	testFile, _, err = test.Path(append(parents, "test-obd-2")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,20 +192,14 @@ func TestOpenParentDiscarderFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, func(d *testDiscarder) bool {
 		e := d.event.(*probe.Event)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
 		v, _ := e.GetFieldValue("open.file.path")
-		if v == testFile {
-			return true
-		}
-		return false
+		return v == testFile
 	}); err != nil {
 		inode := getInode(t, testFile)
 		parentInode := getInode(t, path.Dir(testFile))
@@ -288,7 +207,7 @@ func TestOpenParentDiscarderFilter(t *testing.T) {
 		t.Fatalf("event inode: %d, parent inode: %d, error: %v", inode, parentInode, err)
 	}
 
-	testFile, _, err = test.Path("a", "test-obd-3")
+	testFile, _, err = test.Path(append(parents, "test-obd-3")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,13 +218,18 @@ func TestOpenParentDiscarderFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err == nil {
 		t.Fatal("shouldn't get an event")
 	}
+}
+
+func TestOpenParentDiscarderFilter(t *testing.T) {
+	testOpenParentDiscarderFilter(t, "parent")
+}
+
+func TestOpenGrandParentDiscarderFilter(t *testing.T) {
+	testOpenParentDiscarderFilter(t, "grandparent", "parent")
 }
 
 func TestDiscarderFilterMask(t *testing.T) {
@@ -340,10 +264,7 @@ func TestDiscarderFilterMask(t *testing.T) {
 			time.Sleep(probe.DiscardRetention)
 
 			testFile, testFilePtr, err = test.CreateWithOptions("test-mask", 98, 99, 0o447)
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		}, func(event *probe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_mask_open_rule")
 		})
@@ -376,10 +297,7 @@ func TestDiscarderFilterMask(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if err = f.Close(); err != nil {
-				return err
-			}
-			return nil
+			return f.Close()
 		}, func(event *probe.Event, rule *rules.Rule) {
 			assertTriggeredRule(t, rule, "test_mask_open_rule")
 		})
@@ -413,10 +331,7 @@ func TestOpenFlagsApproverFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err != nil {
 		t.Fatal(err)
 	}
@@ -426,10 +341,7 @@ func TestOpenFlagsApproverFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err != nil {
 		t.Fatal(err)
 	}
@@ -439,10 +351,7 @@ func TestOpenFlagsApproverFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err == nil {
 		t.Fatal("shouldn't get an event")
 	}
@@ -451,7 +360,7 @@ func TestOpenFlagsApproverFilter(t *testing.T) {
 func TestOpenProcessPidDiscarder(t *testing.T) {
 	rule := &rules.RuleDefinition{
 		ID:         "test_rule",
-		Expression: `open.file.path == "{{.Root}}/test-oba-1" && process.file.path == "/bin/cat"`,
+		Expression: `open.file.path == "{{.Root}}/test-oba-1" && process.file.path == "/bin/aaa"`,
 	}
 
 	test, err := newTestModule(t, nil, []*rules.RuleDefinition{rule}, testOpts{})
@@ -460,55 +369,53 @@ func TestOpenProcessPidDiscarder(t *testing.T) {
 	}
 	defer test.Close()
 
-	var fd int
-	var testFile string
-
-	testFile, _, err = test.Path("test-oba-1")
+	testFile, _, err := test.Path("test-oba-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(testFile)
 
-	if err := test.GetEventDiscarder(t, func() error {
-		// The policy file inode is likely to be reused by the kernel after deletion. On deletion, the inode discarder will
-		// be marked as retained in kernel space and will therefore no longer discard events. By waiting for the discard
-		// retention period to expire, we're making sure that a newly created discarder will properly take effect.
-		time.Sleep(probe.DiscardRetention)
+	syscallTester, err := loadSyscallTester(t, test, "syscall_tester")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		fd, err = openTestFile(test, testFile, syscall.O_CREAT)
-		if err != nil {
-			return err
+	args := []string{"multi-open", testFile, testFile}
+
+	cmd := exec.Command(syscallTester, args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close()
+
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := cmd.Wait(); err != nil {
+			t.Fatal(err)
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+	}()
+
+	if err := test.GetEventDiscarder(t, func() error {
+		time.Sleep(probe.DiscardRetention)
+		_, err := io.WriteString(stdin, "\n")
+		return err
 	}, func(d *testDiscarder) bool {
 		e := d.event.(*probe.Event)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
 			return false
 		}
 		v, _ := e.GetFieldValue("open.file.path")
-		if v == testFile {
-			return true
-		}
-		return false
+		return v == testFile
 	}); err != nil {
-		inode := getInode(t, testFile)
-		parentInode := getInode(t, path.Dir(testFile))
-
-		t.Fatalf("event inode: %d, parent inode: %d, error: %v", inode, parentInode, err)
+		t.Error(err)
 	}
 
 	if err := waitForOpenProbeEvent(test, func() error {
-		fd, err = openTestFile(test, testFile, syscall.O_TRUNC)
-		if err != nil {
-			return err
-		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		_, err := io.WriteString(stdin, "\n")
+		return err
 	}, testFile); err == nil {
 		t.Fatalf("shouldn't get an event")
 	}
@@ -522,7 +429,7 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 		Expression: `open.file.path =~ "{{.Root}}/no-approver-*" && open.flags & (O_CREAT | O_SYNC) > 0`,
 	}
 
-	testDrive, err := newTestDrive("xfs", nil)
+	testDrive, err := newTestDrive(t, "xfs", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,11 +460,7 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
-
+		return syscall.Close(fd)
 	}, func(d *testDiscarder) bool {
 		e := d.event.(*probe.Event)
 		if e == nil || (e != nil && e.GetEventType() != model.FileOpenEventType) {
@@ -565,12 +468,7 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 		}
 
 		v, _ := e.GetFieldValue("open.file.path")
-		if v == testFile {
-			return true
-		}
-
-		return false
-
+		return v == testFile
 	}); err != nil {
 		inode := getInode(t, testFile)
 		parentInode := getInode(t, path.Dir(testFile))
@@ -583,10 +481,7 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err = syscall.Close(fd); err != nil {
-			return err
-		}
-		return nil
+		return syscall.Close(fd)
 	}, testFile); err == nil {
 		t.Fatal("shouldn't get an event")
 	}
@@ -613,10 +508,7 @@ func TestDiscarderRetentionFilter(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if err = syscall.Close(fd); err != nil {
-				return err
-			}
-			return nil
+			return syscall.Close(fd)
 		}, newFile); err != nil {
 			discarded = true
 			break

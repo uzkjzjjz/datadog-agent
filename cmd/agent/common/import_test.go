@@ -7,7 +7,6 @@ package common
 
 import (
 	"io/ioutil"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -74,15 +73,11 @@ func TestImport(t *testing.T) {
 }
 
 func RunImport(t *testing.T, integrations []string) {
-	a6ConfDir, err := ioutil.TempDir("", "test_configuration_import")
-	require.NoError(t, err, "Could not create temp dir")
-	defer func() {
-		os.RemoveAll(a6ConfDir)
-	}()
+	a6ConfDir := t.TempDir()
 	a5ConfDir := path.Join(".", "tests", "a5_conf")
 	a6RefConfDir := path.Join(".", "tests", "a6_conf")
 
-	err = ImportConfig(a5ConfDir, a6ConfDir, false)
+	err := ImportConfig(a5ConfDir, a6ConfDir, false)
 	require.NoError(t, err, "ImportConfig failed")
 	assert.FileExists(t, path.Join(a6ConfDir, "datadog.yaml"), "datadog.yaml is missing")
 	validateSelectedParameters(t, path.Join(a6ConfDir, "datadog.yaml"), path.Join(a5ConfDir, "datadog.conf"))
@@ -159,7 +154,8 @@ func validateSelectedParameters(t *testing.T, migratedConfigFile, oldConfigFile 
 
 	// Some second level parameters
 	migratedProcessConfig := migratedConf["process_config"].(map[interface{}]interface{})
-	assert.Equal(t, oldConfig["process_agent_enabled"], migratedProcessConfig["enabled"])
+	processConfigProcessCollection := migratedProcessConfig["process_collection"].(map[interface{}]interface{})
+	assert.Equal(t, oldConfig["process_agent_enabled"], strconv.FormatBool(processConfigProcessCollection["enabled"].(bool)))
 
 	migratedApmConfig := migratedConf["apm_config"].(map[interface{}]interface{})
 	assert.Equal(t, toBool(oldConfig["apm_enabled"]), migratedApmConfig["enabled"])

@@ -3,8 +3,9 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// +build docker
-// +build linux
+//go:build docker && linux
+// +build docker,linux
+
 // As we compare some paths, running the tests on Linux only
 
 package legacy
@@ -79,14 +80,12 @@ instances:
 )
 
 func TestConvertDocker(t *testing.T) {
-	dir, err := ioutil.TempDir("", "agent_test_legacy")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	src := filepath.Join(dir, "docker_daemon.yaml")
 	dst := filepath.Join(dir, "docker.yaml")
 
-	err = ioutil.WriteFile(src, []byte(dockerDaemonLegacyConf), 0640)
+	err := ioutil.WriteFile(src, []byte(dockerDaemonLegacyConf), 0640)
 	require.Nil(t, err)
 
 	configConverter := config.NewConfigConverter()

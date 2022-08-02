@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build !windows
 // +build !windows
 
 package flare
@@ -13,16 +14,17 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateSecurityAgentArchive(t *testing.T) {
 	assert := assert.New(t)
 
 	common.SetupConfig("./test")
-	mockConfig := config.Mock()
+	mockConfig := config.Mock(t)
 	mockConfig.Set("compliance_config.dir", "./test/compliance.d")
 	logFilePath := "./test/logs/agent.log"
 

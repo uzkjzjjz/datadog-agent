@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubeapiserver
 // +build kubeapiserver
 
 package apiserver
@@ -32,6 +33,7 @@ const (
 	maxRetries = 10
 )
 
+// PollerConfig holds the configuration of the metrics poller
 type PollerConfig struct {
 	gcPeriodSeconds int
 	refreshPeriod   int
@@ -222,6 +224,7 @@ func (h *AutoscalersController) deleteAutoscaler(obj interface{}) {
 			h.enqueue(deletedHPA)
 			return
 		}
+		return
 	}
 
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)

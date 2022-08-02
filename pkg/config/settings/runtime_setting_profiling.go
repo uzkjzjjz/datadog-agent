@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/util/flavor"
 	"github.com/DataDog/datadog-agent/pkg/util/profiling"
 	"github.com/DataDog/datadog-agent/pkg/version"
 )
@@ -63,7 +64,7 @@ func (l ProfilingRuntimeSetting) Set(v interface{}) error {
 		}
 
 		// allow full url override for development use
-		site := fmt.Sprintf(profiling.ProfileURLTemplate, s)
+		site := fmt.Sprintf(profiling.ProfilingURLTemplate, s)
 		if config.Datadog.IsSet("internal_profiling.profile_dd_url") {
 			site = config.Datadog.GetString("internal_profiling.profile_dd_url")
 		}
@@ -71,11 +72,16 @@ func (l ProfilingRuntimeSetting) Set(v interface{}) error {
 		// Note that we must derive a new profiling.Settings on every
 		// invocation, as many of these settings may have changed at runtime.
 		v, _ := version.Agent()
+		service := "datadog-agent"
+		if flavor.GetFlavor() == flavor.ClusterAgent {
+			service = "datadog-cluster-agent"
+		}
+
 		settings := profiling.Settings{
-			Site:                 site,
+			ProfilingURL:         site,
 			Env:                  config.Datadog.GetString("env"),
-			Service:              "datadog-agent",
-			Period:               profiling.DefaultProfilingPeriod,
+			Service:              service,
+			Period:               config.Datadog.GetDuration("internal_profiling.period"),
 			MutexProfileFraction: profiling.GetMutexProfileFraction(),
 			BlockProfileRate:     profiling.GetBlockProfileRate(),
 			WithGoroutineProfile: config.Datadog.GetBool("internal_profiling.enable_goroutine_stacktraces"),

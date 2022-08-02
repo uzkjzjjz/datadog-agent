@@ -56,13 +56,35 @@ const (
 	NE
 	Not
 	As
+	Alter
+	Drop
+	Create
+	Grant
+	Revoke
+	Commit
+	Begin
+	Truncate
+	Select
 	From
 	Update
+	Delete
 	Insert
 	Into
 	Join
 	TableName
 	ColonCast
+
+	// PostgreSQL specific JSON operators
+	JSONSelect         // ->
+	JSONSelectText     // ->>
+	JSONSelectPath     // #>
+	JSONSelectPathText // #>>
+	JSONContains       // @>
+	JSONContainsLeft   // <@
+	JSONKeyExists      // ?
+	JSONAnyKeysExist   // ?|
+	JSONAllKeysExist   // ?&
+	JSONDelete         // #-
 
 	// FilteredGroupable specifies that the given token has been discarded by one of the
 	// token filters and that it is groupable together with consecutive FilteredGroupable
@@ -109,8 +131,18 @@ var tokenKindStrings = map[TokenKind]string{
 	NE:                           "NE",
 	Not:                          "NOT",
 	As:                           "As",
+	Alter:                        "Alter",
+	Drop:                         "Drop",
+	Create:                       "Create",
+	Grant:                        "Grant",
+	Revoke:                       "Revoke",
+	Commit:                       "Commit",
+	Begin:                        "Begin",
+	Truncate:                     "Truncate",
+	Select:                       "Select",
 	From:                         "From",
 	Update:                       "Update",
+	Delete:                       "Delete",
 	Insert:                       "Insert",
 	Into:                         "Into",
 	Join:                         "Join",
@@ -120,6 +152,16 @@ var tokenKindStrings = map[TokenKind]string{
 	FilteredGroupableParenthesis: "FilteredGroupableParenthesis",
 	Filtered:                     "Filtered",
 	FilteredBracketedIdentifier:  "FilteredBracketedIdentifier",
+	JSONSelect:                   "JSONSelect",
+	JSONSelectText:               "JSONSelectText",
+	JSONSelectPath:               "JSONSelectPath",
+	JSONSelectPathText:           "JSONSelectPathText",
+	JSONContains:                 "JSONContains",
+	JSONContainsLeft:             "JSONContainsLeft",
+	JSONKeyExists:                "JSONKeyExists",
+	JSONAnyKeysExist:             "JSONAnyKeysExist",
+	JSONAllKeysExist:             "JSONAllKeysExist",
+	JSONDelete:                   "JSONDelete",
 }
 
 func (k TokenKind) String() string {
@@ -129,6 +171,13 @@ func (k TokenKind) String() string {
 	}
 	return str
 }
+
+const (
+	// DBMSSQLServer is a MS SQL Server
+	DBMSSQLServer = "mssql"
+	// DBMSPostgres is a PostgreSQL Server
+	DBMSPostgres = "postgresql"
+)
 
 const escapeCharacter = '\\'
 
@@ -179,8 +228,18 @@ var keywords = map[string]TokenKind{
 	"SAVEPOINT": Savepoint,
 	"LIMIT":     Limit,
 	"AS":        As,
+	"ALTER":     Alter,
+	"CREATE":    Create,
+	"GRANT":     Grant,
+	"REVOKE":    Revoke,
+	"COMMIT":    Commit,
+	"BEGIN":     Begin,
+	"TRUNCATE":  Truncate,
+	"DROP":      Drop,
+	"SELECT":    Select,
 	"FROM":      From,
 	"UPDATE":    Update,
+	"DELETE":    Delete,
 	"INSERT":    Insert,
 	"INTO":      Into,
 	"JOIN":      Join,
@@ -208,7 +267,11 @@ func (tkn *SQLTokenizer) Scan() (TokenKind, []byte) {
 	tkn.SkipBlank()
 
 	switch ch := tkn.lastChar; {
-	case isLeadingLetter(ch):
+	case isLeadingLetter(ch) &&
+		!(tkn.cfg.DBMS == DBMSPostgres && ch == '@'):
+		// The '@' symbol should not be considered part of an identifier in
+		// postgres, so we skip this in the case where the DBMS is postgres
+		// and ch is '@'.
 		return tkn.scanIdentifier()
 	case isDigit(ch):
 		return tkn.scanNumber(false)
@@ -245,7 +308,21 @@ func (tkn *SQLTokenizer) Scan() (TokenKind, []byte) {
 			default:
 				return TokenKind(ch), tkn.bytes()
 			}
-		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '[', ']', '?':
+		case '?':
+			if tkn.cfg.DBMS == DBMSPostgres {
+				switch tkn.lastChar {
+				case '|':
+					tkn.advance()
+					return JSONAnyKeysExist, []byte("?|")
+				case '&':
+					tkn.advance()
+					return JSONAllKeysExist, []byte("?&")
+				default:
+					return JSONKeyExists, tkn.bytes()
+				}
+			}
+			fallthrough
+		case '=', ',', ';', '(', ')', '+', '*', '&', '|', '^', '[', ']':
 			return TokenKind(ch), tkn.bytes()
 		case '.':
 			if isDigit(tkn.lastChar) {
@@ -268,16 +345,58 @@ func (tkn *SQLTokenizer) Scan() (TokenKind, []byte) {
 			case tkn.lastChar == '-':
 				tkn.advance()
 				return tkn.scanCommentType1("--")
+			case tkn.lastChar == '>':
+				if tkn.cfg.DBMS == DBMSPostgres {
+					tkn.advance()
+					switch tkn.lastChar {
+					case '>':
+						tkn.advance()
+						return JSONSelectText, []byte("->>")
+					default:
+						return JSONSelect, []byte("->")
+					}
+				}
+				fallthrough
 			case isDigit(tkn.lastChar):
-				tkn.advance()
 				kind, tokenBytes := tkn.scanNumber(false)
 				return kind, append([]byte{'-'}, tokenBytes...)
+			case tkn.lastChar == '.':
+				tkn.advance()
+				if isDigit(tkn.lastChar) {
+					kind, tokenBytes := tkn.scanNumber(true)
+					return kind, append([]byte{'-', '.'}, tokenBytes...)
+				}
+				tkn.lastChar = '.'
+				tkn.pos--
+				fallthrough
 			default:
 				return TokenKind(ch), tkn.bytes()
 			}
 		case '#':
-			tkn.advance()
-			return tkn.scanCommentType1("#")
+			switch tkn.cfg.DBMS {
+			case DBMSSQLServer:
+				return tkn.scanIdentifier()
+			case DBMSPostgres:
+				switch tkn.lastChar {
+				case '>':
+					tkn.advance()
+					switch tkn.lastChar {
+					case '>':
+						tkn.advance()
+						return JSONSelectPathText, []byte("#>>")
+					default:
+						return JSONSelectPath, []byte("#>")
+					}
+				case '-':
+					tkn.advance()
+					return JSONDelete, []byte("#-")
+				default:
+					return TokenKind(ch), tkn.bytes()
+				}
+			default:
+				tkn.advance()
+				return tkn.scanCommentType1("#")
+			}
 		case '<':
 			switch tkn.lastChar {
 			case '>':
@@ -292,6 +411,13 @@ func (tkn *SQLTokenizer) Scan() (TokenKind, []byte) {
 				default:
 					return LE, []byte("<=")
 				}
+			case '@':
+				if tkn.cfg.DBMS == DBMSPostgres {
+					// check for JSONContainsLeft (<@)
+					tkn.advance()
+					return JSONContainsLeft, []byte("<@")
+				}
+				fallthrough
 			default:
 				return TokenKind(ch), tkn.bytes()
 			}
@@ -357,6 +483,21 @@ func (tkn *SQLTokenizer) Scan() (TokenKind, []byte) {
 				tok = append(append([]byte("$func$"), []byte(out.Query)...), []byte("$func$")...)
 			}
 			return kind, tok
+		case '@':
+			if tkn.cfg.DBMS == DBMSPostgres {
+				// For postgres the @ symbol is reserved as an operator
+				// https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-OPERATORS
+				// And is used as a json operator
+				// https://www.postgresql.org/docs/9.5/functions-json.html
+				switch tkn.lastChar {
+				case '>':
+					tkn.advance()
+					return JSONContains, []byte("@>")
+				default:
+					return TokenKind(ch), tkn.bytes()
+				}
+			}
+			fallthrough
 		case '{':
 			if tkn.pos == 1 || tkn.curlys > 0 {
 				// Do not fully obfuscate top-level SQL escape sequences like {{[?=]call procedure-name[([parameter][,parameter]...)]}.

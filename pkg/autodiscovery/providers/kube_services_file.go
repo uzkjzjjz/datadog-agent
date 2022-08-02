@@ -3,8 +3,8 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-// +build clusterchecks
-// +build kubeapiserver
+//go:build clusterchecks && kubeapiserver
+// +build clusterchecks,kubeapiserver
 
 package providers
 
@@ -22,7 +22,7 @@ type KubeServiceFileConfigProvider struct {
 }
 
 // NewKubeServiceFileConfigProvider returns a new KubeServiceFileConfigProvider
-func NewKubeServiceFileConfigProvider(config config.ConfigurationProviders) (ConfigProvider, error) {
+func NewKubeServiceFileConfigProvider(*config.ConfigurationProviders) (ConfigProvider, error) {
 	return &KubeServiceFileConfigProvider{}, nil
 }
 

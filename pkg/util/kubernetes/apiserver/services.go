@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubeapiserver
 // +build kubeapiserver
 
 package apiserver
@@ -31,6 +32,7 @@ func (metaBundle *metadataMapperBundle) DeepCopy(old *metadataMapperBundle) *met
 	return metaBundle
 }
 
+// EntityForService builds entity strings for Service objects
 func EntityForService(svc *v1.Service) string {
 	if svc == nil {
 		return ""
@@ -39,6 +41,7 @@ func EntityForService(svc *v1.Service) string {
 	return EntityForServiceWithNames(svc.ObjectMeta.Namespace, svc.ObjectMeta.Name)
 }
 
+// EntityForServiceWithNames builds entity strings for Service objects based on the name and the namespace
 func EntityForServiceWithNames(namespace, name string) string {
 	return fmt.Sprintf("%s%s/%s", kubeServiceIDPrefix, namespace, name)
 }

@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build docker
 // +build docker
 
 package docker
@@ -67,8 +68,8 @@ func EnableTestingMode() {
 	})
 }
 
-// HostnameProvider docker implementation for the hostname provider
-func HostnameProvider(ctx context.Context, options map[string]interface{}) (string, error) {
+// GetHostname returns the hostname for docker
+func GetHostname(ctx context.Context) (string, error) {
 	du, err := GetDockerUtil()
 	if err != nil {
 		return "", err

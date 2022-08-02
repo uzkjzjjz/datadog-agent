@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build windows
 // +build windows
 
 package service
@@ -11,14 +12,15 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/debug"
+	"golang.org/x/sys/windows/svc/eventlog"
+
 	"github.com/DataDog/datadog-agent/cmd/agent/app"
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/cmd/agent/common/signals"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/debug"
-	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 var elog debug.Log

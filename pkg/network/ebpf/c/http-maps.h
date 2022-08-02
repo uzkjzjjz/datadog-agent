@@ -53,6 +53,15 @@ struct bpf_map_def SEC("maps/fd_by_ssl_bio") fd_by_ssl_bio = {
     .namespace = "",
 };
 
+struct bpf_map_def SEC("maps/ssl_ctx_by_pid_tgid") ssl_ctx_by_pid_tgid = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(__u64),
+    .value_size = sizeof(void *),
+    .max_entries = 1024,
+    .pinning = 0,
+    .namespace = "",
+};
+
 struct bpf_map_def SEC("maps/open_at_args") open_at_args = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(__u64), // pid_tgid
@@ -70,6 +79,18 @@ struct bpf_map_def SEC("maps/shared_libraries") shared_libraries = {
     .max_entries = 0, // This will get overridden at runtime
     .pinning = 0,
     .namespace = "",
+};
+
+/* Map used to store the sub program actually used by the socket filter.
+ * This is done to avoid memory limitation when attaching a filter to 
+ * a socket.
+ * See: https://datadoghq.atlassian.net/wiki/spaces/NET/pages/2326855913/HTTP#Program-size-limit-for-socket-filters */
+#define HTTP_PROG 0
+struct bpf_map_def SEC("maps/http_progs") http_progs = {
+    .type = BPF_MAP_TYPE_PROG_ARRAY,
+    .key_size = sizeof(u32),
+    .value_size = sizeof(u32),
+    .max_entries = 1,
 };
 
 #endif

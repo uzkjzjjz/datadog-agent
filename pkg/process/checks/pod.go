@@ -3,21 +3,25 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubelet && orchestrator
 // +build kubelet,orchestrator
 
 package checks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	model "github.com/DataDog/agent-payload/v5/process"
-	"github.com/DataDog/datadog-agent/pkg/orchestrator/redact"
+
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors"
+	k8sProcessors "github.com/DataDog/datadog-agent/pkg/collector/corechecks/cluster/orchestrator/processors/k8s"
+	"github.com/DataDog/datadog-agent/pkg/orchestrator"
 	"github.com/DataDog/datadog-agent/pkg/process/config"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/kubelet"
-	orchutil "github.com/DataDog/datadog-agent/pkg/util/orchestrator"
 )
 
 // Pod is a singleton PodCheck.
@@ -27,14 +31,14 @@ var Pod = &PodCheck{}
 type PodCheck struct {
 	sysInfo                 *model.SystemInfo
 	containerFailedLogLimit *util.LogLimit
-	scrubber                *redact.DataScrubber
+	processor               *processors.Processor
 }
 
 // Init initializes a PodCheck instance.
 func (c *PodCheck) Init(cfg *config.AgentConfig, info *model.SystemInfo) {
-	c.sysInfo = info
 	c.containerFailedLogLimit = util.NewLogLimit(10, time.Minute*10)
-	c.scrubber = redact.NewDefaultDataScrubber()
+	c.processor = processors.NewProcessor(new(k8sProcessors.PodHandlers))
+	c.sysInfo = info
 }
 
 // Name returns the name of the ProcessCheck.
@@ -42,6 +46,9 @@ func (c *PodCheck) Name() string { return config.PodCheckName }
 
 // RealTime indicates if this check only runs in real-time mode.
 func (c *PodCheck) RealTime() bool { return false }
+
+// ShouldSaveLastRun indicates if the output from the last run should be saved for use in flares
+func (c *PodCheck) ShouldSaveLastRun() bool { return true }
 
 // Run runs the PodCheck to collect a list of running pods
 func (c *PodCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageBody, error) {
@@ -60,5 +67,24 @@ func (c *PodCheck) Run(cfg *config.AgentConfig, groupID int32) ([]model.MessageB
 		return nil, err
 	}
 
-	return orchutil.ProcessPodList(podList, groupID, cfg.HostName, clusterID, cfg.Orchestrator)
+	ctx := &processors.ProcessorContext{
+		ClusterID:  clusterID,
+		Cfg:        cfg.Orchestrator,
+		HostName:   cfg.HostName,
+		MsgGroupID: groupID,
+		NodeType:   orchestrator.K8sPod,
+	}
+
+	messages, processed := c.processor.Process(ctx, podList)
+
+	if processed == -1 {
+		return nil, fmt.Errorf("unable to process pods: a panic occurred")
+	}
+
+	orchestrator.SetCacheStats(len(podList), processed, ctx.NodeType)
+
+	return messages, nil
 }
+
+// Cleanup frees any resource held by the PodCheck before the agent exits
+func (c *PodCheck) Cleanup() {}

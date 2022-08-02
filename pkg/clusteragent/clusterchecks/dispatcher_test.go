@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build clusterchecks
 // +build clusterchecks
 
 package clusterchecks
@@ -439,7 +440,7 @@ func TestPatchConfiguration(t *testing.T) {
 	}
 	initialDigest := checkConfig.Digest()
 
-	mockConfig := config.Mock()
+	mockConfig := config.Mock(t)
 	mockConfig.Set("cluster_name", "testing")
 	clustername.ResetClusterName()
 	dispatcher := newDispatcher()
@@ -474,7 +475,7 @@ func TestPatchEndpointsConfiguration(t *testing.T) {
 		LogsConfig:    integration.Data("[{\"service\":\"any_service\",\"source\":\"any_source\"}]"),
 	}
 
-	mockConfig := config.Mock()
+	mockConfig := config.Mock(t)
 	mockConfig.Set("cluster_name", "testing")
 	clustername.ResetClusterName()
 	dispatcher := newDispatcher()
@@ -510,7 +511,7 @@ func TestExtraTags(t *testing.T) {
 		{[]string{"one", "two"}, "mycluster", "custom_name", []string{"one", "two", "custom_name:mycluster", "kube_cluster_name:mycluster"}},
 	} {
 		t.Run(fmt.Sprintf(""), func(t *testing.T) {
-			mockConfig := config.Mock()
+			mockConfig := config.Mock(t)
 			mockConfig.Set("cluster_checks.extra_tags", tc.extraTagsConfig)
 			mockConfig.Set("cluster_name", tc.clusterNameConfig)
 			mockConfig.Set("cluster_checks.cluster_tag_name", tc.tagNameConfig)

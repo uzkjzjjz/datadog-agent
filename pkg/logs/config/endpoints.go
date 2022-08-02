@@ -41,7 +41,7 @@ type Endpoint struct {
 	UseCompression          bool `mapstructure:"use_compression" json:"use_compression"`
 	CompressionLevel        int  `mapstructure:"compression_level" json:"compression_level"`
 	ProxyAddress            string
-	IsReliable              bool `mapstructure:"is_reliable" json:"is_reliable"`
+	IsReliable              *bool `mapstructure:"is_reliable" json:"is_reliable"`
 	ConnectionResetInterval time.Duration
 
 	BackoffFactor    float64
@@ -93,10 +93,15 @@ func (e *Endpoint) GetStatus(prefix string, useHTTP bool) string {
 	return fmt.Sprintf("%sSending %s logs in %s to %s on port %d", prefix, compression, protocol, host, port)
 }
 
+// GetIsReliable returns true if the endpoint is reliable. Endpoints are reliable by default.
+func (e *Endpoint) GetIsReliable() bool {
+	return e.IsReliable == nil || *e.IsReliable
+}
+
 // Endpoints holds the main endpoint and additional ones to dualship logs.
 type Endpoints struct {
 	Main                   Endpoint
-	Additionals            []Endpoint
+	Endpoints              []Endpoint
 	UseProto               bool
 	UseHTTP                bool
 	BatchWait              time.Duration
@@ -108,18 +113,20 @@ type Endpoints struct {
 // GetStatus returns the endpoints status, one line per endpoint
 func (e *Endpoints) GetStatus() []string {
 	result := make([]string, 0)
-	result = append(result, e.Main.GetStatus("", e.UseHTTP))
-	for _, additional := range e.Additionals {
-		result = append(result, additional.GetStatus("Additional: ", e.UseHTTP))
+	for _, endpoint := range e.GetReliableEndpoints() {
+		result = append(result, endpoint.GetStatus("Reliable: ", e.UseHTTP))
+	}
+	for _, endpoint := range e.GetUnReliableEndpoints() {
+		result = append(result, endpoint.GetStatus("Unreliable: ", e.UseHTTP))
 	}
 	return result
 }
 
 // NewEndpoints returns a new endpoints composite with default batching settings
-func NewEndpoints(main Endpoint, additionals []Endpoint, useProto bool, useHTTP bool) *Endpoints {
+func NewEndpoints(main Endpoint, additionalEndpoints []Endpoint, useProto bool, useHTTP bool) *Endpoints {
 	return &Endpoints{
 		Main:                   main,
-		Additionals:            additionals,
+		Endpoints:              append([]Endpoint{main}, additionalEndpoints...),
 		UseProto:               useProto,
 		UseHTTP:                useHTTP,
 		BatchWait:              config.DefaultBatchWait,
@@ -130,10 +137,18 @@ func NewEndpoints(main Endpoint, additionals []Endpoint, useProto bool, useHTTP 
 }
 
 // NewEndpointsWithBatchSettings returns a new endpoints composite with non-default batching settings specified
-func NewEndpointsWithBatchSettings(main Endpoint, additionals []Endpoint, useProto bool, useHTTP bool, batchWait time.Duration, batchMaxConcurrentSend int, batchMaxSize int, batchMaxContentSize int) *Endpoints {
+func NewEndpointsWithBatchSettings(main Endpoint,
+	additionalEndpoints []Endpoint,
+	useProto bool,
+	useHTTP bool,
+	batchWait time.Duration,
+	batchMaxConcurrentSend int,
+	batchMaxSize int,
+	batchMaxContentSize int) *Endpoints {
+
 	return &Endpoints{
 		Main:                   main,
-		Additionals:            additionals,
+		Endpoints:              append([]Endpoint{main}, additionalEndpoints...),
 		UseProto:               useProto,
 		UseHTTP:                useHTTP,
 		BatchWait:              batchWait,
@@ -143,23 +158,23 @@ func NewEndpointsWithBatchSettings(main Endpoint, additionals []Endpoint, usePro
 	}
 }
 
-// GetReliableAdditionals returns additional endpoints that can be failed over to and block the pipeline in the
+// GetReliableEndpoints returns additional endpoints that can be failed over to and block the pipeline in the
 // event of an outage and will retry errors. These endpoints are treated the same as the main endpoint.
-func (e *Endpoints) GetReliableAdditionals() []Endpoint {
+func (e *Endpoints) GetReliableEndpoints() []Endpoint {
 	endpoints := []Endpoint{}
-	for _, endpoint := range e.Additionals {
-		if endpoint.IsReliable {
+	for _, endpoint := range e.Endpoints {
+		if endpoint.GetIsReliable() {
 			endpoints = append(endpoints, endpoint)
 		}
 	}
 	return endpoints
 }
 
-// GetUnReliableAdditionals returns additional endpoints that do not guarantee logs are received in the event of an error.
-func (e *Endpoints) GetUnReliableAdditionals() []Endpoint {
+// GetUnReliableEndpoints returns additional endpoints that do not guarantee logs are received in the event of an error.
+func (e *Endpoints) GetUnReliableEndpoints() []Endpoint {
 	endpoints := []Endpoint{}
-	for _, endpoint := range e.Additionals {
-		if !endpoint.IsReliable {
+	for _, endpoint := range e.Endpoints {
+		if !endpoint.GetIsReliable() {
 			endpoints = append(endpoints, endpoint)
 		}
 	}

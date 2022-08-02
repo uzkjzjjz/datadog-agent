@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build kubeapiserver
 // +build kubeapiserver
 
 package externalmetrics
@@ -21,10 +22,11 @@ import (
 	autoscaler_lister "k8s.io/client-go/listers/autoscaling/v2beta1"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/DataDog/watermarkpodautoscaler/api/v1alpha1"
+
 	"github.com/DataDog/datadog-agent/pkg/clusteragent/externalmetrics/model"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/apiserver"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/watermarkpodautoscaler/api/v1alpha1"
 )
 
 const (
@@ -35,6 +37,7 @@ const (
 	autoscalerHPAKindKey        string = "hpa"
 )
 
+// AutoscalerWatcher watches autoscaling objects and reconciles the corresponding external metrics
 type AutoscalerWatcher struct {
 	refreshPeriod           int64
 	autogenExpirationPeriod time.Duration
@@ -102,6 +105,7 @@ func NewAutoscalerWatcher(refreshPeriod, autogenExpirationPeriodHours int64, aut
 	return autoscalerWatcher, nil
 }
 
+// Run starts the autoscaling reconciliation loop
 func (w *AutoscalerWatcher) Run(stopCh <-chan struct{}) {
 	log.Infof("Starting AutoscalerWatcher (waiting for cache sync)")
 	if w.autoscalerListerSynced != nil {

@@ -2,6 +2,7 @@
 // under the Apache License Version 2.0.
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
+//go:build kubeapiserver
 // +build kubeapiserver
 
 package kubernetesapiserver
@@ -17,12 +18,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	obj "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	core "github.com/DataDog/datadog-agent/pkg/collector/corechecks"
 	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/metrics"
 	"github.com/DataDog/datadog-agent/pkg/util/kubernetes/clustername"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestParseComponentStatus(t *testing.T) {
@@ -201,7 +203,7 @@ func TestProcessBundledEvents(t *testing.T) {
 
 	// Test the hostname change when a cluster name is set
 	var testClusterName = "laika"
-	mockConfig := config.Mock()
+	mockConfig := config.Mock(t)
 	mockConfig.Set("cluster_name", testClusterName)
 	clustername.ResetClusterName() // reset state as clustername was already read
 	// defer a reset of the state so that future hostname fetches are not impacted

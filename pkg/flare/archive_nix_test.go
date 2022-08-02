@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build !windows
 // +build !windows
 
 package flare
@@ -15,9 +16,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/stretchr/testify/assert"
 )
 
 // Ensure the permissions.log is being created
@@ -25,7 +27,7 @@ func TestPermsFile(t *testing.T) {
 	assert := assert.New(t)
 
 	common.SetupConfig("./test")
-	mockConfig := config.Mock()
+	mockConfig := config.Mock(t)
 	mockConfig.Set("confd_path", "./test/confd")
 	mockConfig.Set("log_file", "./test/logs/agent.log")
 	zipFilePath := getArchivePath()

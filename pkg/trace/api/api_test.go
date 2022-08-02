@@ -16,20 +16,18 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/trace/config"
-	"github.com/DataDog/datadog-agent/pkg/trace/config/features"
 	"github.com/DataDog/datadog-agent/pkg/trace/info"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/trace/sampler"
-	"github.com/DataDog/datadog-agent/pkg/trace/test/testutil"
+	"github.com/DataDog/datadog-agent/pkg/trace/testutil"
 
-	"github.com/cihub/seelog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tinylib/msgp/msgp"
 	vmsgp "github.com/vmihailenco/msgpack/v4"
 )
@@ -50,7 +48,7 @@ type noopStatsProcessor struct{}
 func (noopStatsProcessor) ProcessStats(_ pb.ClientStatsPayload, _, _ string) {}
 
 func newTestReceiverFromConfig(conf *config.AgentConfig) *HTTPReceiver {
-	dynConf := sampler.NewDynamicConfig("none")
+	dynConf := sampler.NewDynamicConfig()
 
 	rawTraceChan := make(chan *Payload, 5000)
 	receiver := NewHTTPReceiver(conf, dynConf, rawTraceChan, noopStatsProcessor{})
@@ -66,11 +64,11 @@ func newTestReceiverConfig() *config.AgentConfig {
 }
 
 func TestMain(m *testing.M) {
-	seelog.UseLogger(seelog.Disabled)
-
 	defer func(old func(string, ...interface{})) { killProcess = old }(killProcess)
-	killProcess = func(_ string, _ ...interface{}) {}
-
+	killProcess = func(format string, args ...interface{}) {
+		fmt.Printf(format, args...)
+		fmt.Println()
+	}
 	os.Exit(m.Run())
 }
 
@@ -97,8 +95,11 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 		assert.Nil(err)
 
 		resp, err := client.Do(req)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			break
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				break
+			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -113,6 +114,7 @@ func TestReceiverRequestBodyLength(t *testing.T) {
 		resp, err := client.Do(req)
 		assert.Nil(err)
 		assert.Equal(expectedStatus, resp.StatusCode)
+		resp.Body.Close()
 	}
 
 	testBody(http.StatusOK, "[]")
@@ -123,8 +125,8 @@ func TestListenTCP(t *testing.T) {
 	t.Run("measured", func(t *testing.T) {
 		r := &HTTPReceiver{conf: &config.AgentConfig{ConnectionLimit: 0}}
 		ln, err := r.listenTCP(":0")
+		require.NoError(t, err)
 		defer ln.Close()
-		assert.NoError(t, err)
 		_, ok := ln.(*measuredListener)
 		assert.True(t, ok)
 	})
@@ -132,8 +134,8 @@ func TestListenTCP(t *testing.T) {
 	t.Run("limited", func(t *testing.T) {
 		r := &HTTPReceiver{conf: &config.AgentConfig{ConnectionLimit: 10}}
 		ln, err := r.listenTCP(":0")
+		require.NoError(t, err)
 		defer ln.Close()
-		assert.NoError(t, err)
 		_, ok := ln.(*rateLimitedListener)
 		assert.True(t, ok)
 	})
@@ -156,12 +158,13 @@ func TestStateHeaders(t *testing.T) {
 		// this one will return 500, but that's fine, we want to test that all
 		// reponses have the header regardless of status code
 		"/v0.5/traces",
-		"/v0.6/traces",
+		"/v0.7/traces",
 	} {
 		resp, err := http.Post("http://localhost:8126"+e, "application/msgpack", bytes.NewReader(data))
 		if err != nil {
 			t.Fatal(err)
 		}
+		resp.Body.Close()
 		_, ok := resp.Header["Datadog-Agent-Version"]
 		assert.True(ok)
 		v := resp.Header.Get("Datadog-Agent-Version")
@@ -193,7 +196,7 @@ func TestLegacyReceiver(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces),
 			)
 
 			// send traces to that endpoint without a content-type
@@ -258,7 +261,7 @@ func TestReceiverJSONDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces),
 			)
 
 			// send traces to that endpoint without a content-type
@@ -318,7 +321,7 @@ func TestReceiverMsgpackDecoder(t *testing.T) {
 		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
 			// start testing server
 			server := httptest.NewServer(
-				http.HandlerFunc(tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces)),
+				tc.r.handleWithVersion(tc.apiVersion, tc.r.handleTraces),
 			)
 
 			// send traces to that endpoint using the msgpack content-type
@@ -398,7 +401,7 @@ func TestReceiverDecodingError(t *testing.T) {
 	assert := assert.New(t)
 	conf := newTestReceiverConfig()
 	r := newTestReceiverFromConfig(conf)
-	server := httptest.NewServer(http.HandlerFunc(r.handleWithVersion(v04, r.handleTraces)))
+	server := httptest.NewServer(r.handleWithVersion(v04, r.handleTraces))
 	data := []byte("} invalid json")
 	var client http.Client
 
@@ -409,8 +412,9 @@ func TestReceiverDecodingError(t *testing.T) {
 
 		resp, err := client.Do(req)
 		assert.NoError(err)
+		resp.Body.Close()
 		assert.Equal(400, resp.StatusCode)
-		assert.EqualValues(0, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.4"}).TracesDropped.DecodingError)
+		assert.EqualValues(0, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.4"}).TracesDropped.DecodingError.Load())
 	})
 
 	t.Run("with-header", func(t *testing.T) {
@@ -422,8 +426,9 @@ func TestReceiverDecodingError(t *testing.T) {
 
 		resp, err := client.Do(req)
 		assert.NoError(err)
+		resp.Body.Close()
 		assert.Equal(400, resp.StatusCode)
-		assert.EqualValues(traceCount, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.4"}).TracesDropped.DecodingError)
+		assert.EqualValues(traceCount, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.4"}).TracesDropped.DecodingError.Load())
 	})
 }
 
@@ -431,7 +436,7 @@ func TestReceiverUnexpectedEOF(t *testing.T) {
 	assert := assert.New(t)
 	conf := newTestReceiverConfig()
 	r := newTestReceiverFromConfig(conf)
-	server := httptest.NewServer(http.HandlerFunc(r.handleWithVersion(v05, r.handleTraces)))
+	server := httptest.NewServer(r.handleWithVersion(v05, r.handleTraces))
 	var client http.Client
 	traceCount := 2
 
@@ -452,8 +457,9 @@ func TestReceiverUnexpectedEOF(t *testing.T) {
 	resp, err := client.Do(req)
 	assert.NoError(err)
 
+	resp.Body.Close()
 	assert.Equal(400, resp.StatusCode)
-	assert.EqualValues(traceCount, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.5"}).TracesDropped.EOF)
+	assert.EqualValues(traceCount, r.Stats.GetTagStats(info.Tags{EndpointVersion: "v0.5"}).TracesDropped.EOF.Load())
 }
 
 func TestTraceCount(t *testing.T) {
@@ -465,19 +471,19 @@ func TestTraceCount(t *testing.T) {
 			delete(req.Header, k)
 		}
 		_, err := traceCount(req)
-		assert.Contains(t, err.Error(), "not found")
+		assert.EqualError(t, err, fmt.Sprintf("HTTP header %q not found", headerTraceCount))
 	})
 
 	t.Run("value-empty", func(t *testing.T) {
 		req.Header.Set(headerTraceCount, "")
 		_, err := traceCount(req)
-		assert.Contains(t, err.Error(), "value not set")
+		assert.EqualError(t, err, fmt.Sprintf("HTTP header %q not found", headerTraceCount))
 	})
 
 	t.Run("value-bad", func(t *testing.T) {
 		req.Header.Set(headerTraceCount, "qwe")
 		_, err := traceCount(req)
-		assert.Contains(t, err.Error(), "can not be parsed")
+		assert.Equal(t, err, errInvalidHeaderTraceCountValue)
 	})
 
 	t.Run("ok", func(t *testing.T) {
@@ -657,6 +663,7 @@ func TestHandleStats(t *testing.T) {
 			t.Fatal(string(slurp), resp.StatusCode)
 		}
 
+		resp.Body.Close()
 		gotp, gotlang, gotTracerVersion := mockProcessor.Got()
 		if !reflect.DeepEqual(gotp, p) || gotlang != "lang1" || gotTracerVersion != "0.1.0" {
 			t.Fatalf("Did not match payload: %v: %v", gotlang, gotp)
@@ -691,6 +698,7 @@ func TestClientComputedStatsHeader(t *testing.T) {
 					t.Error(err)
 					return
 				}
+				resp.Body.Close()
 				if resp.StatusCode != 200 {
 					t.Error(resp.StatusCode)
 					return
@@ -726,7 +734,7 @@ func TestHandleTraces(t *testing.T) {
 	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
-	handler := http.HandlerFunc(receiver.handleWithVersion(v04, receiver.handleTraces))
+	handler := receiver.handleWithVersion(v04, receiver.handleTraces)
 
 	for n := 0; n < 10; n++ {
 		// consume the traces channel without doing anything
@@ -753,8 +761,8 @@ func TestHandleTraces(t *testing.T) {
 	for _, lang := range langs {
 		ts, ok := rs.Stats[info.Tags{Lang: lang, EndpointVersion: "v0.4"}]
 		assert.True(ok)
-		assert.Equal(int64(20), ts.TracesReceived)
-		assert.Equal(int64(59222), ts.TracesBytes)
+		assert.Equal(int64(20), ts.TracesReceived.Load())
+		assert.Equal(int64(61822), ts.TracesBytes.Load())
 	}
 	// make sure we have all our languages registered
 	assert.Equal("C#|go|java|python|ruby", receiver.Languages())
@@ -803,6 +811,7 @@ func TestClientComputedTopLevel(t *testing.T) {
 					t.Error(err)
 					return
 				}
+				resp.Body.Close()
 				if resp.StatusCode != 200 {
 					t.Error(resp.StatusCode)
 					return
@@ -826,58 +835,6 @@ func TestClientComputedTopLevel(t *testing.T) {
 	t.Run("off", run(false))
 }
 
-func TestConfigEndpoint(t *testing.T) {
-	defer func(old string) { features.Set(old) }(strings.Join(features.All(), ","))
-
-	var tcs = []struct {
-		name               string
-		reqBody            string
-		expectedStatusCode int
-		enabled            bool
-		response           string
-	}{
-		{
-			name:               "disabled",
-			expectedStatusCode: http.StatusNotFound,
-			response:           "404 page not found\n",
-		},
-		{
-			name:               "bad",
-			enabled:            true,
-			expectedStatusCode: http.StatusBadRequest,
-			response:           "unexpected end of JSON input\n",
-		},
-		{
-			name:               "stale",
-			reqBody:            `{"Product":1}`,
-			enabled:            true,
-			expectedStatusCode: http.StatusNoContent,
-			response:           "",
-		},
-	}
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
-			if tc.enabled {
-				features.Set("config_endpoint")
-			}
-			conf := newTestReceiverConfig()
-			rcv := newTestReceiverFromConfig(conf)
-			mux := rcv.buildMux()
-			server := httptest.NewServer(mux)
-
-			req, _ := http.NewRequest("POST", server.URL+"/v0.6/config", strings.NewReader(tc.reqBody))
-			req.Header.Set("Content-Type", "application/msgpack")
-			resp, err := http.DefaultClient.Do(req)
-			assert.Nil(err)
-			body, err := ioutil.ReadAll(resp.Body)
-			assert.Nil(err)
-			assert.Equal(tc.expectedStatusCode, resp.StatusCode)
-			assert.Equal(tc.response, string(body))
-		})
-	}
-}
-
 func TestClientDropP0s(t *testing.T) {
 	conf := newTestReceiverConfig()
 	rcv := newTestReceiverFromConfig(conf)
@@ -896,6 +853,7 @@ func TestClientDropP0s(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatal(resp.StatusCode)
 	}
@@ -916,7 +874,7 @@ func TestReceiverRateLimiterCancel(t *testing.T) {
 	receiver := newTestReceiverFromConfig(conf)
 	receiver.RateLimiter.SetTargetRate(0.000001) // Make sure we sample aggressively
 
-	server := httptest.NewServer(http.HandlerFunc(receiver.handleWithVersion(v04, receiver.handleTraces)))
+	server := httptest.NewServer(receiver.handleWithVersion(v04, receiver.handleTraces))
 
 	defer server.Close()
 	url := server.URL + "/v0.4/traces"
@@ -939,6 +897,7 @@ func TestReceiverRateLimiterCancel(t *testing.T) {
 				assert.Nil(err)
 				assert.NotNil(resp)
 				if resp != nil {
+					resp.Body.Close()
 					assert.Equal(http.StatusOK, resp.StatusCode)
 				}
 			}
@@ -960,7 +919,7 @@ func BenchmarkHandleTracesFromOneApp(b *testing.B) {
 	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
-	handler := http.HandlerFunc(receiver.handleWithVersion(v04, receiver.handleTraces))
+	handler := receiver.handleWithVersion(v04, receiver.handleTraces)
 
 	// benchmark
 	b.ResetTimer()
@@ -1001,7 +960,7 @@ func BenchmarkHandleTracesFromMultipleApps(b *testing.B) {
 	receiver := newTestReceiverFromConfig(conf)
 
 	// response recorder
-	handler := http.HandlerFunc(receiver.handleWithVersion(v04, receiver.handleTraces))
+	handler := receiver.handleWithVersion(v04, receiver.handleTraces)
 
 	// benchmark
 	b.ResetTimer()
@@ -1161,6 +1120,7 @@ func TestWatchdog(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("got %d", resp.StatusCode)
 		}
@@ -1178,6 +1138,7 @@ func TestWatchdog(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			resp.Body.Close()
 			if resp.StatusCode == http.StatusTooManyRequests {
 				break // 👍
 			}

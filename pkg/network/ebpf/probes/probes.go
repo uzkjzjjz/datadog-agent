@@ -17,6 +17,11 @@ const (
 	// InetCskListenStop traces the inet_csk_listen_stop system call (called for both ipv4 and ipv6)
 	InetCskListenStop ProbeName = "kprobe/inet_csk_listen_stop"
 
+	// TCPConnect traces the connect() system call
+	TCPConnect ProbeName = "kprobe/tcp_connect"
+	// TCPFinishConnect traces tcp_finish_connect() kernel function. This is
+	// used to know when a TCP connection switches to the ESTABLISHED state
+	TCPFinishConnect ProbeName = "kprobe/tcp_finish_connect"
 	// TCPv6Connect traces the v6 connect() system call
 	TCPv6Connect ProbeName = "kprobe/tcp_v6_connect"
 	// TCPv6ConnectReturn traces the return value for the v6 connect() system call
@@ -54,7 +59,9 @@ const (
 
 	// We use the following two probes for UDP sends
 	IPMakeSkb        ProbeName = "kprobe/ip_make_skb"
+	IPMakeSkbReturn  ProbeName = "kretprobe/ip_make_skb"
 	IP6MakeSkb       ProbeName = "kprobe/ip6_make_skb"
+	IP6MakeSkbReturn ProbeName = "kretprobe/ip6_make_skb"
 	IP6MakeSkbPre470 ProbeName = "kprobe/ip6_make_skb/pre_4_7_0"
 
 	// UDPRecvMsg traces the udp_recvmsg() system call
@@ -64,9 +71,23 @@ const (
 	// UDPRecvMsgReturn traces the return value for the udp_recvmsg() system call
 	UDPRecvMsgReturn ProbeName = "kretprobe/udp_recvmsg"
 
+	// UDPv6RecvMsg traces the udpv6_recvmsg() system call
+	UDPv6RecvMsg ProbeName = "kprobe/udpv6_recvmsg"
+	// UDPv6RecvMsgPre410 traces the udpv6_recvmsg() system call on kernels prior to 4.1.0
+	UDPv6RecvMsgPre410 ProbeName = "kprobe/udpv6_recvmsg/pre_4_1_0"
+	// UDPv6RecvMsgReturn traces the return value for the udpv6_recvmsg() system call
+	UDPv6RecvMsgReturn ProbeName = "kretprobe/udpv6_recvmsg"
+
+	// SKBConsumeUDP traces skb_consume_udp()
+	SKBConsumeUDP ProbeName = "kprobe/skb_consume_udp"
+	// SKBFreeDatagramLocked traces skb_free_datagram_locked()
+	SKBFreeDatagramLocked ProbeName = "kprobe/skb_free_datagram_locked"
+	// SKB__FreeDatagramLocked traces __skb_free_datagram_locked()
+	SKB__FreeDatagramLocked ProbeName = "kprobe/__skb_free_datagram_locked"
+
 	// UDPDestroySock traces the udp_destroy_sock() function
 	UDPDestroySock ProbeName = "kprobe/udp_destroy_sock"
-	// UDPDestroySockrReturn traces the return of the udp_destroy_sock() system call
+	// UDPDestroySockReturn traces the return of the udp_destroy_sock() system call
 	UDPDestroySockReturn ProbeName = "kretprobe/udp_destroy_sock"
 
 	// TCPRetransmit traces the return value for the tcp_retransmit_skb() system call
@@ -89,16 +110,11 @@ const (
 	// SocketDnsFilter is the socket probe for dns
 	SocketDnsFilter ProbeName = "socket/dns_filter"
 
-	// SockMapFdReturn maps a file descriptor to a kernel sock
-	SockMapFdReturn ProbeName = "kretprobe/sockfd_lookup_light"
-
-	// IPRouteOutputFlow is the kprobe of an ip_route_output_flow call
-	IPRouteOutputFlow ProbeName = "kprobe/ip_route_output_flow"
-	// IPRouteOutputFlow is the kretprobe of an ip_route_output_flow call
-	IPRouteOutputFlowReturn ProbeName = "kretprobe/ip_route_output_flow"
-
 	// ConntrackHashInsert is the probe for new conntrack entries
 	ConntrackHashInsert ProbeName = "kprobe/__nf_conntrack_hash_insert"
+
+	// ConntrackFillInfo is the probe for for dumping existing conntrack entries
+	ConntrackFillInfo ProbeName = "kprobe/ctnetlink_fill_info"
 
 	// SockFDLookup is the kprobe used for mapping socket FDs to kernel sock structs
 	SockFDLookup ProbeName = "kprobe/sockfd_lookup_light"
@@ -119,6 +135,7 @@ type BPFMapName string
 const (
 	ConnMap               BPFMapName = "conn_stats"
 	TcpStatsMap           BPFMapName = "tcp_stats"
+	TcpConnectSockPidMap  BPFMapName = "tcp_ongoing_connect_pid"
 	ConnCloseEventMap     BPFMapName = "conn_close_event"
 	TracerStatusMap       BPFMapName = "tracer_status"
 	PortBindingsMap       BPFMapName = "port_bindings"
@@ -132,6 +149,8 @@ const (
 	SockByPidFDMap        BPFMapName = "sock_by_pid_fd"
 	PidFDBySockMap        BPFMapName = "pid_fd_by_sock"
 	TagsMap               BPFMapName = "conn_tags"
+	TcpSendMsgArgsMap     BPFMapName = "tcp_sendmsg_args"
+	IpMakeSkbArgsMap      BPFMapName = "ip_make_skb_args"
 )
 
 // SectionName returns the SectionName for the given BPF map

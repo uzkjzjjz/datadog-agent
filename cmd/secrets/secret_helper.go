@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build secrets
 // +build secrets
 
 package secrets
@@ -50,6 +51,7 @@ const (
 	k8sSecretPrefix         = "k8s_secret"
 )
 
+// NewKubeClient TODO <agent-core>
 type NewKubeClient func(timeout time.Duration) (kubernetes.Interface, error)
 
 func init() {

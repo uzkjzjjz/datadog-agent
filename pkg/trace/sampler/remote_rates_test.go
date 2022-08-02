@@ -6,41 +6,47 @@
 package sampler
 
 import (
-	"os"
 	"testing"
+	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/proto/pbgo"
-	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+
+	"github.com/DataDog/datadog-agent/pkg/remoteconfig/state"
+	"github.com/DataDog/datadog-agent/pkg/remoteconfig/state/products/apmsampling"
+	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 )
+
+const maxRemoteTPS = 12377
 
 func TestRemoteConfInit(t *testing.T) {
 	assert := assert.New(t)
 	// disabled by default
-	assert.Nil(newRemoteRates())
+	assert.Nil(newRemoteRates(nil, 0, "6.0.0"))
 	// subscription to subscriber fails
-	old := os.Getenv("DD_APM_FEATURES")
-	os.Setenv("DD_APM_FEATURES", "remote_rates")
-	assert.Nil(newRemoteRates())
-	os.Setenv("DD_APM_FEATURES", old)
+	assert.Nil(newRemoteRates(nil, 0, "6.0.0"))
 	// todo:raphael mock grpc server
 }
 
 func newTestRemoteRates() *RemoteRates {
 	return &RemoteRates{
-		samplers: make(map[Signature]*Sampler),
-
-		exit:    make(chan struct{}),
-		stopped: make(chan struct{}),
+		maxSigTPS:          maxRemoteTPS,
+		samplers:           make(map[Signature]*remoteSampler),
+		tpsVersion:         atomic.NewUint64(0),
+		duplicateTargetTPS: atomic.NewUint64(0),
 	}
 }
 
-func configGenerator(version uint64, rates pb.APMSampling) *pbgo.ConfigResponse {
-	raw, _ := rates.MarshalMsg(nil)
-	return &pbgo.ConfigResponse{
-		ConfigDelegatedTargetVersion: version,
-		TargetFiles:                  []*pbgo.File{{Raw: raw}},
+func configGenerator(version uint64, rates apmsampling.APMSampling) map[string]state.APMSamplingConfig {
+	return map[string]state.APMSamplingConfig{
+		"testid": {
+			Config: rates,
+			Metadata: state.Metadata{
+				ID:      "testid",
+				Version: version,
+			},
+		},
 	}
 }
 
@@ -51,19 +57,21 @@ func TestRemoteTPSUpdate(t *testing.T) {
 		service   string
 		env       string
 		targetTPS float64
+		mechanism apmsampling.SamplingMechanism
+		rank      uint32
 	}
 
 	var testSteps = []struct {
 		name             string
-		ratesToApply     pb.APMSampling
+		ratesToApply     apmsampling.APMSampling
 		countServices    []ServiceSignature
 		expectedSamplers []sampler
 		version          uint64
 	}{
 		{
 			name: "first rates received",
-			ratesToApply: pb.APMSampling{
-				TargetTps: []pb.TargetTPS{
+			ratesToApply: apmsampling.APMSampling{
+				TargetTPS: []apmsampling.TargetTPS{
 					{
 						Service: "willBeRemoved",
 						Value:   3.2,
@@ -141,8 +149,8 @@ func TestRemoteTPSUpdate(t *testing.T) {
 		},
 		{
 			name: "receive new remote rates, non matching samplers are trimmed",
-			ratesToApply: pb.APMSampling{
-				TargetTps: []pb.TargetTPS{
+			ratesToApply: apmsampling.APMSampling{
+				TargetTPS: []apmsampling.TargetTPS{
 					{
 						Service: "keep",
 						Value:   27,
@@ -157,15 +165,94 @@ func TestRemoteTPSUpdate(t *testing.T) {
 			},
 			version: 35,
 		},
+		{
+			name: "receive empty remote rates and above max",
+			ratesToApply: apmsampling.APMSampling{
+				TargetTPS: []apmsampling.TargetTPS{
+					{
+						Service: "keep",
+						Value:   3718271,
+					},
+					{
+						Service: "noop",
+					},
+				},
+			},
+			expectedSamplers: []sampler{
+				{
+					service:   "keep",
+					targetTPS: maxRemoteTPS,
+				},
+			},
+			version: 35,
+		},
+		{
+			name: "keep highest rank",
+			ratesToApply: apmsampling.APMSampling{
+				TargetTPS: []apmsampling.TargetTPS{
+					{
+						Service:   "keep",
+						Value:     10,
+						Mechanism: 5,
+						Rank:      3,
+					},
+					{
+						Service:   "keep",
+						Value:     10,
+						Mechanism: 10,
+						Rank:      10,
+					},
+					{
+						Service:   "keep",
+						Value:     10,
+						Mechanism: 6,
+						Rank:      6,
+					},
+				},
+			},
+			countServices: []ServiceSignature{{"keep", ""}},
+			expectedSamplers: []sampler{
+				{
+					service:   "keep",
+					targetTPS: 10,
+					mechanism: 10,
+					rank:      10,
+				},
+			},
+		},
+		{
+			name: "duplicate",
+			ratesToApply: apmsampling.APMSampling{
+				TargetTPS: []apmsampling.TargetTPS{
+					{
+						Service: "keep",
+						Value:   10,
+						Rank:    3,
+					},
+					{
+						Service: "keep",
+						Value:   10,
+						Rank:    3,
+					},
+				},
+			},
+			expectedSamplers: []sampler{
+				{
+					service:   "keep",
+					targetTPS: 10,
+					rank:      3,
+				},
+			},
+		},
 	}
 	r := newTestRemoteRates()
 	for _, step := range testSteps {
 		t.Log(step.name)
-		if step.ratesToApply.TargetTps != nil {
-			r.loadNewConfig(configGenerator(step.version, step.ratesToApply))
+		if step.ratesToApply.TargetTPS != nil {
+			r.onUpdate(configGenerator(step.version, step.ratesToApply))
 		}
 		for _, s := range step.countServices {
-			r.CountSignature(s.Hash())
+			r.countWeightedSig(time.Now(), s.Hash(), 1)
 		}
 
 		assert.Len(r.samplers, len(step.expectedSamplers))
@@ -176,7 +263,9 @@ func TestRemoteTPSUpdate(t *testing.T) {
 			require.True(t, ok)
 			root := &pb.Span{Metrics: map[string]float64{}}
 			assert.Equal(expectedS.targetTPS, s.targetTPS.Load())
-			r.CountSample(root, sig)
+			assert.Equal(expectedS.mechanism, s.target.Mechanism)
+			assert.Equal(expectedS.rank, s.target.Rank)
+			r.countSample(root, sig)
 
 			tpsTag, ok := root.Metrics[tagRemoteTPS]
 			assert.True(ok)

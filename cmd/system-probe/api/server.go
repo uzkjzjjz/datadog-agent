@@ -10,13 +10,14 @@ import (
 	"fmt"
 	"net/http"
 
+	gorilla "github.com/gorilla/mux"
+
 	"github.com/DataDog/datadog-agent/cmd/system-probe/api/module"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/config"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/modules"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/utils"
 	"github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	gorilla "github.com/gorilla/mux"
 )
 
 // StartServer starts the HTTP server for the system-probe, which registers endpoints from all enabled modules.
@@ -33,10 +34,10 @@ func StartServer(cfg *config.Config) error {
 	}
 
 	// Register stats endpoint
-	mux.HandleFunc("/debug/stats", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/debug/stats", utils.WithConcurrencyLimit(utils.DefaultMaxConcurrentRequests, func(w http.ResponseWriter, req *http.Request) {
 		stats := module.GetStats()
 		utils.WriteAsJSON(w, stats)
-	})
+	}))
 
 	setupConfigHandlers(mux)
 

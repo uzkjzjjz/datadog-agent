@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build windows
 // +build windows
 
 package memory
@@ -10,9 +11,10 @@ package memory
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	"github.com/DataDog/datadog-agent/pkg/util/winutil"
-	"github.com/stretchr/testify/require"
 )
 
 func VirtualMemory() (*winutil.VirtualMemoryStat, error) {

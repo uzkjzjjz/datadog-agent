@@ -6,402 +6,173 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"crypto/sha512"
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
+	"github.com/theupdateframework/go-tuf/data"
+	tufutil "github.com/theupdateframework/go-tuf/util"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"go.etcd.io/bbolt"
+
 	"github.com/DataDog/datadog-agent/pkg/config"
-	"github.com/DataDog/datadog-agent/pkg/config/remote/service/tuf"
-	"github.com/DataDog/datadog-agent/pkg/config/remote/store"
+	"github.com/DataDog/datadog-agent/pkg/config/remote/api"
+	rdata "github.com/DataDog/datadog-agent/pkg/config/remote/data"
+	"github.com/DataDog/datadog-agent/pkg/config/remote/telemetry"
+	"github.com/DataDog/datadog-agent/pkg/config/remote/uptane"
 	"github.com/DataDog/datadog-agent/pkg/proto/pbgo"
-	"github.com/DataDog/datadog-agent/pkg/util"
+	"github.com/DataDog/datadog-agent/pkg/util/backoff"
+	"github.com/DataDog/datadog-agent/pkg/util/hostname"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/datadog-agent/pkg/version"
 )
 
 const (
-	minimalRefreshInterval = time.Second * 5
-	defaultMaxBucketSize   = 10
-	defaultURL             = ""
-	defaultTracerCacheSize = 1000
-	defaultTracerCacheTTL  = 10 * time.Second
+	minimalRefreshInterval = 5 * time.Second
+	defaultClientsTTL      = 30 * time.Second
+	maxClientsTTL          = 60 * time.Second
+	newClientBlockTTL      = 2 * time.Second
 )
 
-// Opts defines the remote config service options
-type Opts struct {
-	URL                    string
-	APIKey                 string
-	RemoteConfigurationKey string
-	Hostname               string
-	DBPath                 string
-	RefreshInterval        time.Duration
-	MaxBucketSize          int
-	ReadOnly               bool
-	TracerCacheSize        int
-	TracerCacheTTL         time.Duration
-}
+// Constraints on the maximum backoff time when errors occur
+const (
+	minimalMaxBackoffTime = 2 * time.Minute
+	maximalMaxBackoffTime = 5 * time.Minute
+)
 
 // Service defines the remote config management service responsible for fetching, storing
 // and dispatching the configurations
 type Service struct {
-	sync.RWMutex
+	sync.Mutex
+	firstUpdate bool
+
+	defaultRefreshInterval time.Duration
+
+	// The backoff policy used for retries when errors are encountered
+	backoffPolicy backoff.Policy
+	// The number of errors we're currently tracking within the context of our backoff policy
+	backoffErrorCount int
+
 	ctx      context.Context
-	opts     Opts
-	store    *store.Store
-	client   Client
-	director *tuf.DirectorClient
-	config   *tuf.ConfigClient
+	clock    clock.Clock
+	hostname string
+	db       *bbolt.DB
+	uptane   uptaneClient
+	api      api.API
 
-	subscribers           []*Subscriber
-	configSnapshotVersion uint64
-	configRootVersion     uint64
-	directorRootVersion   uint64
-	orgID                 string
-	TracerInfos           *TracerCache
+	products         map[rdata.Product]struct{}
+	newProducts      map[rdata.Product]struct{}
+	clients          *clients
+	newActiveClients newActiveClients
+
+	lastUpdateErr error
 }
 
-// Refresh configurations by:
-// - collecting the new subscribers or the one whose configuration has expired
-// - create a query
-// - send the query to the backend
-//
-func (s *Service) refresh() {
-	log.Debug("Refreshing configurations")
+// uptaneClient is used to mock the uptane component for testing
+type uptaneClient interface {
+	Update(response *pbgo.LatestConfigsResponse) error
+	State() (uptane.State, error)
+	DirectorRoot(version uint64) ([]byte, error)
+	Targets() (data.TargetFiles, error)
+	TargetFile(path string) ([]byte, error)
+	TargetsMeta() ([]byte, error)
+	TargetsCustom() ([]byte, error)
+	TUFVersionState() (uptane.TUFVersions, error)
+}
 
-	request := pbgo.ClientLatestConfigsRequest{
-		AgentVersion:                 version.AgentVersion,
-		Hostname:                     s.opts.Hostname,
-		CurrentConfigSnapshotVersion: s.configSnapshotVersion,
-		CurrentConfigRootVersion:     s.configRootVersion,
-		CurrentDirectorRootVersion:   s.directorRootVersion,
-		ConnectedTracers:             s.TracerInfos.Tracers(),
+// NewService instantiates a new remote configuration management service
+func NewService() (*Service, error) {
+	refreshInterval := config.Datadog.GetDuration("remote_configuration.refresh_interval")
+	if refreshInterval < minimalRefreshInterval {
+		log.Warnf("remote_configuration.refresh_interval is set to %v which is bellow the minimum of %v", refreshInterval, minimalRefreshInterval)
+		refreshInterval = minimalRefreshInterval
 	}
 
-	// determine which configuration we need to refresh
-	var refreshSubscribers = map[string][]*Subscriber{}
-
-	s.RLock()
-	defer s.RUnlock()
-
-	now := time.Now()
-
-	for _, subscriber := range s.subscribers {
-		product := subscriber.product
-		if subscriber.lastUpdate.Add(subscriber.refreshRate).Before(now) {
-			log.Debugf("Add '%s' to the list of configurations to refresh", product)
-
-			if subscriber.lastUpdate.IsZero() {
-				request.NewProducts = append(request.NewProducts, product)
-			} else {
-				request.Products = append(request.Products, product)
-			}
-
-			refreshSubscribers[product.String()] = append(refreshSubscribers[product.String()], subscriber)
-		}
+	maxBackoffTime := config.Datadog.GetDuration("remote_configuration.max_backoff_interval")
+	if maxBackoffTime < minimalMaxBackoffTime {
+		log.Warnf("remote_configuration.max_backoff_time is set to %v which is below the minimum of %v - setting value to %v", maxBackoffTime, minimalMaxBackoffTime, minimalMaxBackoffTime)
+		maxBackoffTime = minimalMaxBackoffTime
+	} else if maxBackoffTime > maximalMaxBackoffTime {
+		log.Warnf("remote_configuration.max_backoff_time is set to %v which is above the maximum of %v - setting value to %v", maxBackoffTime, maximalMaxBackoffTime, maximalMaxBackoffTime)
+		maxBackoffTime = maximalMaxBackoffTime
 	}
 
-	if len(refreshSubscribers) == 0 {
-		log.Debugf("Nothing to fetch")
-		return
-	}
+	// A backoff is calculated as a range from which a random value will be selected. The formula is as follows.
+	//
+	// min = baseBackoffTime * 2^<NumErrors> / minBackoffFactor
+	// max = min(maxBackoffTime, baseBackoffTime * 2 ^<NumErrors>)
+	//
+	// The following values mean each range will always be [30*2^<NumErrors-1>, min(maxBackoffTime, 30*2^<NumErrors>)].
+	// Every success will cause numErrors to shrink by 2.
+	// This is a sensible default backoff pattern, and there isn't really any need to
+	// let clients configure this at this time.
+	minBackoffFactor := 2.0
+	baseBackoffTime := 30.0
+	recoveryInterval := 2
+	recoveryReset := false
 
-	// Fetch the configuration from the backend
-	response, err := s.client.Fetch(s.ctx, &request)
+	backoffPolicy := backoff.NewPolicy(minBackoffFactor, baseBackoffTime,
+		maxBackoffTime.Seconds(), recoveryInterval, recoveryReset)
+
+	rawRemoteConfigKey := config.Datadog.GetString("remote_configuration.key")
+	remoteConfigKey, err := parseRemoteConfigKey(rawRemoteConfigKey)
 	if err != nil {
-		log.Errorf("Failed to fetch remote configuration: %s", err)
-		return
+		return nil, err
 	}
 
-	if response.DirectorMetas == nil {
-		log.Debugf("No new configuration")
-		return
+	apiKey := config.Datadog.GetString("api_key")
+	if config.Datadog.IsSet("remote_configuration.api_key") {
+		apiKey = config.Datadog.GetString("remote_configuration.api_key")
+	}
+	apiKey = config.SanitizeAPIKey(apiKey)
+	hname, err := hostname.Get(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	http := api.NewHTTPClient(apiKey, remoteConfigKey.AppKey)
+
+	dbPath := path.Join(config.Datadog.GetString("run_path"), "remote-config.db")
+	db, err := openCacheDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	cacheKey := fmt.Sprintf("%s/%d/", remoteConfigKey.Datacenter, remoteConfigKey.OrgID)
+	uptaneClient, err := uptane.NewClient(db, cacheKey, remoteConfigKey.OrgID)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := s.verifyResponseMetadata(response); err != nil {
-		log.Errorf("Failed to verify configuration: %s", err)
-		return
+	clientsTTL := config.Datadog.GetDuration("remote_configuration.clients.ttl_seconds")
+	if clientsTTL < minimalRefreshInterval || clientsTTL > maxClientsTTL {
+		log.Warnf("Configured clients ttl is not within accepted range (%s - %s): %s. Defaulting to %s", minimalRefreshInterval, maxClientsTTL, clientsTTL, defaultClientsTTL)
+		clientsTTL = defaultClientsTTL
 	}
-
-	if err := s.verifyTargetFiles(response.TargetFiles); err != nil {
-		log.Errorf("Failed to verify target files: %s", err)
-		return
-	}
-
-	refreshedProducts := make(map[*pbgo.DelegatedMeta][]*pbgo.File)
-
-TARGETFILE:
-	for _, targetFile := range response.TargetFiles {
-		product, err := getTargetProduct(targetFile.Path)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-
-		for _, delegatedTarget := range response.ConfigMetas.DelegatedTargets {
-			if delegatedTarget.Role == product {
-				log.Debugf("Received configuration for product %s", product)
-				refreshedProducts[delegatedTarget] = append(refreshedProducts[delegatedTarget], targetFile)
-				continue TARGETFILE
-			}
-		}
-
-		log.Errorf("Failed to find delegated target for %s", product)
-		return
-	}
-
-	log.Debugf("Possibly notify subscribers")
-	for delegatedTarget, targetFiles := range refreshedProducts {
-		configResponse := &pbgo.ConfigResponse{
-			ConfigSnapshotVersion:        response.DirectorMetas.Snapshot.Version,
-			ConfigDelegatedTargetVersion: delegatedTarget.Version,
-			DirectoryRoots:               response.DirectorMetas.Roots,
-			DirectoryTargets:             response.DirectorMetas.Targets,
-			TargetFiles:                  targetFiles,
-		}
-
-		product := delegatedTarget.GetRole()
-	SUBSCRIBER:
-		for _, subscriber := range refreshSubscribers[product] {
-			if response.DirectorMetas.Snapshot.Version <= subscriber.lastVersion {
-				log.Debugf("Nothing to do, subscriber version %d > %d", subscriber.lastVersion, response.DirectorMetas.Snapshot.Version)
-				continue
-			}
-
-			if err := s.notifySubscriber(subscriber, configResponse); err != nil {
-				log.Errorf("failed to notify subscriber: %s", err)
-				continue SUBSCRIBER
-			}
-		}
-
-		if err := s.store.StoreConfig(product, configResponse); err != nil {
-			log.Errorf("failed to persistent config for product %s: %s", product, err)
-		}
-	}
-
-	if response.ConfigMetas != nil {
-		if rootCount := len(response.ConfigMetas.Roots); rootCount > 0 {
-			s.configRootVersion = response.ConfigMetas.Roots[rootCount-1].Version
-		}
-		if response.ConfigMetas.Snapshot != nil {
-			s.configSnapshotVersion = response.ConfigMetas.Snapshot.Version
-		}
-	}
-
-	if response.DirectorMetas != nil {
-		if rootCount := len(response.DirectorMetas.Roots); rootCount > 0 {
-			s.directorRootVersion = response.DirectorMetas.Roots[rootCount-1].Version
-		}
-	}
-
-	log.Debugf("Stored last known version to config snapshot %d, config root %d, snapshot root %d", s.configSnapshotVersion, s.configRootVersion, s.directorRootVersion)
-}
-
-func getTargetProduct(path string) (string, error) {
-	splits := strings.SplitN(path, "/", 3)
-	if len(splits) < 3 {
-		return "", fmt.Errorf("Failed to determine product for target file %s", path)
-	}
-
-	return splits[1], nil
-}
-
-type targetCustom struct {
-	OrgID string `json:"org_id"`
-}
-
-// Verify that both director and config metadata from the response and
-// that the target files provided in the response match the ones specified
-// in the director and config repositories
-func (s *Service) verifyResponseMetadata(response *pbgo.LatestConfigsResponse) error {
-	if err := s.director.Update(response); err != nil {
-		return err
-	}
-
-	if err := s.config.Update(response); err != nil {
-		return err
-	}
-
-	log.Debugf("Response successfully verified")
-
-	if response.DirectorMetas != nil && response.DirectorMetas.Snapshot != nil &&
-		response.ConfigMetas.Snapshot.Version <= s.configSnapshotVersion {
-		return fmt.Errorf("snapshot version %d is older than current version %d", response.ConfigMetas.Snapshot.Version, s.configSnapshotVersion)
-	}
-
-	for _, target := range response.TargetFiles {
-		name := tuf.TrimHash(target.Path)
-
-		log.Debugf("Considering director target %s", name)
-		directorTarget, err := s.director.Target(name)
-		if err != nil {
-			return fmt.Errorf("failed to find target '%s' in director repository", name)
-		}
-
-		configTarget, err := s.config.Target(name)
-		if err != nil {
-			return fmt.Errorf("failed to find target '%s' in config repository", name)
-		}
-
-		if configTarget.Length != directorTarget.Length {
-			return fmt.Errorf("target '%s' has size %d in directory repository and %d in config repository", name, configTarget.Length, directorTarget.Length)
-		}
-
-		for kind, directorHash := range directorTarget.Hashes {
-			configHash, found := configTarget.Hashes[kind]
-			if !found {
-				return fmt.Errorf("hash '%s' found in directory repository and not in config repository", directorHash)
-			}
-
-			if !bytes.Equal([]byte(directorHash), []byte(configHash)) {
-				return fmt.Errorf("directory hash '%s' is not equal to config repository '%s'", string(directorHash), string(configHash))
-			}
-		}
-
-		/*
-			// TODO(lebauce): remove this when backend is ready
-
-			// Backend does not return customs for config repository.
-			var directorCustom, configCustom []byte
-			if directorTarget.Custom != nil {
-				directorCustom = *directorTarget.Custom
-			}
-
-			if configTarget.Custom != nil {
-				configCustom = *configTarget.Custom
-			}
-
-			if bytes.Compare(directorCustom, configCustom) != 0 {
-				return fmt.Errorf("directory custom '%s' is not equal to config custom '%s'", string(directorCustom), string(configCustom))
-			}
-		*/
-
-		if directorTarget.Custom == nil {
-			return fmt.Errorf("director target %s has no custom field", name)
-		}
-
-		var custom targetCustom
-		if err := json.Unmarshal([]byte(*directorTarget.Custom), &custom); err != nil {
-			return fmt.Errorf("failed to decode target custom for %s: %w", name, err)
-		}
-
-		if custom.OrgID != s.orgID {
-			return fmt.Errorf("unexpected custom organization id: %s", custom.OrgID)
-		}
-	}
-
-	return nil
-}
-
-// Verify the target files checksum provided in the response with
-// the one specified in the config repository
-func (s *Service) verifyTargetFiles(targetFiles []*pbgo.File) error {
-	for _, targetFile := range targetFiles {
-		path := tuf.TrimHash(targetFile.Path)
-		buffer := &bufferDestination{}
-		if err := s.config.Download(path, buffer); err != nil {
-			return fmt.Errorf("failed to download target file %s: %w", targetFile.Path, err)
-		}
-
-		targetMeta, err := s.config.Target(path)
-		if err != nil {
-			return err
-		}
-
-		if len(targetMeta.HashAlgorithms()) == 0 {
-			return fmt.Errorf("target file %s has no hash", path)
-		}
-
-		for _, algorithm := range targetMeta.HashAlgorithms() {
-			var checksum []byte
-			switch algorithm {
-			case "sha256":
-				sha256Checksum := sha256.Sum256(targetFile.Raw)
-				checksum = sha256Checksum[:]
-			case "sha512":
-				sha512Checksum := sha512.Sum512(targetFile.Raw)
-				checksum = sha512Checksum[:]
-			default:
-				return fmt.Errorf("unsupported checksum %s", algorithm)
-			}
-
-			if !bytes.Equal(checksum, targetMeta.Hashes[algorithm]) {
-				return fmt.Errorf("target file %s has invalid checksum", string(checksum))
-			}
-		}
-	}
-
-	return nil
-}
-
-type bufferDestination struct {
-	bytes.Buffer
-}
-
-func (d *bufferDestination) Delete() error {
-	return nil
-}
-
-func (s *Service) notifySubscriber(subscriber *Subscriber, configResponse *pbgo.ConfigResponse) error {
-	log.Debugf("Notifying subscriber %s with version %d", subscriber.product, configResponse.DirectoryTargets.Version)
-
-	if err := subscriber.callback(configResponse); err != nil {
-		return err
-	}
-
-	subscriber.lastUpdate = time.Now()
-	subscriber.lastVersion = configResponse.DirectoryTargets.Version
-
-	return nil
-}
-
-// RegisterSubscriber registers a new subscriber for a product's configurations
-func (s *Service) RegisterSubscriber(subscriber *Subscriber) {
-	s.Lock()
-	s.subscribers = append(s.subscribers, subscriber)
-	s.Unlock()
-
-	product := subscriber.product
-	log.Debugf("New registered subscriber for %s", product.String())
-
-	config, err := s.store.GetLastConfig(product.String())
-	if err == nil {
-		log.Debugf("Found cached configuration for product %s", product)
-		if err := s.notifySubscriber(subscriber, config); err != nil {
-			log.Error(err)
-		}
-	} else {
-		log.Debugf("No stored configuration for product %s", product)
-	}
-}
-
-// UnregisterSubscriber unregisters a subscriber for a product's configurations
-func (s *Service) UnregisterSubscriber(unregister *Subscriber) {
-	s.Lock()
-	for i, subscriber := range s.subscribers {
-		if subscriber == unregister {
-			s.subscribers = append(s.subscribers[:i], s.subscribers[i+1:]...)
-		}
-	}
-	s.Unlock()
-}
-
-// HasSubscriber returns true if the product already registered a subscriber
-func (s *Service) HasSubscriber(product pbgo.Product) bool {
-	s.Lock()
-	defer s.Unlock()
-	for _, s := range s.subscribers {
-		if s.product == product {
-			return true
-		}
-	}
-	return false
+	clock := clock.New()
+	return &Service{
+		ctx:                    context.Background(),
+		firstUpdate:            true,
+		defaultRefreshInterval: refreshInterval,
+		backoffErrorCount:      0,
+		backoffPolicy:          backoffPolicy,
+		products:               make(map[rdata.Product]struct{}),
+		newProducts:            make(map[rdata.Product]struct{}),
+		hostname:               hname,
+		clock:                  clock,
+		db:                     db,
+		api:                    http,
+		uptane:                 uptaneClient,
+		clients:                newClients(clock, clientsTTL),
+		newActiveClients: newActiveClients{
+			clock:    clock,
+			requests: make(chan chan struct{}),
+			until:    time.Now().UTC(),
+		},
+	}, nil
 }
 
 // Start the remote configuration management service
@@ -410,159 +181,368 @@ func (s *Service) Start(ctx context.Context) error {
 	go func() {
 		defer cancel()
 
+		err := s.refresh()
+		if err != nil {
+			log.Errorf("could not refresh remote-config: %v", err)
+		}
+
 		for {
+			var err error
+			refreshInterval := s.calculateRefreshInterval()
 			select {
-			case <-time.After(s.opts.RefreshInterval):
-				s.refresh()
+			case <-s.clock.After(refreshInterval):
+				err = s.refresh()
+			// New clients detected, request refresh
+			case response := <-s.newActiveClients.requests:
+				if time.Now().UTC().After(s.newActiveClients.until) {
+					s.newActiveClients.setRateLimit(refreshInterval)
+					err = s.refresh()
+				} else {
+					telemetry.CacheBypassRateLimit.Inc()
+				}
+				close(response)
 			case <-ctx.Done():
 				return
 			}
+
+			if err != nil {
+				log.Errorf("could not refresh remote-config: %v", err)
+			}
 		}
 	}()
+	return nil
+}
+
+func (s *Service) calculateRefreshInterval() time.Duration {
+	backoffTime := s.backoffPolicy.GetBackoffDuration(s.backoffErrorCount)
+
+	return s.defaultRefreshInterval + backoffTime
+}
+
+func (s *Service) refresh() error {
+	s.Lock()
+	activeClients := s.clients.activeClients()
+	s.refreshProducts(activeClients)
+	previousState, err := s.uptane.TUFVersionState()
+	if err != nil {
+		log.Warnf("could not get previous TUF version state: %v", err)
+		if s.lastUpdateErr != nil {
+			s.lastUpdateErr = fmt.Errorf("%v: %v", err, s.lastUpdateErr)
+		} else {
+			s.lastUpdateErr = err
+		}
+	}
+	if s.forceRefresh() || err != nil {
+		previousState = uptane.TUFVersions{}
+	}
+	clientState, err := s.getClientState()
+	if err != nil {
+		log.Warnf("could not get previous backend client state: %v", err)
+		if s.lastUpdateErr != nil {
+			s.lastUpdateErr = fmt.Errorf("%v: %v", err, s.lastUpdateErr)
+		} else {
+			s.lastUpdateErr = err
+		}
+	}
+	request := buildLatestConfigsRequest(s.hostname, previousState, activeClients, s.products, s.newProducts, s.lastUpdateErr, clientState)
+	s.Unlock()
+	response, err := s.api.Fetch(s.ctx, request)
+	s.Lock()
+	defer s.Unlock()
+	s.lastUpdateErr = nil
+	if err != nil {
+		s.backoffErrorCount = s.backoffPolicy.IncError(s.backoffErrorCount)
+		return err
+	}
+	err = s.uptane.Update(response)
+	if err != nil {
+		s.backoffErrorCount = s.backoffPolicy.IncError(s.backoffErrorCount)
+		s.lastUpdateErr = err
+		return err
+	}
+	s.firstUpdate = false
+	for product := range s.newProducts {
+		s.products[product] = struct{}{}
+	}
+	s.newProducts = make(map[rdata.Product]struct{})
+
+	s.backoffErrorCount = s.backoffPolicy.DecError(s.backoffErrorCount)
 
 	return nil
 }
 
-// GetConfigs returns config for the given product
-func (s *Service) GetConfigs(product string) ([]*pbgo.ConfigResponse, error) {
-	return s.store.GetConfigs(product)
+func (s *Service) forceRefresh() bool {
+	return s.firstUpdate
 }
 
-// GetStore returns the configuration store
-func (s *Service) GetStore() *store.Store {
-	return s.store
+func (s *Service) refreshProducts(activeClients []*pbgo.Client) {
+	for _, client := range activeClients {
+		for _, product := range client.Products {
+			if _, hasProduct := s.products[rdata.Product(product)]; !hasProduct {
+				s.newProducts[rdata.Product(product)] = struct{}{}
+			}
+		}
+	}
 }
 
-// NewService instantiates a new remote configuration management service
-func NewService(opts Opts) (*Service, error) {
-	if opts.RefreshInterval <= 0 {
-		opts.RefreshInterval = config.Datadog.GetDuration("remote_configuration.refresh_interval")
+func (s *Service) getClientState() ([]byte, error) {
+	rawTargetsCustom, err := s.uptane.TargetsCustom()
+	if err != nil {
+		return nil, err
 	}
-
-	if opts.RefreshInterval < minimalRefreshInterval {
-		opts.RefreshInterval = minimalRefreshInterval
+	custom, err := parseTargetsCustom(rawTargetsCustom)
+	if err != nil {
+		return nil, err
 	}
+	return custom.OpaqueBackendState, nil
+}
 
-	if opts.DBPath == "" {
-		opts.DBPath = path.Join(config.Datadog.GetString("run_path"), "remote-config.db")
-	}
-
-	if opts.APIKey == "" {
-		apiKey := config.Datadog.GetString("api_key")
-		if config.Datadog.IsSet("remote_configuration.api_key") {
-			apiKey = config.Datadog.GetString("remote_configuration.api_key")
-		}
-		opts.APIKey = config.SanitizeAPIKey(apiKey)
-	}
-
-	if opts.RemoteConfigurationKey == "" {
-		opts.RemoteConfigurationKey = config.Datadog.GetString("remote_configuration.key")
-	}
-
-	if opts.URL == "" {
-		opts.URL = config.Datadog.GetString("remote_configuration.endpoint")
-	}
-
-	if opts.Hostname == "" {
-		hostname, err := util.GetHostname(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		opts.Hostname = hostname
-	}
-
-	if opts.MaxBucketSize <= 0 {
-		opts.MaxBucketSize = defaultMaxBucketSize
-	}
-
-	if opts.URL == "" {
-		opts.URL = defaultURL
-	}
-
-	split := strings.SplitN(opts.RemoteConfigurationKey, "/", 3)
-	if len(split) < 3 {
-		return nil, fmt.Errorf("invalid remote configuration key format, should be datacenter/org_id/app_key")
-	}
-
-	datacenter, org, appKey := split[0], split[1], split[2]
-
-	store, err := store.NewStore(opts.DBPath, !opts.ReadOnly, opts.MaxBucketSize, datacenter+"/"+org)
+// ClientGetConfigs is the polling API called by tracers and agents to get the latest configurations
+func (s *Service) ClientGetConfigs(request *pbgo.ClientGetConfigsRequest) (*pbgo.ClientGetConfigsResponse, error) {
+	s.Lock()
+	defer s.Unlock()
+	err := validateRequest(request)
 	if err != nil {
 		return nil, err
 	}
 
-	opts.TracerCacheSize = config.Datadog.GetInt("remote_configuration.tracer_cache.size")
-	if opts.TracerCacheSize <= 0 {
-		opts.TracerCacheSize = defaultTracerCacheSize
+	if !s.clients.active(request.Client) {
+		s.Unlock()
+		response := make(chan struct{})
+		s.newActiveClients.requests <- response
+		select {
+		case <-response:
+		case <-time.After(newClientBlockTTL):
+			telemetry.CacheBypassTimeout.Inc()
+		}
+		s.Lock()
 	}
 
-	opts.TracerCacheTTL = time.Second * config.Datadog.GetDuration("remote_configuration.tracer_cache.ttl_seconds")
-	if opts.TracerCacheTTL <= 0 {
-		opts.TracerCacheTTL = defaultTracerCacheTTL
+	s.clients.seen(request.Client)
+	tufVersions, err := s.uptane.TUFVersionState()
+	if err != nil {
+		return nil, err
+	}
+	if tufVersions.DirectorTargets == request.Client.State.TargetsVersion {
+		return &pbgo.ClientGetConfigsResponse{}, nil
+	}
+	roots, err := s.getNewDirectorRoots(request.Client.State.RootVersion, tufVersions.DirectorRoot)
+	if err != nil {
+		return nil, err
+	}
+	targetsRaw, err := s.uptane.TargetsMeta()
+	if err != nil {
+		return nil, err
+	}
+	targetFiles, err := s.getTargetFiles(rdata.StringListToProduct(request.Client.Products), request.CachedTargetFiles)
+	if err != nil {
+		return nil, err
 	}
 
-	if opts.TracerCacheTTL <= 5*time.Second || opts.TracerCacheTTL >= 60*time.Second {
-		log.Warnf("Configured tracer cache ttl is not within accepted range (%ds - %ds): %s. Defaulting to %s", 5, 10, opts.TracerCacheTTL, defaultTracerCacheTTL)
-		opts.TracerCacheTTL = defaultTracerCacheTTL
+	directorTargets, err := s.uptane.Targets()
+	if err != nil {
+		return nil, err
+	}
+	matchedClientConfigs, err := executeClientPredicates(request.Client, directorTargets)
+	if err != nil {
+		return nil, err
 	}
 
-	return &Service{
-		ctx:         context.Background(),
-		client:      NewHTTPClient(opts.URL, opts.APIKey, appKey, opts.Hostname),
-		store:       store,
-		director:    tuf.NewDirectorClient(store),
-		config:      tuf.NewConfigClient(store),
-		opts:        opts,
-		orgID:       org,
-		TracerInfos: NewTracerCache(opts.TracerCacheSize, opts.TracerCacheTTL, time.Second),
+	// filter files to only return the ones that predicates marked for this client
+	matchedConfigsMap := make(map[string]interface{})
+	for _, configPointer := range matchedClientConfigs {
+		matchedConfigsMap[configPointer] = struct{}{}
+	}
+	filteredFiles := make([]*pbgo.File, 0, len(matchedClientConfigs))
+	for _, targetFile := range targetFiles {
+		if _, ok := matchedConfigsMap[targetFile.Path]; ok {
+			filteredFiles = append(filteredFiles, targetFile)
+		}
+	}
+
+	return &pbgo.ClientGetConfigsResponse{
+		Roots:         roots,
+		Targets:       targetsRaw,
+		TargetFiles:   filteredFiles,
+		ClientConfigs: matchedClientConfigs,
 	}, nil
 }
 
-// dumpResponse dumps the response to the standard output and
-// should only be used for debugging purposes
-// nolint:deadcode,unused
-func dumpResponse(response *pbgo.LatestConfigsResponse) {
-	fmt.Printf("Response:\n")
-	if response.DirectorMetas != nil {
-		fmt.Printf(" Directory:\n")
-		fmt.Printf("  Roots:\n")
-		for _, root := range response.DirectorMetas.Roots {
-			fmt.Printf("  - %s\n", string(root.Raw))
+// ConfigGetState returns the state of the configuration and the director repos in the local store
+func (s *Service) ConfigGetState() (*pbgo.GetStateConfigResponse, error) {
+	state, err := s.uptane.State()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &pbgo.GetStateConfigResponse{
+		ConfigState:     map[string]*pbgo.FileMetaState{},
+		DirectorState:   map[string]*pbgo.FileMetaState{},
+		TargetFilenames: map[string]string{},
+	}
+
+	for metaName, metaState := range state.ConfigState {
+		response.ConfigState[metaName] = &pbgo.FileMetaState{Version: metaState.Version, Hash: metaState.Hash}
+	}
+
+	for metaName, metaState := range state.DirectorState {
+		response.DirectorState[metaName] = &pbgo.FileMetaState{Version: metaState.Version, Hash: metaState.Hash}
+	}
+
+	for targetName, targetHash := range state.TargetFilenames {
+		response.TargetFilenames[targetName] = targetHash
+	}
+
+	return response, nil
+}
+
+func (s *Service) getNewDirectorRoots(currentVersion uint64, newVersion uint64) ([][]byte, error) {
+	var roots [][]byte
+	for i := currentVersion + 1; i <= newVersion; i++ {
+		root, err := s.uptane.DirectorRoot(i)
+		if err != nil {
+			return nil, err
 		}
-		if response.DirectorMetas.Timestamp != nil {
-			fmt.Printf("  Timestamp: %+v\n", string(response.DirectorMetas.Timestamp.Raw))
+		roots = append(roots, root)
+	}
+	return roots, nil
+}
+
+func (s *Service) getTargetFiles(products []rdata.Product, cachedTargetFiles []*pbgo.TargetFileMeta) ([]*pbgo.File, error) {
+	productSet := make(map[rdata.Product]struct{})
+	for _, product := range products {
+		productSet[product] = struct{}{}
+	}
+	targets, err := s.uptane.Targets()
+	if err != nil {
+		return nil, err
+	}
+	cachedTargets := make(map[string]data.FileMeta)
+	for _, cachedTarget := range cachedTargetFiles {
+		hashes := make(data.Hashes)
+		for _, hash := range cachedTarget.Hashes {
+			h, err := hex.DecodeString(hash.Hash)
+			if err != nil {
+				return nil, err
+			}
+			hashes[hash.Algorithm] = h
 		}
-		if response.DirectorMetas.Snapshot != nil {
-			fmt.Printf("  Snapshot: %+v\n", string(response.DirectorMetas.Snapshot.Raw))
-		}
-		if response.DirectorMetas.Targets != nil {
-			fmt.Printf("  Targets: %+v\n", string(response.DirectorMetas.Targets.Raw))
+		cachedTargets[cachedTarget.Path] = data.FileMeta{
+			Hashes: hashes,
+			Length: cachedTarget.Length,
 		}
 	}
-	if response.ConfigMetas != nil {
-		fmt.Printf(" Config:\n")
-		fmt.Printf("  Roots: %+v\n", response.ConfigMetas.Roots)
-		for _, root := range response.ConfigMetas.Roots {
-			fmt.Printf("  - %s\n", string(root.Raw))
+	var configFiles []*pbgo.File
+	for targetPath, targetMeta := range targets {
+		configPathMeta, err := rdata.ParseConfigPath(targetPath)
+		if err != nil {
+			return nil, err
 		}
-		if response.ConfigMetas.Timestamp != nil {
-			fmt.Printf("  Timestamp: %+v\n", string(response.ConfigMetas.Timestamp.Raw))
+		if _, inClientProducts := productSet[rdata.Product(configPathMeta.Product)]; inClientProducts {
+			if notEqualErr := tufutil.FileMetaEqual(cachedTargets[targetPath], targetMeta.FileMeta); notEqualErr == nil {
+				continue
+			}
+			fileContents, err := s.uptane.TargetFile(targetPath)
+			if err != nil {
+				return nil, err
+			}
+			configFiles = append(configFiles, &pbgo.File{
+				Path: targetPath,
+				Raw:  fileContents,
+			})
 		}
-		if response.ConfigMetas.Snapshot != nil {
-			fmt.Printf("  Snapshot: %+v\n", string(response.ConfigMetas.Snapshot.Raw))
+	}
+	return configFiles, nil
+}
+
+func validateRequest(request *pbgo.ClientGetConfigsRequest) error {
+	if request.Client == nil {
+		return status.Error(codes.InvalidArgument, "client is a required field for client config update requests")
+	}
+
+	if request.Client.State == nil {
+		return status.Error(codes.InvalidArgument, "client.state is a required field for client config update requests")
+	}
+
+	if request.Client.State.RootVersion <= 0 {
+		return status.Error(codes.InvalidArgument, "client.state.root_version must be >= 1 (clients must start with the base TUF director root)")
+	}
+
+	if request.Client.IsAgent && request.Client.ClientAgent == nil {
+		return status.Error(codes.InvalidArgument, "client.client_agent is a required field for agent client config update requests")
+	}
+
+	if request.Client.IsTracer && request.Client.ClientTracer == nil {
+		return status.Error(codes.InvalidArgument, "client.client_tracer is a required field for tracer client config update requests")
+	}
+
+	if request.Client.IsTracer && request.Client.IsAgent {
+		return status.Error(codes.InvalidArgument, "client.is_tracer and client.is_agent cannot both be true")
+	}
+
+	if !request.Client.IsTracer && !request.Client.IsAgent {
+		return status.Error(codes.InvalidArgument, "agents only support remote config updates from tracer or agent at this time")
+	}
+
+	if request.Client.Id == "" {
+		return status.Error(codes.InvalidArgument, "client.id is a required field for client config update requests")
+	}
+
+	// Validate tracer-specific fields
+	if request.Client.IsTracer {
+		if request.Client.ClientTracer == nil {
+			return status.Error(codes.InvalidArgument, "client.client_tracer must be set if client.is_tracer is true")
 		}
-		if response.ConfigMetas.TopTargets != nil {
-			fmt.Printf("  TopTargets: %+v\n", string(response.ConfigMetas.TopTargets.Raw))
+		if request.Client.ClientAgent != nil {
+			return status.Error(codes.InvalidArgument, "client.client_agent must not be set if client.is_tracer is true")
 		}
-		if response.ConfigMetas.DelegatedTargets != nil {
-			fmt.Printf("  Delegated targets:\n")
-			for _, delegatedTarget := range response.ConfigMetas.DelegatedTargets {
-				fmt.Printf("   - %v\n", string(delegatedTarget.Raw))
+
+		clientTracer := request.Client.ClientTracer
+
+		if request.Client.Id == clientTracer.RuntimeId {
+			return status.Error(codes.InvalidArgument, "client.id must be different from client.client_tracer.runtime_id")
+		}
+
+		if request.Client.ClientTracer.Language == "" {
+			return status.Error(codes.InvalidArgument, "client.client_tracer.language is a required field for tracer client config update requests")
+		}
+
+	}
+
+	// Validate agent-specific fields
+	if request.Client.IsAgent {
+		if request.Client.ClientAgent == nil {
+			return status.Error(codes.InvalidArgument, "client.client_agent must be set if client.is_agent is true")
+		}
+		if request.Client.ClientTracer != nil {
+			return status.Error(codes.InvalidArgument, "client.client_tracer must not be set if client.is_agent is true")
+		}
+	}
+
+	// Validate cached target files fields
+	for targetFileIndex, targetFile := range request.CachedTargetFiles {
+		if targetFile.Path == "" {
+			return status.Errorf(codes.InvalidArgument, "cached_target_files[%d].path is a required field for client config update requests", targetFileIndex)
+		}
+		_, err := rdata.ParseConfigPath(targetFile.Path)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "cached_target_files[%d].path is not a valid path: %s", targetFileIndex, err.Error())
+		}
+		if targetFile.Length == 0 {
+			return status.Errorf(codes.InvalidArgument, "cached_target_files[%d].length must be >= 1 (no empty file allowed)", targetFileIndex)
+		}
+		if len(targetFile.Hashes) == 0 {
+			return status.Error(codes.InvalidArgument, "cached_target_files[%d].hashes is a required field for client config update requests")
+		}
+		for hashIndex, hash := range targetFile.Hashes {
+			if hash.Algorithm == "" {
+				return status.Errorf(codes.InvalidArgument, "cached_target_files[%d].hashes[%d].algorithm is a required field for client config update requests", targetFileIndex, hashIndex)
+			}
+			if len(hash.Hash) == 0 {
+				return status.Errorf(codes.InvalidArgument, "cached_target_files[%d].hashes[%d].hash is a required field for client config update requests", targetFileIndex, hashIndex)
 			}
 		}
 	}
-	fmt.Printf("Target files:\n")
-	for _, targetFile := range response.TargetFiles {
-		fmt.Printf("   - %s\n", targetFile.Path)
-	}
+
+	return nil
 }

@@ -15,6 +15,8 @@ type EventType = string
 
 // Event is an interface that an Event has to implement for the evaluation
 type Event interface {
+	// Init initialize the event
+	Init()
 	// GetType returns the Type of the Event
 	GetType() EventType
 	// GetFieldEventType returns the Event Type for the given Field
@@ -31,7 +33,7 @@ type Event interface {
 	GetTags() []string
 }
 
-func eventTypesFromFields(model Model, state *state) ([]EventType, error) {
+func eventTypesFromFields(model Model, state *State) ([]EventType, error) {
 	events := make(map[EventType]bool)
 	for field := range state.fieldValues {
 		eventType, err := model.NewEvent().GetFieldEventType(field)

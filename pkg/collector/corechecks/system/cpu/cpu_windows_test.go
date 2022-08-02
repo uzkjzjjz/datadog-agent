@@ -3,13 +3,15 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build windows
 // +build windows
 
 package cpu
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/metrics"
 	"testing"
+
+	"github.com/DataDog/datadog-agent/pkg/metrics"
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator/mocksender"
 	pdhtest "github.com/DataDog/datadog-agent/pkg/util/winutil/pdhutil"

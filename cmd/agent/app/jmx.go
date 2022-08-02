@@ -3,11 +3,13 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build jmx
 // +build jmx
 
 package app
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/cmd/agent/app/standalone"
 	"github.com/DataDog/datadog-agent/cmd/agent/common"
+	"github.com/DataDog/datadog-agent/pkg/collector"
 	"github.com/DataDog/datadog-agent/pkg/config"
 )
 
@@ -95,8 +98,17 @@ var (
 	saveFlare         bool
 )
 
+var (
+	discoveryTimeout       uint
+	discoveryRetryInterval uint
+	discoveryMinInstances  uint
+)
+
 func init() {
 	jmxCmd.PersistentFlags().StringVarP(&jmxLogLevel, "log-level", "l", "", "set the log level (default 'debug') (deprecated, use the env var DD_LOG_LEVEL instead)")
+	jmxCmd.PersistentFlags().UintVarP(&discoveryTimeout, "discovery-timeout", "", 5, "max retry duration until Autodiscovery resolves the check template (in seconds)")
+	jmxCmd.PersistentFlags().UintVarP(&discoveryRetryInterval, "discovery-retry-interval", "", 1, "(unused)")
+	jmxCmd.PersistentFlags().UintVarP(&discoveryMinInstances, "discovery-min-instances", "", 1, "minimum number of config instances to be discovered before running the check(s)")
 
 	// attach list and collect commands to jmx command
 	jmxCmd.AddCommand(jmxListCmd)
@@ -163,14 +175,25 @@ func runJmxCommandConsole(command string) error {
 		return err
 	}
 
-	err = config.SetupJMXLogger(jmxLoggerName, logLevel, logFile, "", false, true, false)
+	err = config.SetupJMXLogger(jmxLoggerName, logFile, "", false, true, false)
 	if err != nil {
 		return fmt.Errorf("Unable to set up JMX logger: %v", err)
 	}
 
-	common.LoadComponents(config.Datadog.GetString("confd_path"))
+	common.LoadComponents(context.Background(), config.Datadog.GetString("confd_path"))
 
-	err = standalone.ExecJMXCommandConsole(command, cliSelectedChecks, logLevel)
+	// Create the CheckScheduler, but do not attach it to
+	// AutoDiscovery.  NOTE: we do not start common.Coll, either.
+	collector.InitCheckScheduler(common.Coll)
+
+	// Note: when no checks are selected, cliSelectedChecks will be the empty slice and thus
+	//       WaitForConfigsFromAD will timeout and return no AD configs.
+	waitCtx, cancelTimeout := context.WithTimeout(
+		context.Background(), time.Duration(discoveryTimeout)*time.Second)
+	allConfigs := common.WaitForConfigsFromAD(waitCtx, cliSelectedChecks, int(discoveryMinInstances))
+	cancelTimeout()
+
+	err = standalone.ExecJMXCommandConsole(command, cliSelectedChecks, logLevel, allConfigs)
 
 	if runtime.GOOS == "windows" {
 		standalone.PrintWindowsUserWarning("jmx")

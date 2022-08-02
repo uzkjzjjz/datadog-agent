@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
+//go:build linux
 // +build linux
 
 package probe
@@ -18,12 +19,14 @@ import (
 var openCapabilities = Capabilities{
 	"open.file.path": {
 		PolicyFlags:     PolicyFlagBasename,
-		FieldValueTypes: eval.ScalarValueType | eval.PatternValueType,
+		FieldValueTypes: eval.ScalarValueType | eval.PatternValueType | eval.GlobValueType,
 		ValidateFnc:     validateBasenameFilter,
+		FilterWeight:    15,
 	},
 	"open.file.name": {
 		PolicyFlags:     PolicyFlagBasename,
 		FieldValueTypes: eval.ScalarValueType,
+		FilterWeight:    10,
 	},
 	"open.flags": {
 		PolicyFlags:     PolicyFlagFlags,
