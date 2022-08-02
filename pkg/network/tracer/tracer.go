@@ -371,7 +371,7 @@ func (t *Tracer) matchHTTPConnections(conns []network.ConnectionStats, httpStats
 			return
 		}
 
-		httpByKeyTuple[kt] = map[http.Key]struct{}{hKey: struct{}{}}
+		httpByKeyTuple[kt] = map[http.Key]struct{}{hKey: {}}
 	}
 
 	var scratchConn network.ConnectionStats
@@ -405,8 +405,9 @@ func (t *Tracer) matchHTTPConnections(conns []network.ConnectionStats, httpStats
 		ktc := network.HTTPKeyTupleFromConn(c)
 		if hkeys, ok := httpByKeyTuple[ktc]; ok {
 			for hkey := range hkeys {
+				stats := httpStats[hkey]
 				hkey.KeyTuple = ktc
-				addMatched(hkey, httpStats[hkey])
+				addMatched(hkey, stats)
 			}
 		}
 	}
