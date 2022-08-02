@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -366,5 +367,17 @@ func (d *DockerUtil) GetContainerStats(ctx context.Context, containerID string) 
 	if err != nil {
 		return nil, fmt.Errorf("error listing containers: %s", err)
 	}
+	d.GetContainerPIDs(ctx, containerID)
 	return containerStats, nil
+}
+
+func (d *DockerUtil) GetContainerPIDs(ctx context.Context, containerID string) []int {
+	var pids []int
+	procs, _ := d.cli.ContainerTop(ctx, containerID, nil)
+	for proc, entry := range procs.Processes {
+		log.Info(proc, entry[1])
+		pid, _ := strconv.Atoi(entry[1])
+		pids = append(pids, pid)
+	}
+	return pids
 }

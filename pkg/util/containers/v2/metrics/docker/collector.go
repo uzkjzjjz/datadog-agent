@@ -87,7 +87,7 @@ func (d *dockerCollector) GetContainerStats(containerNS, containerID string, cac
 	} else {
 		log.Debugf("Unable to inspect container some metrics will be missing, cid: %s, err: %v", containerID, err)
 	}
-
+	outStats.PID.PIDs = d.pids(containerID)
 	return outStats, nil
 }
 
@@ -153,6 +153,11 @@ func (d *dockerCollector) stats(containerID string) (*types.StatsJSON, error) {
 	}
 
 	return stats, nil
+}
+
+// pids associated with container ID
+func (d *dockerCollector) pids(containerID string) []int {
+	return d.du.GetContainerPIDs(context.TODO(), containerID)
 }
 
 func (d *dockerCollector) spec(containerID string) (*types.ContainerJSON, error) {
