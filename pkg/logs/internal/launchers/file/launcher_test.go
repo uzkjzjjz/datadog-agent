@@ -3,14 +3,12 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-//go:build !windows
-// +build !windows
-
 package file
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -52,7 +50,7 @@ func (suite *LauncherTestSuite) SetupTest() {
 	var err error
 	suite.testDir = suite.T().TempDir()
 
-	suite.testPath = fmt.Sprintf("%s/launcher.log", suite.testDir)
+	suite.testPath = filepath.Join(suite.testDir, "launcher.log")
 	suite.testRotatedPath = fmt.Sprintf("%s.1", suite.testPath)
 
 	f, err := os.Create(suite.testPath)
@@ -174,13 +172,13 @@ func (suite *LauncherTestSuite) TestLauncherScanWithFileRemovedAndCreated() {
 
 	// remove file
 	err = os.Remove(suite.testPath)
-	suite.Nil(err)
+	suite.NoError(err)
 	s.scan()
 	suite.Equal(tailerLen-1, len(s.tailers))
 
 	// create file
 	_, err = os.Create(suite.testPath)
-	suite.Nil(err)
+	suite.NoError(err)
 	s.scan()
 	suite.Equal(tailerLen, len(s.tailers))
 }
@@ -206,38 +204,38 @@ func TestLauncherTestSuiteWithConfigID(t *testing.T) {
 }
 
 func TestLauncherScanStartNewTailer(t *testing.T) {
-	var path string
+	var logPath string
 	var msg *message.Message
 
 	IDs := []string{"", "123456789"}
 
+	defer status.Clear()
 	for _, configID := range IDs {
 		testDir := t.TempDir()
 
 		// create launcher
-		path = fmt.Sprintf("%s/*.log", testDir)
+		logPath = filepath.Join(testDir, "*.log")
 		openFilesLimit := 2
 		sleepDuration := 20 * time.Millisecond
 		launcher := NewLauncher(openFilesLimit, sleepDuration, false, 10*time.Second)
 		launcher.pipelineProvider = mock.NewMockProvider()
 		launcher.registry = auditor.NewRegistry()
 		outputChan := launcher.pipelineProvider.NextPipelineChan()
-		source := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Identifier: configID, Path: path})
+		source := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Identifier: configID, Path: logPath})
 		launcher.activeSources = append(launcher.activeSources, source)
 		status.Clear()
 		status.InitStatus(util.CreateSources([]*sources.LogSource{source}))
-		defer status.Clear()
 
 		// create file
-		path = fmt.Sprintf("%s/test.log", testDir)
-		file, err := os.Create(path)
-		assert.Nil(t, err)
+		logPath = filepath.Join(testDir, "test.log")
+		file, err := os.Create(logPath)
+		assert.NoError(t, err)
 
 		// add content
 		_, err = file.WriteString("hello\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = file.WriteString("world\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// test scan from beginning
 		launcher.scan()
@@ -251,7 +249,7 @@ func TestLauncherScanStartNewTailer(t *testing.T) {
 
 func TestLauncherWithConcurrentContainerTailer(t *testing.T) {
 	testDir := t.TempDir()
-	path := fmt.Sprintf("%s/container.log", testDir)
+	logPath := filepath.Join(testDir, "container.log")
 
 	// create launcher
 	openFilesLimit := 3
@@ -260,18 +258,18 @@ func TestLauncherWithConcurrentContainerTailer(t *testing.T) {
 	launcher.pipelineProvider = mock.NewMockProvider()
 	launcher.registry = auditor.NewRegistry()
 	outputChan := launcher.pipelineProvider.NextPipelineChan()
-	firstSource := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/*.log", testDir), TailingMode: "beginning", Identifier: "123456789"})
-	secondSource := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/*.log", testDir), TailingMode: "beginning", Identifier: "987654321"})
+	firstSource := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(testDir, "*.log"), TailingMode: "beginning", Identifier: "123456789"})
+	secondSource := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(testDir, "*.log"), TailingMode: "beginning", Identifier: "987654321"})
 
 	// create/truncate file
-	file, err := os.Create(path)
-	assert.Nil(t, err)
+	file, err := os.Create(logPath)
+	assert.NoError(t, err)
 
 	// add content before starting the tailer
 	_, err = file.WriteString("Once\n")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_, err = file.WriteString("Upon\n")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// test scan from the beginning, it shall read previously written strings
 	launcher.addSource(firstSource)
@@ -279,9 +277,9 @@ func TestLauncherWithConcurrentContainerTailer(t *testing.T) {
 
 	// add content after starting the tailer
 	_, err = file.WriteString("A\n")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_, err = file.WriteString("Time\n")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	msg := <-outputChan
 	assert.Equal(t, "Once", string(msg.Content))
@@ -307,23 +305,23 @@ func TestLauncherTailFromTheBeginning(t *testing.T) {
 	launcher.pipelineProvider = mock.NewMockProvider()
 	launcher.registry = auditor.NewRegistry()
 	outputChan := launcher.pipelineProvider.NextPipelineChan()
-	sources := []*sources.LogSource{
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/test.log", testDir), TailingMode: "beginning"}),
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/container.log", testDir), TailingMode: "beginning", Identifier: "123456789"}),
+	logSources := []*sources.LogSource{
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(testDir, "test.log"), TailingMode: "beginning"}),
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(testDir, "container.log"), TailingMode: "beginning", Identifier: "123456789"}),
 		// Same file different container ID
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/container.log", testDir), TailingMode: "beginning", Identifier: "987654321"}),
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(testDir, "container.log"), TailingMode: "beginning", Identifier: "987654321"}),
 	}
 
-	for i, source := range sources {
+	for i, source := range logSources {
 		// create/truncate file
 		file, err := os.Create(source.Config.Path)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// add content before starting the tailer
 		_, err = file.WriteString("Once\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = file.WriteString("Upon\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// test scan from the beginning, it shall read previously written strings
 		launcher.addSource(source)
@@ -331,9 +329,9 @@ func TestLauncherTailFromTheBeginning(t *testing.T) {
 
 		// add content after starting the tailer
 		_, err = file.WriteString("A\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = file.WriteString("Time\n")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		msg := <-outputChan
 		assert.Equal(t, "Once", string(msg.Content))
@@ -348,31 +346,27 @@ func TestLauncherTailFromTheBeginning(t *testing.T) {
 
 func TestLauncherScanWithTooManyFiles(t *testing.T) {
 	var err error
-	var path string
 
 	testDir := t.TempDir()
 
 	// creates files
-	path = fmt.Sprintf("%s/1.log", testDir)
-	_, err = os.Create(path)
-	assert.Nil(t, err)
+	_, err = os.Create(filepath.Join(testDir, "1.log"))
+	assert.NoError(t, err)
 
-	path = fmt.Sprintf("%s/2.log", testDir)
-	_, err = os.Create(path)
-	assert.Nil(t, err)
+	_, err = os.Create(filepath.Join(testDir, "2.log"))
+	assert.NoError(t, err)
 
-	path = fmt.Sprintf("%s/3.log", testDir)
-	_, err = os.Create(path)
-	assert.Nil(t, err)
+	_, err = os.Create(filepath.Join(testDir, "3.log"))
+	assert.NoError(t, err)
 
 	// create launcher
-	path = fmt.Sprintf("%s/*.log", testDir)
+	logPath := filepath.Join(testDir, "*.log")
 	openFilesLimit := 2
 	sleepDuration := 20 * time.Millisecond
 	launcher := NewLauncher(openFilesLimit, sleepDuration, false, 10*time.Second)
 	launcher.pipelineProvider = mock.NewMockProvider()
 	launcher.registry = auditor.NewRegistry()
-	source := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: path})
+	source := sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: logPath})
 	launcher.activeSources = append(launcher.activeSources, source)
 	status.Clear()
 	status.InitStatus(util.CreateSources([]*sources.LogSource{source}))
@@ -382,9 +376,8 @@ func TestLauncherScanWithTooManyFiles(t *testing.T) {
 	launcher.scan()
 	assert.Equal(t, 2, len(launcher.tailers))
 
-	path = fmt.Sprintf("%s/2.log", testDir)
-	err = os.Remove(path)
-	assert.Nil(t, err)
+	err = os.Remove(filepath.Join(testDir, "2.log"))
+	assert.NoError(t, err)
 
 	launcher.scan()
 	assert.Equal(t, 1, len(launcher.tailers))
@@ -394,32 +387,30 @@ func TestLauncherScanWithTooManyFiles(t *testing.T) {
 }
 
 func TestContainerIDInContainerLogFile(t *testing.T) {
-	assert := assert.New(t)
+	testDir := t.TempDir()
+	podsFile := filepath.Join(testDir, "var", "logs", "pods", "file-uuid-foo-bar.log")
 	//func (s *Launcher) shouldIgnore(file *File) bool {
 	logSource := sources.NewLogSource("mylogsource", nil)
 	logSource.SetSourceType(sources.DockerSourceType)
 	logSource.Config = &config.LogsConfig{
 		Type: config.FileType,
-		Path: "/var/log/pods/file-uuid-foo-bar.log",
+		Path: podsFile,
 
 		Identifier: "abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd",
 	}
 
 	// create an empty file that will represent the log file that would have been found in /var/log/containers
-	ContainersLogsDir = "/tmp/"
-	os.Remove("/tmp/myapp_my-namespace_myapp-abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd.log")
+	ContainersLogsDir = filepath.Join(testDir, "tmp")
+	os.Mkdir(ContainersLogsDir, 0700)
+	tmpFile := filepath.Join(ContainersLogsDir, "myapp_my-namespace_myapp-abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd.log")
+	_ = os.Remove(tmpFile) // tmpFile should not exist
 
-	err := os.Symlink("/var/log/pods/file-uuid-foo-bar.log", "/tmp/myapp_my-namespace_myapp-abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd.log")
-	defer func() {
-		// cleaning up after the test run
-		os.Remove("/tmp/myapp_my-namespace_myapp-abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd.log")
-		os.Remove("/tmp/myapp_my-namespace_myapp-thisisnotacontainerIDevenifthisispointingtothecorrectfile.log")
-	}()
+	err := os.Symlink(podsFile, tmpFile)
 
-	assert.NoError(err, "error while creating the temporary file")
+	assert.NoError(t, err, "error while creating the temporary file")
 
 	file := filetailer.File{
-		Path:           "/var/log/pods/file-uuid-foo-bar.log",
+		Path:           podsFile,
 		IsWildcardPath: false,
 		Source:         sources.NewReplaceableSource(logSource),
 	}
@@ -427,46 +418,46 @@ func TestContainerIDInContainerLogFile(t *testing.T) {
 	launcher := &Launcher{}
 
 	// we've found a symlink validating that the file we have just scanned is concerning the container we're currently processing for this source
-	assert.False(launcher.shouldIgnore(&file), "the file existing in ContainersLogsDir is pointing to the same container, scanned file should be tailed")
+	assert.False(t, launcher.shouldIgnore(&file), "the file existing in ContainersLogsDir is pointing to the same container, scanned file should be tailed")
 
 	// now, let's change the container for which we are trying to scan files,
 	// because the symlink is pointing from another container, we should ignore
 	// that log file
 	file.Source.Config().Identifier = "1234123412341234123412341234123412341234123412341234123412341234"
-	assert.True(launcher.shouldIgnore(&file), "the file existing in ContainersLogsDir is not pointing to the same container, scanned file should be ignored")
+	assert.True(t, launcher.shouldIgnore(&file), "the file existing in ContainersLogsDir is not pointing to the same container, scanned file should be ignored")
 
 	// in this scenario, no link is found in /var/log/containers, thus, we should not ignore the file
-	os.Remove("/tmp/myapp_my-namespace_myapp-abcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcdabcdefabcdefabcd.log")
-	assert.False(launcher.shouldIgnore(&file), "no files existing in ContainersLogsDir, we should not ignore the file we have just scanned")
+	assert.NoError(t, os.Remove(tmpFile))
+	assert.False(t, launcher.shouldIgnore(&file), "no files existing in ContainersLogsDir, we should not ignore the file we have just scanned")
 
 	// in this scenario, the file we've found doesn't look like a container ID
-	os.Symlink("/var/log/pods/file-uuid-foo-bar.log", "/tmp/myapp_my-namespace_myapp-thisisnotacontainerIDevenifthisispointingtothecorrectfile.log")
-	assert.False(launcher.shouldIgnore(&file), "no container ID found, we don't want to ignore this scanned file")
+	os.Symlink(tmpFile, filepath.Join(ContainersLogsDir, "myapp_my-namespace_myapp-thisisnotacontainerIDevenifthisispointingtothecorrectfile.log"))
+	assert.False(t, launcher.shouldIgnore(&file), "no container ID found, we don't want to ignore this scanned file")
 }
 
 func TestLauncherUpdatesSourceForExistingTailer(t *testing.T) {
 
 	testDir := t.TempDir()
 
-	path := fmt.Sprintf("%s/*.log", testDir)
-	os.Create(path)
+	logPath := filepath.Join(testDir, "*.log")
+	os.Create(logPath)
 	openFilesLimit := 2
 	sleepDuration := 20 * time.Millisecond
 	launcher := NewLauncher(openFilesLimit, sleepDuration, false, 10*time.Second)
 	launcher.pipelineProvider = mock.NewMockProvider()
 	launcher.registry = auditor.NewRegistry()
 
-	source := sources.NewLogSource("Source 1", &config.LogsConfig{Type: config.FileType, Identifier: "TEST_ID", Path: path})
+	source := sources.NewLogSource("Source 1", &config.LogsConfig{Type: config.FileType, Identifier: "TEST_ID", Path: logPath})
 
 	launcher.addSource(source)
-	tailer := launcher.tailers[getScanKey(path, source)]
+	tailer := launcher.tailers[getScanKey(logPath, source)]
 
 	// test scan from beginning
 	assert.Equal(t, 1, len(launcher.tailers))
 	assert.Equal(t, tailer.Source(), source)
 
 	// Add a new source with the same file
-	source2 := sources.NewLogSource("Source 2", &config.LogsConfig{Type: config.FileType, Identifier: "TEST_ID", Path: path})
+	source2 := sources.NewLogSource("Source 2", &config.LogsConfig{Type: config.FileType, Identifier: "TEST_ID", Path: logPath})
 
 	launcher.addSource(source2)
 

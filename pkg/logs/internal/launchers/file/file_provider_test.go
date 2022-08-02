@@ -3,14 +3,11 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-//go:build !windows
-// +build !windows
-
 package file
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -40,33 +37,26 @@ func (suite *ProviderTestSuite) SetupTest() {
 	suite.testDir = suite.T().TempDir()
 
 	// Create directory tree:
-	path := fmt.Sprintf("%s/1", suite.testDir)
-	err = os.Mkdir(path, os.ModePerm)
-	suite.Nil(err)
+	err = os.Mkdir(filepath.Join(suite.testDir, "1"), os.ModePerm)
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/1/1.log", suite.testDir)
-	_, err = os.Create(path)
-	suite.Nil(err)
+	_, err = os.Create(filepath.Join(suite.testDir, "1", "1.log"))
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/1/2.log", suite.testDir)
-	_, err = os.Create(path)
-	suite.Nil(err)
+	_, err = os.Create(filepath.Join(suite.testDir, "1", "2.log"))
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/1/3.log", suite.testDir)
-	_, err = os.Create(path)
-	suite.Nil(err)
+	_, err = os.Create(filepath.Join(suite.testDir, "1", "3.log"))
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/2", suite.testDir)
-	err = os.Mkdir(path, os.ModePerm)
-	suite.Nil(err)
+	err = os.Mkdir(filepath.Join(suite.testDir, "2"), os.ModePerm)
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/2/1.log", suite.testDir)
-	_, err = os.Create(path)
-	suite.Nil(err)
+	_, err = os.Create(filepath.Join(suite.testDir, "2", "1.log"))
+	suite.NoError(err)
 
-	path = fmt.Sprintf("%s/2/2.log", suite.testDir)
-	_, err = os.Create(path)
-	suite.Nil(err)
+	_, err = os.Create(filepath.Join(suite.testDir, "2", "2.log"))
+	suite.NoError(err)
 }
 
 func (suite *ProviderTestSuite) TearDownTest() {
@@ -74,22 +64,22 @@ func (suite *ProviderTestSuite) TearDownTest() {
 }
 
 func (suite *ProviderTestSuite) TestFilesToTailReturnsSpecificFile() {
-	path := fmt.Sprintf("%s/1/1.log", suite.testDir)
+	testLogFile := filepath.Join(suite.testDir, "1", "1.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogFile)
 	util.CreateSources(logSources)
 	files := fileProvider.filesToTail(logSources)
 
 	suite.Equal(1, len(files))
 	suite.False(files[0].IsWildcardPath)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[0].Path)
+	suite.Equal(testLogFile, files[0].Path)
 	suite.Equal(make([]string, 0), logSources[0].Messages.GetMessages())
 }
 
 func (suite *ProviderTestSuite) TestFilesToTailReturnsAllFilesFromDirectory() {
-	path := fmt.Sprintf("%s/1/*.log", suite.testDir)
+	testLogFile := filepath.Join(suite.testDir, "1", "*.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogFile)
 	status.InitStatus(util.CreateSources(logSources))
 	files := fileProvider.filesToTail(logSources)
 
@@ -97,9 +87,9 @@ func (suite *ProviderTestSuite) TestFilesToTailReturnsAllFilesFromDirectory() {
 	suite.True(files[0].IsWildcardPath)
 	suite.True(files[1].IsWildcardPath)
 	suite.True(files[2].IsWildcardPath)
-	suite.Equal(fmt.Sprintf("%s/1/3.log", suite.testDir), files[0].Path)
-	suite.Equal(fmt.Sprintf("%s/1/2.log", suite.testDir), files[1].Path)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[2].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "3.log"), files[0].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "2.log"), files[1].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "1.log"), files[2].Path)
 	suite.Equal([]string{"3 files tailed out of 3 files matching"}, logSources[0].Messages.GetMessages())
 	suite.Equal(
 		[]string{
@@ -112,9 +102,9 @@ func (suite *ProviderTestSuite) TestFilesToTailReturnsAllFilesFromDirectory() {
 func (suite *ProviderTestSuite) TestCollectFilesWildcardFlag() {
 	// with wildcard
 
-	path := fmt.Sprintf("%s/1/*.log", suite.testDir)
+	testLogFile := filepath.Join(suite.testDir, "1", "*.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogFile)
 	files, err := fileProvider.collectFiles(logSources[0])
 	suite.NoError(err, "searching for files in this directory shouldn't fail")
 	for _, file := range files {
@@ -123,9 +113,9 @@ func (suite *ProviderTestSuite) TestCollectFilesWildcardFlag() {
 
 	// without wildcard
 
-	path = fmt.Sprintf("%s/1/1.log", suite.testDir)
+	testLogFile = filepath.Join(suite.testDir, "1", "1.log")
 	fileProvider = newFileProvider(suite.filesLimit)
-	logSources = suite.newLogSources(path)
+	logSources = suite.newLogSources(testLogFile)
 	files, err = fileProvider.collectFiles(logSources[0])
 	suite.NoError(err, "searching for files in this directory shouldn't fail")
 	for _, file := range files {
@@ -134,24 +124,24 @@ func (suite *ProviderTestSuite) TestCollectFilesWildcardFlag() {
 }
 
 func (suite *ProviderTestSuite) TestFilesToTailReturnsAllFilesFromAnyDirectoryWithRightPermissions() {
-	path := fmt.Sprintf("%s/*/*1.log", suite.testDir)
+	testLogPath := filepath.Join(suite.testDir, "*", "*1.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogPath)
 	util.CreateSources(logSources)
 	files := fileProvider.filesToTail(logSources)
 
 	suite.Equal(2, len(files))
 	suite.True(files[0].IsWildcardPath)
 	suite.True(files[1].IsWildcardPath)
-	suite.Equal(fmt.Sprintf("%s/2/1.log", suite.testDir), files[0].Path)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[1].Path)
+	suite.Equal(filepath.Join(suite.testDir, "2", "1.log"), files[0].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "1.log"), files[1].Path)
 	suite.Equal([]string{"2 files tailed out of 2 files matching"}, logSources[0].Messages.GetMessages())
 }
 
 func (suite *ProviderTestSuite) TestFilesToTailReturnsSpecificFileWithWildcard() {
-	path := fmt.Sprintf("%s/1/?.log", suite.testDir)
+	testLogPath := filepath.Join(suite.testDir, "1", "?.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogPath)
 	status.InitStatus(util.CreateSources(logSources))
 	files := fileProvider.filesToTail(logSources)
 
@@ -159,9 +149,9 @@ func (suite *ProviderTestSuite) TestFilesToTailReturnsSpecificFileWithWildcard()
 	suite.True(files[0].IsWildcardPath)
 	suite.True(files[1].IsWildcardPath)
 	suite.True(files[2].IsWildcardPath)
-	suite.Equal(fmt.Sprintf("%s/1/3.log", suite.testDir), files[0].Path)
-	suite.Equal(fmt.Sprintf("%s/1/2.log", suite.testDir), files[1].Path)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[2].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "3.log"), files[0].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "2.log"), files[1].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "1.log"), files[2].Path)
 	suite.Equal([]string{"3 files tailed out of 3 files matching"}, logSources[0].Messages.GetMessages())
 	suite.Equal(
 		[]string{
@@ -173,25 +163,25 @@ func (suite *ProviderTestSuite) TestFilesToTailReturnsSpecificFileWithWildcard()
 
 func (suite *ProviderTestSuite) TestWildcardPathsAreSorted() {
 	filesLimit := 6
-	path := fmt.Sprintf("%s/*/*.log", suite.testDir)
+	testLogPath := filepath.Join(suite.testDir, "*", "*.log")
 	fileProvider := newFileProvider(filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogPath)
 	files := fileProvider.filesToTail(logSources)
 	suite.Equal(5, len(files))
 	for i := 0; i < len(files); i++ {
 		suite.Assert().True(files[i].IsWildcardPath)
 	}
-	suite.Equal(fmt.Sprintf("%s/1/3.log", suite.testDir), files[0].Path)
-	suite.Equal(fmt.Sprintf("%s/2/2.log", suite.testDir), files[1].Path)
-	suite.Equal(fmt.Sprintf("%s/1/2.log", suite.testDir), files[2].Path)
-	suite.Equal(fmt.Sprintf("%s/2/1.log", suite.testDir), files[3].Path)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[4].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "3.log"), files[0].Path)
+	suite.Equal(filepath.Join(suite.testDir, "2", "2.log"), files[1].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "2.log"), files[2].Path)
+	suite.Equal(filepath.Join(suite.testDir, "2", "1.log"), files[3].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "1.log"), files[4].Path)
 }
 
 func (suite *ProviderTestSuite) TestNumberOfFilesToTailDoesNotExceedLimit() {
-	path := fmt.Sprintf("%s/*/*.log", suite.testDir)
+	testLogPath := filepath.Join(suite.testDir, "*", "*.log")
 	fileProvider := newFileProvider(suite.filesLimit)
-	logSources := suite.newLogSources(path)
+	logSources := suite.newLogSources(testLogPath)
 	status.InitStatus(util.CreateSources(logSources))
 	files := fileProvider.filesToTail(logSources)
 	suite.Equal(suite.filesLimit, len(files))
@@ -208,8 +198,8 @@ func (suite *ProviderTestSuite) TestAllWildcardPathsAreUpdated() {
 	filesLimit := 2
 	fileProvider := newFileProvider(filesLimit)
 	logSources := []*sources.LogSource{
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/1/*.log", suite.testDir)}),
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: fmt.Sprintf("%s/2/*.log", suite.testDir)}),
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(suite.testDir, "1", "*.log")}),
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: filepath.Join(suite.testDir, "2", "*.log")}),
 	}
 	status.InitStatus(util.CreateSources(logSources))
 	files := fileProvider.filesToTail(logSources)
@@ -229,9 +219,10 @@ func (suite *ProviderTestSuite) TestAllWildcardPathsAreUpdated() {
 		status.Get().Warnings,
 	)
 
-	os.Remove(fmt.Sprintf("%s/1/2.log", suite.testDir))
-	os.Remove(fmt.Sprintf("%s/1/3.log", suite.testDir))
-	os.Remove(fmt.Sprintf("%s/2/2.log", suite.testDir))
+	suite.NoError(os.Remove(filepath.Join(suite.testDir, "1", "2.log")))
+	suite.NoError(os.Remove(filepath.Join(suite.testDir, "1", "3.log")))
+	suite.NoError(os.Remove(filepath.Join(suite.testDir, "2", "2.log")))
+
 	files = fileProvider.filesToTail(logSources)
 	suite.Equal(2, len(files))
 	suite.Equal([]string{"1 files tailed out of 1 files matching"}, logSources[0].Messages.GetMessages())
@@ -244,8 +235,7 @@ func (suite *ProviderTestSuite) TestAllWildcardPathsAreUpdated() {
 		status.Get().Warnings,
 	)
 
-	os.Remove(fmt.Sprintf("%s/2/1.log", suite.testDir))
-
+	suite.NoError(os.Remove(filepath.Join(suite.testDir, "2", "1.log")))
 	files = fileProvider.filesToTail(logSources)
 	suite.Equal(1, len(files))
 	suite.Equal([]string{"1 files tailed out of 1 files matching"}, logSources[0].Messages.GetMessages())
@@ -255,11 +245,11 @@ func (suite *ProviderTestSuite) TestAllWildcardPathsAreUpdated() {
 
 func (suite *ProviderTestSuite) TestExcludePath() {
 	filesLimit := 6
-	path := fmt.Sprintf("%s/*/*.log", suite.testDir)
-	excludePaths := []string{fmt.Sprintf("%s/2/*.log", suite.testDir)}
+	testLogPath := filepath.Join(suite.testDir, "*", "*.log")
+	excludePaths := []string{filepath.Join(suite.testDir, "2", "*.log")}
 	fileProvider := newFileProvider(filesLimit)
 	logSources := []*sources.LogSource{
-		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: path, ExcludePaths: excludePaths}),
+		sources.NewLogSource("", &config.LogsConfig{Type: config.FileType, Path: testLogPath, ExcludePaths: excludePaths}),
 	}
 
 	files := fileProvider.filesToTail(logSources)
@@ -267,9 +257,9 @@ func (suite *ProviderTestSuite) TestExcludePath() {
 	for i := 0; i < len(files); i++ {
 		suite.Assert().True(files[i].IsWildcardPath)
 	}
-	suite.Equal(fmt.Sprintf("%s/1/3.log", suite.testDir), files[0].Path)
-	suite.Equal(fmt.Sprintf("%s/1/2.log", suite.testDir), files[1].Path)
-	suite.Equal(fmt.Sprintf("%s/1/1.log", suite.testDir), files[2].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "3.log"), files[0].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "2.log"), files[1].Path)
+	suite.Equal(filepath.Join(suite.testDir, "1", "1.log"), files[2].Path)
 }
 
 func TestProviderTestSuite(t *testing.T) {
