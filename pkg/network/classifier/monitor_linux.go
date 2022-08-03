@@ -17,7 +17,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
 	filterpkg "github.com/DataDog/datadog-agent/pkg/network/filter"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/ebpf-manager"
+	manager "github.com/DataDog/ebpf-manager"
 	"github.com/cilium/ebpf"
 )
 
@@ -27,13 +27,13 @@ type classifier struct {
 }
 
 // NewClassifier starts the packets classifier
-func NewClassifier(cfg *config.Config, connMap *ebpf.Map, telemetryMap *ebpf.Map) (Classifier, error) {
+func NewClassifier(cfg *config.Config, connMap *ebpf.Map, connPidMap *ebpf.Map, telemetryMap *ebpf.Map) (Classifier, error) {
 	p, err := newEBPFProgram(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating ebpf program: %w", err)
 	}
 
-	if err := p.Init(connMap, telemetryMap); err != nil {
+	if err := p.Init(connMap, connPidMap, telemetryMap); err != nil {
 		return nil, fmt.Errorf("error initializing ebpf programs: %w", err)
 	}
 

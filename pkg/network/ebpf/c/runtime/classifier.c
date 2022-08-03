@@ -36,6 +36,7 @@ static __always_inline void do_tail_call(void* ctx, int protocol) {
  * egress: https://elixir.bootlin.com/linux/v4.14/source/net/ipv4/ip_output.c#L297
  * We use this hook to associate a struct sock* with a 
  * (saddr, daddr, sport, dport) tuple. */
+// TODO: use the skb tuple to key conn_tuple_t, instead of indexing by cpu
 SEC("kprobe/__cgroup_bpf_run_filter_skb")
 int kprobe____cgroup_bpf_run_filter_skb(struct pt_regs *ctx) {
     conn_tuple_t tup;
@@ -51,6 +52,14 @@ int kprobe____cgroup_bpf_run_filter_skb(struct pt_regs *ctx) {
     bpf_map_update_elem(&filter_args, &cpu, &tup, BPF_ANY);
 
     return 0;
+}
+
+static __always_inline void set_conn_pid(conn_tuple_t* t) {
+    u32* pid = bpf_map_lookup_elem(&conn_to_pid, t);
+    if (pid == 0)
+        return;
+
+    t->pid = *pid;
 }
 
 SEC("socket/classifier_filter")
@@ -72,6 +81,7 @@ int socket__classifier_filter(struct __sk_buff* skb) {
     if (intup == 0)
         return 0;
 
+    // if the input tuple is not set then abort
     if ((!intup->saddr_h || !intup->saddr_l) && (!intup->daddr_h || !intup->daddr_l) && !intup->sport && !intup->dport)
         return 0;
 
@@ -83,6 +93,15 @@ int socket__classifier_filter(struct __sk_buff* skb) {
     
     // 'delete' the tuple being passed in
     __builtin_memset(intup, 0, sizeof(conn_tuple_t));
+
+    // if we could not get the pid no point
+    // continuing, as we won't get the correct
+    // conn_stats_ts_t object.
+    set_conn_pid(tup);
+    if (tup->pid == 0) {
+        log_info("pid == 0\n");
+        return 0;
+    }
 
     normalize_tuple(tup);
     if (skb_info->tcp_flags & TCPHDR_FIN) {

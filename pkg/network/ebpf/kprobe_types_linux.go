@@ -11,8 +11,8 @@ type ConnTuple struct {
 	Sport    uint16
 	Dport    uint16
 	Netns    uint32
-	Pid      uint32
 	Metadata uint32
+	Pid      uint32
 }
 type TCPStats struct {
 	Retransmits       uint32

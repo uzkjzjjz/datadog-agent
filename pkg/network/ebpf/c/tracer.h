@@ -64,12 +64,26 @@ typedef struct {
     __u16 sport;
     __u16 dport;
     __u32 netns;
-    __u32 pid;
     // Metadata description:
     // First bit indicates if the connection is TCP (1) or UDP (0)
     // Second bit indicates if the connection is V6 (1) or V4 (0)
-    __u32 metadata; // This is that big because it seems that we atleast need a 32-bit aligned struct
+    __u32 metadata;
+    /* pid MUST remain at the end.
+     * We use the data above to construct
+     * conn_tuple_no_pid_t object. */
+    __u32 pid;
 } conn_tuple_t;
+
+typedef struct {
+    __u64 saddr_h;
+    __u64 saddr_l;
+    __u64 daddr_h;
+    __u64 daddr_l;
+    __u16 sport;
+    __u16 dport;
+    __u32 netns;
+    __u32 metadata;
+} conn_tuple_no_pid_t;
 
 typedef struct {
     __u32 retransmits;

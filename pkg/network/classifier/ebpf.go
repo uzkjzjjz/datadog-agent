@@ -65,6 +65,7 @@ func newEBPFProgram(c *config.Config) (*ebpfProgram, error) {
 			{Name: string(probes.TelemetryMap)}, // shared conn_stats_max_entries_hit
 			{Name: string(probes.ConnMap)},
 			{Name: string(probes.ClassifierTelemetryMap)},
+			{Name: string(probes.ConnToPidMap)},
 			{Name: protoProgsMap},
 			{Name: protoInFlightMap},
 			{Name: protoArgs},
@@ -83,7 +84,7 @@ func newEBPFProgram(c *config.Config) (*ebpfProgram, error) {
 	}, nil
 }
 
-func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
+func (e *ebpfProgram) Init(connMap *ebpf.Map, connPidMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 	defer e.bytecode.Close()
 
 	e.Manager.DumpHandler = dumpMapsHandler
@@ -108,6 +109,7 @@ func (e *ebpfProgram) Init(connMap *ebpf.Map, telemetryMap *ebpf.Map) error {
 		MapEditors: map[string]*ebpf.Map{
 			string(probes.ConnMap):      connMap,
 			string(probes.TelemetryMap): telemetryMap,
+			string(probes.ConnToPidMap): connPidMap,
 		},
 		MapSpecEditors: map[string]manager.MapSpecEditor{
 			protoInFlightMap: {

@@ -239,7 +239,8 @@ func newPacketsClassifier(supported bool, c *config.Config, ebpfTracer connectio
 	}
 	connMap := ebpfTracer.GetMap(string(probes.ConnMap))
 	telemetryMap := ebpfTracer.GetMap(string(probes.TelemetryMap))
-	packetsClassifier, err := classifier.NewClassifier(c, connMap, telemetryMap)
+	connPidMap := ebpfTracer.GetMap(string(probes.ConnToPidMap))
+	packetsClassifier, err := classifier.NewClassifier(c, connMap, connPidMap, telemetryMap)
 	if err != nil {
 		log.Errorf("could not instantiate packets inspection: %s", err)
 		return classifier.NewNullClassifier()

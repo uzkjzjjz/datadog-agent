@@ -94,6 +94,7 @@ func New(config *config.Config, constants []manager.ConstantEditor) (connection.
 			string(probes.UdpPortBindingsMap): {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			string(probes.SockByPidFDMap):     {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			string(probes.PidFDBySockMap):     {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
+			string(probes.ConnToPidMap):       {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 		},
 		ConstantEditors: constants,
 	}
@@ -221,6 +222,8 @@ func (t *kprobeTracer) GetMap(name string) *ebpf.Map {
 	case string(probes.ConnMap):
 		fallthrough
 	case string(probes.TelemetryMap):
+		fallthrough
+	case string(probes.ConnToPidMap):
 		fallthrough
 	case string(probes.SockByPidFDMap):
 		m, _, _ := t.m.GetMap(name)

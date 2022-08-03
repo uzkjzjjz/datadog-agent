@@ -109,11 +109,18 @@ static __always_inline void update_tcp_stats(conn_tuple_t *t, tcp_stats_t stats)
     }
 }
 
+static __always_inline void map_conn_to_pid(conn_tuple_t* t) {
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
+
+    bpf_map_update_elem(&conn_to_pid, t, &pid, BPF_NOEXIST);
+}
+
 static __always_inline int handle_message(conn_tuple_t *t, size_t sent_bytes, size_t recv_bytes, conn_direction_t dir,
                                           __u32 packets_out, __u32 packets_in, packet_count_increment_t segs_type)
 {
     u64 ts = bpf_ktime_get_ns();
 
+    map_conn_to_pid(t);
     update_conn_stats(t, sent_bytes, recv_bytes, ts, dir, packets_out, packets_in, segs_type);
 
     return 0;
