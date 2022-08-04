@@ -43,7 +43,8 @@ import (
 )
 
 const (
-	statsdPoolSize = 64
+	statsdPoolSize   = 64
+	rateLimiterGroup = "rule_id"
 )
 
 // Opts define module options
@@ -392,7 +393,7 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 	ruleIDs = append(ruleIDs, sprobe.AllCustomRuleIDs()...)
 
 	m.apiServer.Apply(ruleIDs)
-	m.rateLimiter.Apply(ruleIDs)
+	m.rateLimiter.Apply(rateLimiterGroup, ruleIDs)
 
 	m.displayReport(report)
 
@@ -498,7 +499,7 @@ func (m *Module) RuleMatch(rule *rules.Rule, event eval.Event) {
 
 // SendEvent sends an event to the backend after checking that the rate limiter allows it for the provided rule
 func (m *Module) SendEvent(rule *rules.Rule, event Event, extTagsCb func() []string, service string) {
-	if m.rateLimiter.Allow(rule.ID) {
+	if m.rateLimiter.Allow(rateLimiterGroup, rule.ID) {
 		m.apiServer.SendEvent(rule, event, extTagsCb, service)
 	} else {
 		seclog.Tracef("Event on rule %s was dropped due to rate limiting", rule.ID)
@@ -529,7 +530,7 @@ func (m *Module) metricsSender() {
 			if err := m.probe.SendStats(); err != nil {
 				log.Debug(err)
 			}
-			if err := m.rateLimiter.SendStats(); err != nil {
+			if err := m.rateLimiter.SendGroupStats(rateLimiterGroup); err != nil {
 				log.Debug(err)
 			}
 			if err := m.apiServer.SendStats(); err != nil {
@@ -619,7 +620,7 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 	ctx, cancelFnc := context.WithCancel(context.Background())
 
 	// custom limiters
-	limits := make(map[rules.RuleID]Limit)
+	limits := make(map[string]map[string]utils.Limit)
 
 	selfTester, err := selftests.NewSelfTester()
 	if err != nil {
@@ -634,7 +635,7 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 		statsdClient:   statsdClient,
 		apiServer:      NewAPIServer(cfg, probe, statsdClient),
 		grpcServer:     grpc.NewServer(),
-		rateLimiter:    NewRateLimiter(statsdClient, LimiterOpts{Limits: limits}),
+		rateLimiter:    NewRateLimiter(statsdClient, LimiterOpts{Limits: make(map[string]map[string]Limit)}),
 		sigupChan:      make(chan os.Signal, 1),
 		ctx:            ctx,
 		cancelFnc:      cancelFnc,

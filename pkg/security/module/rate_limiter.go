@@ -16,7 +16,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 )
 
 const (
@@ -35,12 +34,11 @@ type Limit struct {
 
 // LimiterOpts rate limiter options
 type LimiterOpts struct {
-	Limits map[rules.RuleID]Limit
+	Limits map[string]map[string]Limit
 }
 
 // Limiter describes an object that applies limits on
-// the rate of triggering of a rule to ensure we don't overflow
-// with too permissive rules
+// the rate of triggering something (rules, acvitity dumps events etc)
 type Limiter struct {
 	limiter *rate.Limiter
 
@@ -50,67 +48,67 @@ type Limiter struct {
 	allowed int64
 }
 
-// NewLimiter returns a new rule limiter
+// NewLimiter returns a new rate limiter
 func NewLimiter(limit rate.Limit, burst int) *Limiter {
 	return &Limiter{
 		limiter: rate.NewLimiter(limit, burst),
 	}
 }
 
-// RateLimiter describes a set of rule rate limiters
+// RateLimiter describes a set of rate limiters
 type RateLimiter struct {
 	sync.RWMutex
 	opts         LimiterOpts
-	limiters     map[rules.RuleID]*Limiter
+	limiters     map[string]map[string]*Limiter
 	statsdClient statsd.ClientInterface
 }
 
 // NewRateLimiter initializes an empty rate limiter
 func NewRateLimiter(client statsd.ClientInterface, opts LimiterOpts) *RateLimiter {
 	return &RateLimiter{
-		limiters:     make(map[string]*Limiter),
+		limiters:     make(map[string]map[string]*Limiter),
 		statsdClient: client,
 		opts:         opts,
 	}
 }
 
-// Apply a set of rules
-func (rl *RateLimiter) Apply(rules []rules.RuleID) {
+// Apply a set of rate limiters
+func (rl *RateLimiter) Apply(group string, ids []string) {
 	rl.Lock()
 	defer rl.Unlock()
 
 	newLimiters := make(map[string]*Limiter)
-	for _, id := range rules {
-		if limiter, found := rl.limiters[id]; found {
+	for _, id := range ids {
+		if limiter, found := rl.limiters[group][id]; found {
 			newLimiters[id] = limiter
 		} else {
 			limit := defaultLimit
 			burst := defaultBurst
 
-			if l, exists := rl.opts.Limits[id]; exists {
+			if l, exists := rl.opts.Limits[group][id]; exists {
 				limit = rate.Limit(l.Limit)
 				burst = l.Burst
 			}
 			newLimiters[id] = NewLimiter(limit, burst)
 		}
 	}
-	rl.limiters = newLimiters
+	rl.limiters[group] = newLimiters
 }
 
-// Allow returns true if a specific rule shall be allowed to sent a new event
-func (rl *RateLimiter) Allow(ruleID string) bool {
+// Allow returns true if a specific consumer shall be allowed take a token
+func (rl *RateLimiter) Allow(group string, id string) bool {
 	rl.RLock()
 	defer rl.RUnlock()
 
-	ruleLimiter, ok := rl.limiters[ruleID]
+	limiter, ok := rl.limiters[group][id]
 	if !ok {
 		return false
 	}
-	if ruleLimiter.limiter.Allow() {
-		ruleLimiter.allowed++
+	if limiter.limiter.Allow() {
+		limiter.allowed++
 		return true
 	}
-	ruleLimiter.dropped++
+	limiter.dropped++
 	return false
 }
 
@@ -120,29 +118,29 @@ type RateLimiterStat struct {
 	allowed int64
 }
 
-// GetStats returns a map indexed by ruleIDs that describes the amount of events
-// that were dropped because of the rate limiter
-func (rl *RateLimiter) GetStats() map[rules.RuleID]RateLimiterStat {
+// GetGroupStats returns a map indexed by IDs of a specified group
+// that describes the amount of allowed and dropped hits
+func (rl *RateLimiter) GetGroupStats(group string) map[string]RateLimiterStat {
 	rl.Lock()
 	defer rl.Unlock()
 
-	stats := make(map[rules.RuleID]RateLimiterStat)
-	for ruleID, ruleLimiter := range rl.limiters {
-		stats[ruleID] = RateLimiterStat{
-			dropped: ruleLimiter.dropped,
-			allowed: ruleLimiter.allowed,
+	stats := make(map[string]RateLimiterStat)
+	for id, limiter := range rl.limiters[group] {
+		stats[id] = RateLimiterStat{
+			dropped: limiter.dropped,
+			allowed: limiter.allowed,
 		}
-		ruleLimiter.dropped = 0
-		ruleLimiter.allowed = 0
+		limiter.dropped = 0
+		limiter.allowed = 0
 	}
 	return stats
 }
 
-// SendStats sends statistics about the number of sent and drops events
-// for the set of rules
-func (rl *RateLimiter) SendStats() error {
-	for ruleID, counts := range rl.GetStats() {
-		tags := []string{fmt.Sprintf("rule_id:%s", ruleID)}
+// SendGroupStats sends statistics about the number of allowed and drops hits
+// for the given group of rate limiters
+func (rl *RateLimiter) SendGroupStats(group string) error {
+	for id, counts := range rl.GetGroupStats(group) {
+		tags := []string{fmt.Sprintf("%s:%s", group, id)}
 		if counts.dropped > 0 {
 			if err := rl.statsdClient.Count(metrics.MetricRateLimiterDrop, counts.dropped, tags, 1.0); err != nil {
 				return err
