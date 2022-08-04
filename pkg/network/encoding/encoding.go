@@ -77,9 +77,10 @@ func modelConnections(conns *network.Connections) *model.Connections {
 		agentConns[i] = FormatConnection(conn, routeIndex, httpEncoder, dnsFormatter, ipc, tagsSet)
 	}
 
-	if httpEncoder != nil && httpEncoder.orphanEntries > 0 {
+	if httpEncoder != nil {
 		log.Debugf(
-			"detected orphan http aggreggations. this can be either caused by conntrack sampling or missed tcp close events. count=%d",
+			"http stats summary (userspace) request_count=%d orphan_aggregations=%d",
+			httpEncoder.requestCount,
 			httpEncoder.orphanEntries,
 		)
 	}

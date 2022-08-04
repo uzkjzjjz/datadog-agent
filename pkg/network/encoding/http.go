@@ -23,6 +23,7 @@ type httpEncoder struct {
 	poolIdx  int
 
 	orphanEntries int
+	requestCount  int
 }
 
 func newHTTPEncoder(payload *network.Connections) *httpEncoder {
@@ -56,7 +57,18 @@ func (e *httpEncoder) GetHTTPAggregationsAndTags(c network.ConnectionStats) (*mo
 	}
 
 	keyTuple := network.HTTPKeyTupleFromConn(c)
-	return e.aggregations[keyTuple], e.tags[keyTuple]
+
+	// Count HTTP requests
+	aggr := e.aggregations[keyTuple]
+	if aggr != nil {
+		for _, pathStats := range aggr.EndpointAggregations {
+			for _, stats := range pathStats.StatsByResponseStatus {
+				e.requestCount += int(stats.Count)
+			}
+		}
+	}
+
+	return aggr, e.tags[keyTuple]
 }
 
 func (e *httpEncoder) buildAggregations(payload *network.Connections) {

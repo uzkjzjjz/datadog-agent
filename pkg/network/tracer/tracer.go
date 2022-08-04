@@ -335,6 +335,19 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 	active := t.activeBuffer.Connections()
 
 	delta := t.state.GetDelta(clientID, latestTime, active, t.reverseDNS.GetDNSStats(), t.httpMonitor.GetHTTPStats())
+
+	// DEBUG
+	requestCount := 0
+	for _, httpStats := range delta.HTTP {
+		for i := 100; i <= 500; i += 100 {
+			stats := httpStats.Stats(i)
+			if stats != nil {
+				requestCount += stats.Count
+			}
+		}
+	}
+	log.Debug("http total request count (pre-encoding): %d", requestCount)
+
 	t.activeBuffer.Reset()
 
 	t.retryConntrack(delta.Conns)
