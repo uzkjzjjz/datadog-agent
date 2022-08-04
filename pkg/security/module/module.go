@@ -64,7 +64,7 @@ type Module struct {
 	apiServer        *APIServer
 	grpcServer       *grpc.Server
 	listener         net.Listener
-	rateLimiter      *RateLimiter
+	rateLimiter      *utils.RateLimiter
 	sigupChan        chan os.Signal
 	ctx              context.Context
 	cancelFnc        context.CancelFunc
@@ -393,7 +393,7 @@ func (m *Module) LoadPolicies(policyProviders []rules.PolicyProvider, sendLoaded
 	ruleIDs = append(ruleIDs, sprobe.AllCustomRuleIDs()...)
 
 	m.apiServer.Apply(ruleIDs)
-	m.rateLimiter.Apply(rateLimiterGroup, ruleIDs)
+	m.rateLimiter.SetGroupLimiters(rateLimiterGroup, ruleIDs)
 
 	m.displayReport(report)
 
@@ -635,7 +635,7 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 		statsdClient:   statsdClient,
 		apiServer:      NewAPIServer(cfg, probe, statsdClient),
 		grpcServer:     grpc.NewServer(),
-		rateLimiter:    NewRateLimiter(statsdClient, LimiterOpts{Limits: make(map[string]map[string]Limit)}),
+		rateLimiter:    utils.NewRateLimiter(statsdClient),
 		sigupChan:      make(chan os.Signal, 1),
 		ctx:            ctx,
 		cancelFnc:      cancelFnc,
