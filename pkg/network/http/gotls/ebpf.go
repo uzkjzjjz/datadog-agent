@@ -1,3 +1,4 @@
+//go:build linux_bpf
 // +build linux_bpf
 
 package gotls
@@ -19,8 +20,8 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
 	"github.com/DataDog/datadog-agent/pkg/network/go/binversion"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/ebpf"
-	"github.com/DataDog/ebpf/manager"
+	"github.com/DataDog/ebpf-manager"
+	"github.com/cilium/ebpf"
 	"github.com/twmb/murmur3"
 )
 
@@ -50,6 +51,14 @@ const (
 	readProbe       = "uprobe/crypto/tls.(*Conn).Read"
 	readReturnProbe = "uprobe/crypto/tls.(*Conn).Read/return"
 	closeProbe      = "uprobe/crypto/tls.(*Conn).Close"
+)
+
+// TODO
+const (
+	writeFuncName      = "uprobe__crypto_tls_Conn_Write"
+	readFuncName       = "uprobe__crypto_tls_Conn_Read"
+	readReturnFuncName = "uprobe__crypto_tls_Conn_Read__return"
+	closeFuncName      = "uprobe__crypto_tls_Conn_Close"
 )
 
 type GoTLSProgram struct {
@@ -349,11 +358,14 @@ func (o *GoTLSProgram) startBinaryProgram(binaryPath string, elfFile *elf.File, 
 	readReturnProbes := []*manager.Probe{}
 	for i, offset := range attachmentArgs.readReturnAddresses {
 		readReturnProbes = append(readReturnProbes, &manager.Probe{
+			ProbeIdentificationPair: manager.ProbeIdentificationPair{
+				EBPFSection:  readReturnProbe,
+				EBPFFuncName: readReturnFuncName,
+				UID:          makeReturnUID(uid, i),
+			},
 			BinaryPath: binaryPath,
 			// Each return probe needs to have a unique uid value,
 			// so add the index to the binary UID to make an overall UID.
-			UID:          makeReturnUID(uid, i),
-			Section:      readReturnProbe,
 			UprobeOffset: offset,
 		})
 	}
@@ -372,9 +384,33 @@ func (o *GoTLSProgram) startBinaryProgram(binaryPath string, elfFile *elf.File, 
 			// are added below using manager.Options.MapEditors
 		},
 		Probes: append([]*manager.Probe{
-			{BinaryPath: binaryPath, UID: uid, Section: writeProbe, UprobeOffset: attachmentArgs.writeAddress},
-			{BinaryPath: binaryPath, UID: uid, Section: readProbe, UprobeOffset: attachmentArgs.readAddress},
-			{BinaryPath: binaryPath, UID: uid, Section: closeProbe, UprobeOffset: attachmentArgs.closeAddress},
+			{
+				BinaryPath:   binaryPath,
+				UprobeOffset: attachmentArgs.writeAddress,
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  writeProbe,
+					EBPFFuncName: writeFuncName,
+					UID:          uid,
+				},
+			},
+			{
+				BinaryPath: binaryPath,
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  readProbe,
+					EBPFFuncName: readFuncName,
+					UID:          uid,
+				},
+				UprobeOffset: attachmentArgs.readAddress,
+			},
+			{
+				BinaryPath: binaryPath,
+				ProbeIdentificationPair: manager.ProbeIdentificationPair{
+					EBPFSection:  closeProbe,
+					EBPFFuncName: closeFuncName,
+					UID:          uid,
+				},
+				UprobeOffset: attachmentArgs.closeAddress,
+			},
 		}, readReturnProbes...),
 	}
 

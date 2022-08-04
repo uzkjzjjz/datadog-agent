@@ -4,17 +4,8 @@
 #include "bpf_helpers.h"
 #include "go-tls-types.h"
 #include "go-tls-maps.h"
+#include "port_range.h"
 #include "ip.h"
-
-// TODO de-duplicate with http.c
-// TODO: Replace those by injected constants based on system configuration
-// once we have port range detection merged into the codebase.
-#define EPHEMERAL_RANGE_BEG 32768
-#define EPHEMERAL_RANGE_END 60999
-
-static __always_inline int is_ephemeral_port(u16 port) {
-    return port >= EPHEMERAL_RANGE_BEG && port <= EPHEMERAL_RANGE_END;
-}
 
 // Implemented either in c/runtime/conn-tuple.h or from c/sockfd.h
 static int read_conn_tuple(conn_tuple_t *t, struct sock *skp, u64 pid_tgid, metadata_mask_t type);

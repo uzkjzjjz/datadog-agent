@@ -10,7 +10,7 @@
 #include "http-types.h"
 #include "tags-types.h"
 #include "http-buffer.h"
-#include "http.h"
+#include "https.h"
 
 static __always_inline tls_probe_data_t* get_probe_data() {
 	uint32_t key = 0;
@@ -44,14 +44,7 @@ int uprobe__crypto_tls_Conn_Write(struct pt_regs *ctx) {
 		return 1;
 	}
 
-    char buffer[HTTP_BUFFER_SIZE];
-    __builtin_memset(buffer, 0, sizeof(buffer));
-	read_into_buffer(buffer, b_data, b_len);
-
-    skb_info_t skb_info = {0};
-    __builtin_memcpy(&skb_info.tup, t, sizeof(conn_tuple_t));
-    http_process(buffer, &skb_info, skb_info.tup.sport, GO);
-
+    https_process(t, b_data, b_len, GO);
     return 0;
 }
 
@@ -122,13 +115,7 @@ int uprobe__crypto_tls_Conn_Read__return(struct pt_regs *ctx) {
 	// (and if so, treat it like there's no error at all),
 	// and I didn't find a straightforward way of doing this.
 
-    char buffer[HTTP_BUFFER_SIZE];
-    __builtin_memset(buffer, 0, sizeof(buffer));
-	read_into_buffer(buffer, (char*) call_data.b_data, bytes_read);
-
-    skb_info_t skb_info = {0};
-    __builtin_memcpy(&skb_info.tup, t, sizeof(conn_tuple_t));
-    http_process(buffer, &skb_info, skb_info.tup.sport, GO);
+    https_process(t, (void*) call_data.b_data, bytes_read, GO);
 
 	return 0;
 }
@@ -151,15 +138,10 @@ int uprobe__crypto_tls_Conn_Close(struct pt_regs *ctx) {
 		return 1;
 	}
 
-    char buffer[HTTP_BUFFER_SIZE];
+    char buffer[100];
     __builtin_memset(buffer, 0, sizeof(buffer));
 
-    skb_info_t skb_info = {0};
-    __builtin_memcpy(&skb_info.tup, t, sizeof(conn_tuple_t));
-
-    // TODO: this is just a hack. Let's get rid of this skb_info argument altogether
-    skb_info.tcp_flags |= TCPHDR_FIN;
-    http_process(buffer, &skb_info, skb_info.tup.sport, GO);
+    https_finish(t);
 
 	// Clear the element in the map since this connection is closed
     bpf_map_delete_elem(&conn_tup_by_tls_conn, &conn_pointer);
