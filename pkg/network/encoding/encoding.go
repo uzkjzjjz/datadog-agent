@@ -83,6 +83,7 @@ func modelConnections(conns *network.Connections) *model.Connections {
 			httpEncoder.requestCount,
 			httpEncoder.orphanEntries,
 		)
+		httpEncoder.DebugLogCollisions()
 	}
 
 	routes := make([]*model.Route, len(routeIndex))

@@ -346,7 +346,7 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 			}
 		}
 	}
-	log.Debug("http total request count (pre-encoding): %d", requestCount)
+	log.Debugf("http total request count (pre-encoding): %d", requestCount)
 
 	t.activeBuffer.Reset()
 

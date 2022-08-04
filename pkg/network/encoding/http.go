@@ -11,10 +11,16 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/http"
+	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
+type aggregationDebug struct {
+	*model.HTTPAggregations
+	references []network.ConnectionStats
+}
+
 type httpEncoder struct {
-	aggregations map[http.KeyTuple]*model.HTTPAggregations
+	aggregations map[http.KeyTuple]*aggregationDebug
 	tags         map[http.KeyTuple]uint64
 
 	// pre-allocated objects
@@ -32,7 +38,7 @@ func newHTTPEncoder(payload *network.Connections) *httpEncoder {
 	}
 
 	encoder := &httpEncoder{
-		aggregations: make(map[http.KeyTuple]*model.HTTPAggregations, len(payload.Conns)),
+		aggregations: make(map[http.KeyTuple]*aggregationDebug, len(payload.Conns)),
 		tags:         make(map[http.KeyTuple]uint64, len(payload.Conns)),
 
 		// pre-allocate all data objects at once
@@ -66,9 +72,12 @@ func (e *httpEncoder) GetHTTPAggregationsAndTags(c network.ConnectionStats) (*mo
 				e.requestCount += int(stats.Count)
 			}
 		}
+
+		aggr.references = append(aggr.references, c)
+		return aggr.HTTPAggregations, e.tags[keyTuple]
 	}
 
-	return aggr, e.tags[keyTuple]
+	return nil, 0
 }
 
 func (e *httpEncoder) buildAggregations(payload *network.Connections) {
@@ -86,8 +95,10 @@ func (e *httpEncoder) buildAggregations(payload *network.Connections) {
 		}
 
 		if aggregation == nil {
-			aggregation = &model.HTTPAggregations{
-				EndpointAggregations: make([]*model.HTTPStats, 0, aggrSize[key.KeyTuple]),
+			aggregation = &aggregationDebug{
+				HTTPAggregations: &model.HTTPAggregations{
+					EndpointAggregations: make([]*model.HTTPStats, 0, aggrSize[key.KeyTuple]),
+				},
 			}
 			e.aggregations[key.KeyTuple] = aggregation
 		}
@@ -131,4 +142,15 @@ func (e *httpEncoder) getDataSlice() []*model.HTTPStats_Data {
 	}
 	e.poolIdx += http.NumStatusClasses
 	return ptrs
+}
+
+func (e *httpEncoder) DebugLogCollisions() {
+	collisions := 0
+	for _, aggr := range e.aggregations {
+		if aggr != nil && len(aggr.references) > 1 {
+			collisions += len(aggr.references) - 1
+			log.Debugf("the following connections reference the same HTTP stats: %+v", aggr.references)
+		}
+	}
+	log.Debugf("total HTTP collisions: %d", collisions)
 }
