@@ -20,7 +20,7 @@ go_deps:
   needs: []
   script:
     - inv -e deps --verbose
-    - tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache.tar.zst
+    - cd $GOPATH/pkg/mod/; tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache.tar.zst
   artifacts:
     expire_in: 1 day
     paths:
@@ -34,8 +34,7 @@ go_tools_deps:
   needs: []
   script:
     - inv -e download-tools
-    - cd $GOPATH/pkg/mod/
-    - tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache_tools.tar.zst
+    - cd $GOPATH/pkg/mod/; tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache_tools.tar.zst
   artifacts:
     expire_in: 1 day
     paths:
