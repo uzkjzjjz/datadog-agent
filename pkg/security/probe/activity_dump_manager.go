@@ -154,6 +154,38 @@ func (adm *ActivityDumpManager) removeActivityDumpRateLimiter(id string) {
 	adm.RateLimiter.RemoveLimiter(rateLimiterGroupBind, id)
 }
 
+func (adm *ActivityDumpManager) testRateLimiter() {
+	adm.Lock()
+	defer adm.Unlock()
+
+	// create limiters for 2 cgroups, foo and bar with default limits/bursts
+	adm.addNewActivityDumpRateLimiter("foo")
+	adm.addNewActivityDumpRateLimiter("bar")
+
+	// discard bind and dns events for foo
+	adm.RateLimiter.UpdateLimit(rateLimiterGroupBind, "foo", 0, 0)
+	adm.RateLimiter.UpdateLimit(rateLimiterGroupDNS, "foo", 0, 0)
+
+	stats, err := adm.RateLimiter.GetLimiterStats(rateLimiterGroupOpen, "foo", true)
+	if err != nil {
+		if stats.Dropped > stats.Allowed { // dumb if :)
+			// reduce rate of opens for foo
+			adm.RateLimiter.UpdateLimit(rateLimiterGroupOpen, "foo", defaultOpenLimit/2, defaultOpenLimit)
+		}
+	}
+
+	stats, err = adm.RateLimiter.GetGlobalGroupStats(rateLimiterGroupOpen, true)
+	if err != nil {
+		if stats.Dropped > stats.Allowed { // dumb if :)
+			// reduce globally the rate of opens
+			adm.RateLimiter.UpdateGroupLimit(rateLimiterGroupOpen, defaultOpenLimit/2, defaultOpenLimit)
+		}
+	}
+
+	// bar cgroups have ended
+	adm.removeActivityDumpRateLimiter("bar")
+}
+
 // NewActivityDumpManager returns a new ActivityDumpManager instance
 func NewActivityDumpManager(p *Probe) (*ActivityDumpManager, error) {
 	tracedPIDs, found, err := p.manager.GetMap("traced_pids")
