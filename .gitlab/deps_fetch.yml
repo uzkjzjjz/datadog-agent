@@ -5,12 +5,12 @@
 
 .retrieve_linux_go_deps:
   - mkdir -p $GOPATH/pkg/mod
-  - zstd -T0 -cd modcache.tar.zst | tar -xf -C $GOPATH/pkg/mod
+  - zstd -T0 -cd modcache.tar.zst | tar -xC $GOPATH/pkg/mod
   - rm -f modcache.tar.zst
 
 .retrieve_linux_go_tools_deps:
   - mkdir -p $GOPATH/pkg/mod
-  - zstd -T0 -cd modcache_tools.tar.zst | tar -xf -C $GOPATH/pkg/mod
+  - zstd -T0 -cd modcache_tools.tar.zst | tar -xC $GOPATH/pkg/mod
   - rm -f modcache_tools.tar.zst
 
 go_deps:
