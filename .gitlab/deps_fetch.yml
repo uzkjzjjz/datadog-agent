@@ -20,7 +20,7 @@ go_deps:
   needs: []
   script:
     - inv -e deps --verbose
-    - cd $GOPATH/pkg/mod/ && tar --use-compress-program zstd -cf $CI_PROJECT_DIR/modcache.tar.zst .
+    - tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache.tar.zst
   artifacts:
     expire_in: 1 day
     paths:
