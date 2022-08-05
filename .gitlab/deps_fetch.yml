@@ -4,11 +4,13 @@
 # to reuse them in further jobs that need them.
 
 .retrieve_linux_go_deps:
-  - mkdir -p $GOPATH/pkg/mod && tar --use-compress-program zstd -xf modcache.tar.zst -C $GOPATH/pkg/mod
+  - mkdir -p $GOPATH/pkg/mod
+  - zstd -T0 -cd modcache.tar.zst | tar -xf -C $GOPATH/pkg/mod
   - rm -f modcache.tar.zst
 
 .retrieve_linux_go_tools_deps:
-  - mkdir -p $GOPATH/pkg/mod && tar --use-compress-program zstd -xf modcache_tools.tar.zst -C $GOPATH/pkg/mod
+  - mkdir -p $GOPATH/pkg/mod
+  - zstd -T0 -cd modcache_tools.tar.zst | tar -xf -C $GOPATH/pkg/mod
   - rm -f modcache_tools.tar.zst
 
 go_deps:
@@ -32,7 +34,8 @@ go_tools_deps:
   needs: []
   script:
     - inv -e download-tools
-    - cd $GOPATH/pkg/mod/ && tar --use-compress-program zstd -cf $CI_PROJECT_DIR/modcache_tools.tar.zst .
+    - cd $GOPATH/pkg/mod/
+    - tar -cf . | zstd -T0 -5 > $CI_PROJECT_DIR/modcache_tools.tar.zst
   artifacts:
     expire_in: 1 day
     paths:
