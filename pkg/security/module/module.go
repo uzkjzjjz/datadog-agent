@@ -627,6 +627,9 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 		log.Errorf("unable to instantiate self tests: %s", err)
 	}
 
+	// custom limiters
+	limits := make(map[string]map[string]utils.Limit)
+
 	m := &Module{
 		config:         cfg,
 		probe:          probe,
@@ -635,7 +638,7 @@ func NewModule(cfg *sconfig.Config, opts ...Opts) (module.Module, error) {
 		statsdClient:   statsdClient,
 		apiServer:      NewAPIServer(cfg, probe, statsdClient),
 		grpcServer:     grpc.NewServer(),
-		rateLimiter:    utils.NewRateLimiter(statsdClient),
+		rateLimiter:    utils.NewRateLimiter(statsdClient, utils.LimiterOpts{Limits: limits}),
 		sigupChan:      make(chan os.Signal, 1),
 		ctx:            ctx,
 		cancelFnc:      cancelFnc,

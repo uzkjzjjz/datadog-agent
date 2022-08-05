@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
+	"golang.org/x/time/rate"
 
 	coreconfig "github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/security/api"
@@ -49,6 +50,7 @@ type ActivityDumpManager struct {
 	loadController *ActivityDumpLoadController
 	contextTags    []string
 	hostname       string
+	RateLimiter    *utils.RateLimiter
 }
 
 // Start runs the ActivityDumpManager
@@ -126,6 +128,32 @@ func (adm *ActivityDumpManager) resolveTags() {
 	}
 }
 
+// rate limiter consts
+const (
+	rateLimiterGroupExec = "AD_Exec"
+	rateLimiterGroupOpen = "AD_Open"
+	rateLimiterGroupDNS  = "AD_DNS"
+	rateLimiterGroupBind = "AD_Bind"
+
+	defaultOpenLimit = 50
+	defaultDNSLimit  = 20
+	defaultBindLimit = 20
+)
+
+func (adm *ActivityDumpManager) addNewActivityDumpRateLimiter(id string) {
+	adm.RateLimiter.AddNewLimiter(rateLimiterGroupExec, id, rate.Inf, 1)
+	adm.RateLimiter.AddNewLimiter(rateLimiterGroupOpen, id, defaultOpenLimit, defaultOpenLimit*2)
+	adm.RateLimiter.AddNewLimiter(rateLimiterGroupDNS, id, defaultDNSLimit, defaultDNSLimit*2)
+	adm.RateLimiter.AddNewLimiter(rateLimiterGroupBind, id, defaultBindLimit, defaultBindLimit*2)
+}
+
+func (adm *ActivityDumpManager) removeActivityDumpRateLimiter(id string) {
+	adm.RateLimiter.RemoveLimiter(rateLimiterGroupExec, id)
+	adm.RateLimiter.RemoveLimiter(rateLimiterGroupOpen, id)
+	adm.RateLimiter.RemoveLimiter(rateLimiterGroupDNS, id)
+	adm.RateLimiter.RemoveLimiter(rateLimiterGroupBind, id)
+}
+
 // NewActivityDumpManager returns a new ActivityDumpManager instance
 func NewActivityDumpManager(p *Probe) (*ActivityDumpManager, error) {
 	tracedPIDs, found, err := p.manager.GetMap("traced_pids")
@@ -182,6 +210,7 @@ func NewActivityDumpManager(p *Probe) (*ActivityDumpManager, error) {
 		snapshotQueue:     make(chan *ActivityDump, 100),
 		storage:           storageManager,
 		loadController:    loadController,
+		RateLimiter:       utils.NewRateLimiter(nil, utils.LimiterOpts{Limits: make(map[string]map[string]utils.Limit)}), // TODO: pass the statdclient
 	}
 
 	adm.prepareContextTags()

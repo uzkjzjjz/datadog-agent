@@ -71,14 +71,12 @@ type RateLimiter struct {
 }
 
 // NewRateLimiter initializes an empty rate limiter
-func NewRateLimiter(client statsd.ClientInterface) *RateLimiter {
+func NewRateLimiter(client statsd.ClientInterface, opts LimiterOpts) *RateLimiter {
 	return &RateLimiter{
 		limiters:     make(map[string]map[string]*Limiter),
 		groupStats:   make(map[string]RateLimiterStat),
 		statsdClient: client,
-		opts: LimiterOpts{
-			Limits: make(map[string]map[string]Limit),
-		},
+		opts:         opts,
 	}
 }
 
@@ -110,11 +108,16 @@ func (rl *RateLimiter) AddNewLimiter(group string, id string, limit rate.Limit, 
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if burst <= 1 {
+	if burst < 1 {
 		return fmt.Errorf("EINVAL")
 	}
 
-	_, ok := rl.limiters[group][id]
+	_, ok := rl.limiters[group]
+	if !ok {
+		rl.limiters[group] = make(map[string]*Limiter)
+	}
+
+	_, ok = rl.limiters[group][id]
 	if ok {
 		return fmt.Errorf("EEXIST")
 	}
@@ -166,7 +169,7 @@ func (rl *RateLimiter) UpdateLimit(group string, id string, newLimit rate.Limit,
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if newBurst <= 1 {
+	if newBurst < 1 {
 		return fmt.Errorf("EINVAL")
 	}
 
@@ -186,7 +189,7 @@ func (rl *RateLimiter) UpdateGroupLimit(group string, newLimit rate.Limit, newBu
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if newBurst <= 1 {
+	if newBurst < 1 {
 		return fmt.Errorf("EINVAL")
 	}
 
