@@ -11,7 +11,7 @@ deploy_staging_deb-7:
   stage: deploy7
   resource_group: deb_bucket
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies:
     - agent_deb-x64-a7
     - agent_deb-arm64-a7
@@ -22,6 +22,8 @@ deploy_staging_deb-7:
     - dogstatsd_deb-x64
     - dogstatsd_deb-arm64
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     # We first check that the current version hasn't already been deployed
@@ -54,7 +56,7 @@ deploy_staging_rpm-7:
   stage: deploy7
   resource_group: rpm_bucket
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies:
     - agent_rpm-x64-a7
     - agent_rpm-arm64-a7
@@ -63,6 +65,8 @@ deploy_staging_rpm-7:
     - iot_agent_rpm-armhf
     - dogstatsd_rpm-x64
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     - *setup_rpm_signing_key
@@ -81,12 +85,14 @@ deploy_staging_suse_rpm-7:
   stage: deploy7
   resource_group: suse_bucket
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies:
     - agent_suse-x64-a7
     - dogstatsd_suse-x64
     - iot_agent_suse-x64
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR_SUSE
   script:
     - *setup_rpm_signing_key
@@ -101,9 +107,11 @@ deploy_staging_dmg-a7:
     !reference [.on_deploy_a7]
   stage: deploy7
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["agent_dmg-x64-a7"]
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     - $S3_CP_CMD --recursive --exclude "*" --include "datadog-agent-7*.dmg" $OMNIBUS_PACKAGE_DIR s3://$MACOS_S3_BUCKET/$BUCKET_BRANCH/ --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732
@@ -117,9 +125,11 @@ deploy_staging_dsd:
     !reference [.on_deploy_a7]
   stage: deploy7
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["build_dogstatsd-binary_x64"]
   script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - $S3_CP_CMD $S3_ARTIFACTS_URI/dogstatsd/dogstatsd ./dogstatsd
     - export PACKAGE_VERSION=$(inv agent.version --url-safe --major-version 7)
     - $S3_CP_CMD ./dogstatsd $S3_DSD6_URI/linux/dogstatsd-$PACKAGE_VERSION --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732
@@ -130,9 +140,11 @@ deploy_staging_iot_agent:
     !reference [.on_deploy_a7]
   stage: deploy7
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["build_iot_agent-binary_x64"]
   script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - $S3_CP_CMD $S3_ARTIFACTS_URI/iot/agent ./agent
     - export PACKAGE_VERSION=$(inv agent.version --url-safe --major-version 7)
     - $S3_CP_CMD ./agent $S3_DSD6_URI/linux/iot/agent-$PACKAGE_VERSION --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732
@@ -144,9 +156,11 @@ deploy_staging_android_tags:
     - when: never
   stage: deploy7
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["agent_android_apk"]
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     - $S3_CP_CMD --recursive --exclude "*" --include "*.apk" $OMNIBUS_PACKAGE_DIR s3://$ANDROID_BUILDS_S3_BUCKET/tagged/ --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers full=id=3a6e02b08553fd157ae3fb918945dd1eaae5a1aa818940381ef07a430cf25732

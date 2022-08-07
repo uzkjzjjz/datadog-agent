@@ -12,9 +12,11 @@
 .deploy_cloudfront_invalidate:
   stage: deploy_invalidate
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: []
   script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - cd /deploy_scripts/cloudfront-invalidation
     - "REPO=apt RUNNER_ENV=build-stable REPO_ENV=staging PATTERN_SUBSTRING=/$BUCKET_BRANCH/ ./invalidate.sh"
     - "REPO=yum RUNNER_ENV=build-stable REPO_ENV=staging PATTERN_SUBSTRING=/$BUCKET_BRANCH/ ./invalidate.sh"

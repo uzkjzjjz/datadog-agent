@@ -12,9 +12,11 @@ check_already_deployed_version_6:
     !reference [.on_deploy_a6]
   stage: check_deploy
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["agent_deb-x64-a6", "agent_deb-arm64-a6"]
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     - cd $OMNIBUS_PACKAGE_DIR && /deploy_scripts/fail_deb_is_pkg_already_exists.sh datadog-agent_6*_amd64.deb
@@ -25,9 +27,11 @@ check_already_deployed_version_7:
     !reference [.on_deploy_a7]
   stage: check_deploy
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: ["agent_deb-x64-a7", "agent_deb-arm64-a7"]
   before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
     - ls $OMNIBUS_PACKAGE_DIR
   script:
     - cd $OMNIBUS_PACKAGE_DIR && /deploy_scripts/fail_deb_is_pkg_already_exists.sh datadog-agent_7*_amd64.deb
@@ -39,7 +43,7 @@ check_if_build_only:
     !reference [.on_deploy]
   stage: check_deploy
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   dependencies: []
   script:
     - if [ "$BUCKET_BRANCH" == "none" ]; then echo "Stopping pipeline"; exit 1; fi

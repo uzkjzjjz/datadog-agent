@@ -4,9 +4,12 @@
 periodic_kitchen_cleanup_s3:
   stage: maintenance_jobs
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   rules:
     !reference [.on_testing_cleanup]
+  before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
   script:
     - aws s3 rm --recursive s3://$DEB_TESTING_S3_BUCKET/pool
     - aws s3 rm --recursive s3://$DEB_TESTING_S3_BUCKET/dists
@@ -19,9 +22,12 @@ periodic_kitchen_cleanup_s3:
 periodic_kitchen_cleanup_azure:
   stage: maintenance_jobs
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-builders/gitlab_agent_deploy:$DATADOG_AGENT_BUILDERS
-  tags: ["runner:main"]
+  tags: ["arch:amd64"]
   rules:
     !reference [.on_testing_cleanup]
+  before_script:
+    # FIXME: k8s runners don't source /etc/profile on startup, so we need to source it manually to set up rvm
+    - source /etc/profile
   script:
     - export ARM_SUBSCRIPTION_ID=`aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.azure_kitchen_subscription_id --with-decryption --query "Parameter.Value" --out text`
     - export ARM_CLIENT_ID=`aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.azure_kitchen_client_id --with-decryption --query "Parameter.Value" --out text`
