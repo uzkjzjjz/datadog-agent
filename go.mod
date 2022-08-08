@@ -423,12 +423,14 @@ require (
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/libp2p/go-reuseport v0.1.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/opentracing/basictracer-go v1.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.0 // indirect
+	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/pulumi-aws/sdk/v5 v5.7.2 // indirect
 	github.com/pulumi/pulumi-awsx/sdk v1.0.0-beta.9 // indirect
