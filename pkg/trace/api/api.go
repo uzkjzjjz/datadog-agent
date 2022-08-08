@@ -571,6 +571,13 @@ func (r *HTTPReceiver) handleTraces(v Version, w http.ResponseWriter, req *http.
 		tp.Tags[tagContainersTags] = ctags
 	}
 
+	myTags := fmt.Sprintf("container_id:%s,container_name:python-app-patched_0", tp.ContainerID)
+	log.Debug(fmt.Sprintf("settings container tags to: %v", myTags))
+	if tp.Tags == nil {
+		tp.Tags = make(map[string]string)
+	}
+	tp.Tags[tagContainersTags] = fmt.Sprintf("%s,%s", tp.Tags[tagContainersTags], myTags)
+	log.Debug(fmt.Sprintf("settings tracer_payload tags to: %v", tp.Tags[tagContainersTags]))
 	payload := &Payload{
 		Source:                 ts,
 		TracerPayload:          tp,
