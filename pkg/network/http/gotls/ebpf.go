@@ -53,7 +53,6 @@ const (
 	closeProbe      = "uprobe/crypto/tls.(*Conn).Close"
 )
 
-// TODO
 const (
 	writeFuncName      = "uprobe__crypto_tls_Conn_Write"
 	readFuncName       = "uprobe__crypto_tls_Conn_Read"
@@ -155,7 +154,8 @@ func (o *GoTLSProgram) Start() {
 	}
 
 	// TODO remove
-	testProg := os.Getenv("GO_TLS_TEST")
+	//testProg := os.Getenv("GO_TLS_TEST")
+	testProg := "/proc/506217/exe"
 	if testProg != "" {
 		go func() {
 			time.Sleep(2 * time.Second)
