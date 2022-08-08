@@ -23,6 +23,11 @@ See "Getting the Secrets" below for more information
 ## Generate the board
 
 1. `python release_qa.py <AGENT_VERSION>`
+2. (optional) `assign.py` can randomly assign all cards if desired
+    - `DRY_RUN=true python assign.py <Board Id> <comma-separated-trello-names>`
+    - Needs team's jira usernames. Current list:
+      `scottopell2,brianfloersch1,remymathieu1,carlosroman86,vickenty,nicolasguerguadj,ogaca`
+    - Remove the `DRY_RUN` env var if everything looks good
 
 
 ### Adding a new test
