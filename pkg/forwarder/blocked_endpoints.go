@@ -25,32 +25,32 @@ type blockedEndpoints struct {
 	m                sync.RWMutex
 }
 
-func newBlockedEndpoints() *blockedEndpoints {
-	backoffFactor := config.Datadog.GetFloat64("forwarder_backoff_factor")
+func newBlockedEndpoints(configDatadog config.Config) *blockedEndpoints {
+	backoffFactor := configDatadog.GetFloat64("forwarder_backoff_factor")
 	if backoffFactor < 2 {
 		log.Warnf("Configured forwarder_backoff_factor (%v) is less than 2; 2 will be used", backoffFactor)
 		backoffFactor = 2
 	}
 
-	backoffBase := config.Datadog.GetFloat64("forwarder_backoff_base")
+	backoffBase := configDatadog.GetFloat64("forwarder_backoff_base")
 	if backoffBase <= 0 {
 		log.Warnf("Configured forwarder_backoff_base (%v) is not positive; 2 will be used", backoffBase)
 		backoffBase = 2
 	}
 
-	backoffMax := config.Datadog.GetFloat64("forwarder_backoff_max")
+	backoffMax := configDatadog.GetFloat64("forwarder_backoff_max")
 	if backoffMax <= 0 {
 		log.Warnf("Configured forwarder_backoff_max (%v) is not positive; 64 seconds will be used", backoffMax)
 		backoffMax = 64
 	}
 
-	recInterval := config.Datadog.GetInt("forwarder_recovery_interval")
+	recInterval := configDatadog.GetInt("forwarder_recovery_interval")
 	if recInterval <= 0 {
 		log.Warnf("Configured forwarder_recovery_interval (%v) is not positive; %v will be used", recInterval, config.DefaultForwarderRecoveryInterval)
 		recInterval = config.DefaultForwarderRecoveryInterval
 	}
 
-	recoveryReset := config.Datadog.GetBool("forwarder_recovery_reset")
+	recoveryReset := configDatadog.GetBool("forwarder_recovery_reset")
 
 	return &blockedEndpoints{
 		errorPerEndpoint: make(map[string]*block),

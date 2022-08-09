@@ -52,17 +52,17 @@ func NewWorker(
 		resetConnectionChan: make(chan struct{}, 1),
 		stopChan:            make(chan struct{}),
 		stopped:             make(chan struct{}),
-		Client:              NewHTTPClient(),
+		Client:              NewHTTPClient(config.Datadog),
 		blockedList:         blocked,
 	}
 }
 
 // NewHTTPClient creates a new http.Client
-func NewHTTPClient() *http.Client {
+func NewHTTPClient(configDatadog config.Config) *http.Client {
 	transport := httputils.CreateHTTPTransport()
 
 	return &http.Client{
-		Timeout:   config.Datadog.GetDuration("forwarder_timeout") * time.Second,
+		Timeout:   configDatadog.GetDuration("forwarder_timeout") * time.Second,
 		Transport: transport,
 	}
 }
