@@ -12,13 +12,12 @@ import (
 	"debug/dwarf"
 	"debug/elf"
 	"debug/gosym"
+	"errors"
 	"fmt"
-
 	"github.com/go-delve/delve/pkg/dwarf/godwarf"
 	"github.com/go-delve/delve/pkg/dwarf/loclist"
 	"github.com/go-delve/delve/pkg/goversion"
 
-	"github.com/DataDog/datadog-agent/pkg/network/go/asmscan"
 	"github.com/DataDog/datadog-agent/pkg/network/go/binversion"
 	"github.com/DataDog/datadog-agent/pkg/network/go/dwarfutils"
 	"github.com/DataDog/datadog-agent/pkg/network/go/dwarfutils/locexpr"
@@ -401,9 +400,10 @@ func (i *inspectionState) findFunctions() ([]FunctionMetadata, error) {
 	// to look for the functions.
 	// Otherwise, fall-back to a go symbol table-based implementation
 	// (see https://pkg.go.dev/debug/gosym).
-	if i.dwarfInspectionState != nil {
-		return i.findFunctionsUsingDWARF()
-	}
+
+	//if i.dwarfInspectionState != nil {
+	//	return i.findFunctionsUsingDWARF()
+	//}
 
 	return i.findFunctionsUsingGoSymTab()
 }
@@ -610,7 +610,7 @@ func (i *inspectionState) getParameterLocationAtPC(parameterDIE *dwarf.Entry, pc
 // - https://github.com/go-delve/delve/blob/75bbbbb60cecda0d65c63de7ae8cb8b8412d6fc3/pkg/proc/breakpoints.go#L86-L95
 // - https://github.com/go-delve/delve/blob/75bbbbb60cecda0d65c63de7ae8cb8b8412d6fc3/pkg/proc/breakpoints.go#L374
 func (i *inspectionState) findReturnLocations(lowPC, highPC uint64) ([]uint64, error) {
-	textSection := i.elfFile.Section(".text")
+	/*textSection := i.elfFile.Section(".text")
 	if textSection == nil {
 		return nil, fmt.Errorf("no %q section found in binary file", ".text")
 	}
@@ -622,30 +622,84 @@ func (i *inspectionState) findReturnLocations(lowPC, highPC uint64) ([]uint64, e
 		return asmscan.ScanFunction(textSection, lowPC, highPC, asmscan.FindARM64ReturnInstructions)
 	default:
 		return nil, fmt.Errorf("unsupported architecture %q", i.arch)
+	}*/
+}
+
+func SymbolToOffset(f *elf.File, symbol string) (uint32, error) {
+	if f == nil {
+		return 0, errors.New("got nil elf file")
 	}
+
+	regularSymbols, regularSymbolsErr := f.Symbols()
+	dynamicSymbols, dynamicSymbolsErr := f.DynamicSymbols()
+
+	// Only if we failed getting both regular and dynamic symbols - then we abort.
+	if regularSymbolsErr != nil && dynamicSymbolsErr != nil {
+		return 0, fmt.Errorf("could not open symbol sections to resolve symbol offset: %w, %w", regularSymbolsErr, dynamicSymbolsErr)
+	}
+
+	// Concatenating into a single list.
+	// The list can have duplications, but we will find the first occurrence which is sufficient.
+	syms := append(regularSymbols, dynamicSymbols...)
+
+	sectionsToSearchForSymbol := []*elf.Section{}
+
+	for i := range f.Sections {
+		if f.Sections[i].Flags == elf.SHF_ALLOC+elf.SHF_EXECINSTR {
+			sectionsToSearchForSymbol = append(sectionsToSearchForSymbol, f.Sections[i])
+		}
+	}
+
+	var executableSection *elf.Section
+
+	for j := range syms {
+		if syms[j].Name == symbol {
+			// Find what section the symbol is in by checking the executable section's
+			// addr space.
+			for m := range sectionsToSearchForSymbol {
+				if syms[j].Value > sectionsToSearchForSymbol[m].Addr &&
+					syms[j].Value < sectionsToSearchForSymbol[m].Addr+sectionsToSearchForSymbol[m].Size {
+					executableSection = sectionsToSearchForSymbol[m]
+				}
+			}
+
+			if executableSection == nil {
+				return 0, errors.New("could not find symbol in executable sections of binary")
+			}
+
+			return uint32(syms[j].Value - executableSection.Addr + executableSection.Offset), nil
+		}
+	}
+
+	return 0, fmt.Errorf("symbol %s not found in file", symbol)
 }
 
 func (i *inspectionState) findFunctionsUsingGoSymTab() ([]FunctionMetadata, error) {
+	var functionMetadata []FunctionMetadata
 	symbolTable, err := i.parseSymbolTable()
 	if err != nil {
 		return nil, err
 	}
 
-	functionMetadata := []FunctionMetadata{}
-	for _, config := range i.config.Functions {
-		f := symbolTable.LookupFunc(config.Name)
+	for _, funcConfig := range i.config.Functions {
+		offset, err := SymbolToOffset(i.elfFile, funcConfig.Name)
+		if err != nil {
+			return nil, fmt.Errorf("could not find location for function %q: %w", funcConfig.Name, err)
+		}
+
+		f := symbolTable.LookupFunc(funcConfig.Name)
 		if f == nil {
-			return nil, fmt.Errorf("could not find func %q in symbol table", config.Name)
+			return nil, fmt.Errorf("could not find func %q in symbol table", funcConfig.Name)
 		}
 
 		lowPC := f.Entry
 		highPC := f.End
 
 		var returnLocations []uint64
-		if config.IncludeReturnLocations {
+		if funcConfig.IncludeReturnLocations {
 			locations, err := i.findReturnLocations(lowPC, highPC)
 			if err != nil {
-				return nil, fmt.Errorf("could not find return locations for function %q: %w", config.Name, err)
+				return nil, fmt.Errorf("could not find return locations for function %q: %w", funcConfig.Name, err)
 			}
 
 			returnLocations = locations
@@ -654,8 +708,8 @@ func (i *inspectionState) findFunctionsUsingGoSymTab() ([]FunctionMetadata, erro
 		// Parameter metadata cannot be determined without DWARF symbols,
 		// so this is as much metadata as we can extract.
 		functionMetadata = append(functionMetadata, FunctionMetadata{
-			Name:            config.Name,
-			EntryLocation:   lowPC,
+			Name:            funcConfig.Name,
+			EntryLocation:   uint64(offset),
 			Parameters:      nil,
 			ReturnLocations: returnLocations,
 		})

@@ -1,3 +1,4 @@
+//go:build linux_bpf
 // +build linux_bpf
 
 package gotls
@@ -172,14 +173,14 @@ func (a *attachmentArgs) loadConnWrite(function bininspect.FunctionMetadata, ins
 	a.writeAddress = function.EntryLocation
 
 	params := function.Parameters
-	if !inspectionData.IncludesDebugSymbols {
-		// Fall back to the lookup table values
-		fallbackParams, err := lookup.GetWriteParams(inspectionData.GoVersion, string(inspectionData.Arch))
-		if err != nil {
-			return fmt.Errorf("error when using fallback lookup table for write params: %w", err)
-		}
-		params = fallbackParams
+	//if !inspectionData.IncludesDebugSymbols {
+	// Fall back to the lookup table values
+	fallbackParams, err := lookup.GetWriteParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	if err != nil {
+		return fmt.Errorf("error when using fallback lookup table for write params: %w", err)
 	}
+	params = fallbackParams
+	//}
 
 	// Unpack the parameters
 	if len(params) != 2 {
@@ -216,14 +217,14 @@ func (a *attachmentArgs) loadConnRead(function bininspect.FunctionMetadata, insp
 	copy(a.readReturnAddresses, function.ReturnLocations)
 
 	params := function.Parameters
-	if !inspectionData.IncludesDebugSymbols {
-		// Fall back to the lookup table values
-		fallbackParams, err := lookup.GetReadParams(inspectionData.GoVersion, string(inspectionData.Arch))
-		if err != nil {
-			return fmt.Errorf("error when using fallback lookup table for read params: %w", err)
-		}
-		params = fallbackParams
+	//if !inspectionData.IncludesDebugSymbols {
+	// Fall back to the lookup table values
+	fallbackParams, err := lookup.GetReadParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	if err != nil {
+		return fmt.Errorf("error when using fallback lookup table for read params: %w", err)
 	}
+	params = fallbackParams
+	//}
 
 	// Unpack the parameters
 	if len(params) != 2 {
@@ -339,14 +340,14 @@ func (a *attachmentArgs) loadConnClose(function bininspect.FunctionMetadata, ins
 	a.closeAddress = function.EntryLocation
 
 	params := function.Parameters
-	if !inspectionData.IncludesDebugSymbols {
-		// Fall back to the lookup table values
-		fallbackParams, err := lookup.GetCloseParams(inspectionData.GoVersion, string(inspectionData.Arch))
-		if err != nil {
-			return fmt.Errorf("error when using fallback lookup table for close params: %w", err)
-		}
-		params = fallbackParams
+	//if !inspectionData.IncludesDebugSymbols {
+	// Fall back to the lookup table values
+	fallbackParams, err := lookup.GetCloseParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	if err != nil {
+		return fmt.Errorf("error when using fallback lookup table for close params: %w", err)
 	}
+	params = fallbackParams
+	//}
 
 	// Unpack the parameters
 	if len(params) != 1 {

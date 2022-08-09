@@ -155,7 +155,7 @@ func (o *GoTLSProgram) Start() {
 
 	// TODO remove
 	//testProg := os.Getenv("GO_TLS_TEST")
-	testProg := "/proc/506217/exe"
+	testProg := "/proc/63243/exe"
 	if testProg != "" {
 		go func() {
 			time.Sleep(2 * time.Second)
@@ -385,7 +385,8 @@ func (o *GoTLSProgram) startBinaryProgram(binaryPath string, elfFile *elf.File, 
 		},
 		Probes: append([]*manager.Probe{
 			{
-				BinaryPath:   binaryPath,
+				BinaryPath: binaryPath,
+				// 1571232
 				UprobeOffset: attachmentArgs.writeAddress,
 				ProbeIdentificationPair: manager.ProbeIdentificationPair{
 					EBPFSection:  writeProbe,
