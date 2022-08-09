@@ -16,6 +16,18 @@ struct bpf_map_def SEC("maps/conn_stats") conn_stats = {
     .namespace = "",
 };
 
+/* This is a key/value store with the keys being a conn_tuple_t for send & recv calls
+ * and the values being failed_conn_stats__t *.
+ */
+struct bpf_map_def SEC("maps/failed_conn_stats") failed_conn_stats = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(conn_tuple_t),
+    .value_size = sizeof(failed_conn_stats_t),
+    .max_entries = 0,
+    .pinning = 0,
+    .namespace = "",
+}
+
 /* This is a key/value store with the keys being a conn_tuple_t (but without the PID being used)
  * and the values being a tcp_stats_t *.
  */
