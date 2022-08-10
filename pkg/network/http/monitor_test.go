@@ -15,6 +15,8 @@ import (
 	"net"
 	nethttp "net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -116,6 +118,30 @@ func TestUnknownMethodRegression(t *testing.T) {
 	require.True(t, ok)
 	_, ok = telemetry["misses"]
 	require.True(t, ok)
+}
+
+func TestMyStamTest(t *testing.T) {
+	monitor, err := NewMonitor(config.New(), nil, nil)
+	require.NoError(t, err)
+	err = monitor.Start()
+	require.NoError(t, err)
+	defer monitor.Stop()
+
+	srvDoneFn := testutil.HTTPServer(t, "127.0.0.1:443", testutil.Options{
+		EnableTLS:        true,
+		EnableKeepAlives: true,
+	})
+	defer srvDoneFn()
+
+	err = os.Setenv("GO_TLS_TEST", fmt.Sprintf("/proc/%d/exe", os.Getpid()))
+	require.NoError(t, err)
+
+	exec.Command("curl -k https://127.0.0.1:443/200/foobar").Run()
+
+	stats := monitor.GetHTTPStats()
+	addr, err := url.Parse("https://127.0.0.1:443/200/foobar")
+	require.NoError(t, err)
+	includesRequest(t, stats, &nethttp.Request{URL: addr})
 }
 
 func TestRSTPacketRegression(t *testing.T) {
