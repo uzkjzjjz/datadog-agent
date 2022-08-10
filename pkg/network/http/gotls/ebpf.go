@@ -155,7 +155,7 @@ func (o *GoTLSProgram) Start() {
 
 	// TODO remove
 	//testProg := os.Getenv("GO_TLS_TEST")
-	testProg := "/proc/392387/exe"
+	testProg := "/proc/457357/exe"
 	if testProg != "" {
 		go func() {
 			time.Sleep(2 * time.Second)
