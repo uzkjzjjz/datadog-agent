@@ -3,6 +3,7 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2022-present Datadog, Inc.
 
+//go:build ignore
 // +build ignore
 
 package main
@@ -33,6 +34,7 @@ var (
 	archFlag           = flag.String("arch", "", "list of Go architectures")
 	packageFlag        = flag.String("package", "", "package to use when generating source")
 	sharedBuildDirFlag = flag.String("shared-build-dir", "", "shared directory to cache Go versions")
+	tagsFlag           = flag.String("tags", "", "list of go:build tags")
 )
 
 // This program is intended to be called from go generate.
@@ -80,7 +82,7 @@ func main() {
 		}
 	}()
 
-	err = run(ctx, outputFile, minGoVersion, goArches, *packageFlag, *testProgramFlag, *sharedBuildDirFlag)
+	err = run(ctx, outputFile, minGoVersion, goArches, *packageFlag, *tagsFlag, *testProgramFlag, *sharedBuildDirFlag)
 	if err != nil {
 		log.Fatalf("error generating lookup table: %s", err)
 	}
@@ -105,6 +107,7 @@ func run(
 	minGoVersion goversion.GoVersion,
 	goArches []string,
 	pkg string,
+	tags string,
 	testProgramPath string,
 	sharedBuildDir string,
 ) error {
@@ -127,6 +130,7 @@ func run(
 
 	generator := &lutgen.LookupTableGenerator{
 		Package:                pkg,
+		Tags:                   tags,
 		MinGoVersion:           minGoVersion,
 		Architectures:          goArches,
 		CompilationParallelism: 1,

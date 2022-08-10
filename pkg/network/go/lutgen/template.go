@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
+	"strings"
 	"text/template"
 
 	"github.com/go-delve/delve/pkg/goversion"
@@ -23,6 +24,8 @@ var sourceTemplate = template.Must(template.New("").Parse(templateContents))
 
 type templateArgs struct {
 	Package                string
+	Tags                   string
+	OldTags                string
 	Imports                []string
 	MinGoVersion           goversion.GoVersion
 	SupportedArchitectures []string
@@ -50,6 +53,10 @@ type branchTemplateArgs struct {
 }
 
 func (t *templateArgs) Render(writer io.Writer) error {
+	if len(t.Tags) > 0 {
+		t.OldTags = strings.ReplaceAll(strings.ReplaceAll(t.Tags, "|", ""), "&&", ",")
+	}
+
 	// Render the template to Go source, and write to a buffer
 	var buf bytes.Buffer
 	if err := sourceTemplate.Execute(&buf, t); err != nil {

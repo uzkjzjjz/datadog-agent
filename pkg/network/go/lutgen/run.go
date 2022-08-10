@@ -35,6 +35,7 @@ import (
 // which are configured in LookupFunction types.
 type LookupTableGenerator struct {
 	Package                string
+	Tags                   string
 	MinGoVersion           goversion.GoVersion
 	Architectures          []string
 	CompilationParallelism int
@@ -126,6 +127,7 @@ func (g *LookupTableGenerator) Run(ctx context.Context, writer io.Writer) error 
 			"github.com/go-delve/delve/pkg/goversion",
 		}, g.ExtraImports...),
 		Package:                g.Package,
+		Tags:                   g.Tags,
 		LookupFunctions:        lookupFunctionArgs,
 		MinGoVersion:           g.MinGoVersion,
 		SupportedArchitectures: g.Architectures,
