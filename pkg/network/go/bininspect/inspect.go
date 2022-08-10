@@ -14,6 +14,7 @@ import (
 	"debug/gosym"
 	"errors"
 	"fmt"
+	"github.com/DataDog/datadog-agent/pkg/network/go/asmscan"
 	"github.com/go-delve/delve/pkg/dwarf/godwarf"
 	"github.com/go-delve/delve/pkg/dwarf/loclist"
 	"github.com/go-delve/delve/pkg/goversion"
@@ -487,7 +488,7 @@ func (i *inspectionState) inspectFunctionUsingDWARF(entry *dwarf.Entry, config F
 	var returnLocations []uint64
 	if config.IncludeReturnLocations {
 		highPC, _ := entry.Val(dwarf.AttrHighpc).(uint64)
-		locations, err := i.findReturnLocations(lowPC, highPC)
+		locations, err := i.findReturnLocations(lowPC, highPC, 0)
 		if err != nil {
 			return FunctionMetadata{}, fmt.Errorf("could not find return locations for function %q: %w", config.Name, err)
 		}
@@ -609,20 +610,20 @@ func (i *inspectionState) getParameterLocationAtPC(parameterDIE *dwarf.Entry, pc
 // - https://github.com/go-delve/delve/pull/2704/files#diff-fb7b7a020e32bf8bf477c052ac2d2857e7e587478be6039aebc7135c658417b2R769
 // - https://github.com/go-delve/delve/blob/75bbbbb60cecda0d65c63de7ae8cb8b8412d6fc3/pkg/proc/breakpoints.go#L86-L95
 // - https://github.com/go-delve/delve/blob/75bbbbb60cecda0d65c63de7ae8cb8b8412d6fc3/pkg/proc/breakpoints.go#L374
-func (i *inspectionState) findReturnLocations(lowPC, highPC uint64) ([]uint64, error) {
-	/*textSection := i.elfFile.Section(".text")
+func (i *inspectionState) findReturnLocations(lowPC, highPC, functionOffset uint64) ([]uint64, error) {
+	textSection := i.elfFile.Section(".text")
 	if textSection == nil {
 		return nil, fmt.Errorf("no %q section found in binary file", ".text")
 	}
 
 	switch i.arch {
 	case GoArchX86_64:
-		return asmscan.ScanFunction(textSection, lowPC, highPC, asmscan.FindX86_64ReturnInstructions)
+		return asmscan.ScanFunction(textSection, lowPC, highPC, functionOffset, asmscan.FindX86_64ReturnInstructions)
 	case GoArchARM64:
-		return asmscan.ScanFunction(textSection, lowPC, highPC, asmscan.FindARM64ReturnInstructions)
+		return asmscan.ScanFunction(textSection, lowPC, highPC, functionOffset, asmscan.FindARM64ReturnInstructions)
 	default:
 		return nil, fmt.Errorf("unsupported architecture %q", i.arch)
-	}*/
+	}
 }
 
 func SymbolToOffset(f *elf.File, symbol string) (uint32, error) {
@@ -697,7 +698,7 @@ func (i *inspectionState) findFunctionsUsingGoSymTab() ([]FunctionMetadata, erro
 
 		var returnLocations []uint64
 		if funcConfig.IncludeReturnLocations {
-			locations, err := i.findReturnLocations(lowPC, highPC)
+			locations, err := i.findReturnLocations(lowPC, highPC, uint64(offset))
 			if err != nil {
 				return nil, fmt.Errorf("could not find return locations for function %q: %w", funcConfig.Name, err)
 			}
