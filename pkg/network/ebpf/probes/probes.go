@@ -128,9 +128,8 @@ const (
 	// DoSendfileRet is the kretprobe used to trace traffic via SENDFILE(2) syscall
 	DoSendfileRet ProbeName = "kretprobe/do_sendfile"
 
-	DoSysOpen ProbeName = "kprobe/do_sys_open"
-
-	GetPidTaskReturn ProbeName = "kretprobe/get_pid_task"
+	UserPathAtEmpty       ProbeName = "kprobe/user_path_at_empty"
+	SecurityInodeReadlink ProbeName = "kprobe/security_inode_readlink"
 
 	SecuritySkAlloc ProbeName = "kprobe/security_sk_alloc"
 

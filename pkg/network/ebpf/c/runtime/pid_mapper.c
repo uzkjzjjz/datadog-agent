@@ -11,7 +11,7 @@
 #define TCP_OPS_ID 2
 #define INET_OPS_ID 3
 
-struct bpf_map_def SEC("maps/tgidpid_to_proc_fd") tgidpid_to_fd = {
+struct bpf_map_def SEC("maps/tgidpid_to_fd") tgidpid_to_fd = {
    .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(__u64),
     .value_size = sizeof(int),
@@ -81,7 +81,7 @@ static int __always_inline parse_fd(char* buffer) {
     return fd;
 }
 
-SEC("kprobe/do_sys_open")
+SEC("kprobe/user_path_at_empty")
 int kprobe__do_sys_open(struct pt_regs* ctx) {
     char* path = (char *)PT_REGS_PARM2(ctx);
     char buffer[FDPATH_SZ];
@@ -107,107 +107,74 @@ int kprobe__do_sys_open(struct pt_regs* ctx) {
     return 0;
 }
 
-static __always_inline void map_sock_to_pid(struct file* f, u32 pid) {
-    struct socket* sock;
-    struct sock* sk;
+//static __always_inline void map_sock_to_pid(struct file* f, u32 pid) {
+//    struct socket* sock;
+//    struct sock* sk;
+//
+//    bpf_probe_read_kernel(&sock, sizeof(struct socket *), &f->private_data);
+//    if (sock == NULL)
+//        return;
+//
+//    bpf_probe_read_kernel(&sk, sizeof(struct sock *), &sock->sk);
+//    if (sk == NULL)
+//        return;
+//
+//    bpf_map_update_elem(&sock_to_pid, &sk, &pid, BPF_NOEXIST);
+//}
+//
+//static __always_inline int fingerprint_tcp_inet_ops(struct file* f) {
+//    struct socket* sock;
+//    struct proto_ops *pops;
+//
+//    KERNEL_READ_FAIL(&sock, sizeof(struct socket *), &f->private_data);
+//    if (sock == NULL)
+//        return 0;
+//
+//    KERNEL_READ_FAIL(&pops, sizeof(struct proto_ops *), &sock->ops);
+//
+//    u32 *addr_id = bpf_map_lookup_elem(&symbol_table, &pops);
+//    if (!addr_id)
+//        return 0;
+//
+//    if ((*addr_id == TCP_OPS_ID) || (*addr_id == INET_OPS_ID)) {
+//        return 1;
+//    }
+//
+//    return 0;
+//}
 
-    bpf_probe_read_kernel(&sock, sizeof(struct socket *), &f->private_data);
-    if (sock == NULL)
-        return;
+static __always_inline int is_inode_socket(struct inode* i) {
+    struct inode_operations *i_op;
+    KERNEL_READ_FAIL(&i_op, sizeof(struct inode_operations *), &i->i_op); 
 
-    bpf_probe_read_kernel(&sk, sizeof(struct sock *), &sock->sk);
-    if (sk == NULL)
-        return;
-
-    bpf_map_update_elem(&sock_to_pid, &sk, &pid, BPF_NOEXIST);
-}
-
-static __always_inline int fingerprint_tcp_inet_ops(struct file* f) {
-    struct socket* sock;
-    struct proto_ops *pops;
-
-    KERNEL_READ_FAIL(&sock, sizeof(struct socket *), &f->private_data);
-    if (sock == NULL)
-        return 0;
-
-    KERNEL_READ_FAIL(&pops, sizeof(struct proto_ops *), &sock->ops);
-
-    u32 *addr_id = bpf_map_lookup_elem(&symbol_table, &pops);
+    log_info("i_op %lx\n", i_op);
+    u32 *addr_id = bpf_map_lookup_elem(&symbol_table, &i_op);
     if (!addr_id)
         return 0;
 
-    if ((*addr_id == TCP_OPS_ID) || (*addr_id == INET_OPS_ID)) {
-        return 1;
-    }
-
-    return 0;
+    return *addr_id == SOCKET_OPS_ID;
 }
 
-static __always_inline int is_fd_socket(struct file* f) {
-   struct file_operations* fops;
-   KERNEL_READ_FAIL(&fops, sizeof(struct file_operations *), &f->f_op);
-
-   u32 *addr_id = bpf_map_lookup_elem(&symbol_table, &fops);
-   if (!addr_id)
-       return 0;
-
-   return *addr_id == SOCKET_OPS_ID;
-}
-
-SEC("kretprobe/get_pid_task")
-int kretprobe__get_pid_task(struct pt_regs* ctx) {
-    u32 tgid;
-    struct file** fdarr;
-    struct file* f;
-    struct fdtable* fdt;
-    struct task_struct* tsk;
-    struct files_struct* fs;
-
+SEC("kprobe/security_inode_readlink")
+int kprobe__security_inode_readlink(struct pt_regs* ctx) {
     u64 tgidpid = bpf_get_current_pid_tgid();
-    int *fdptr = bpf_map_lookup_elem(&tgidpid_to_fd, &tgidpid);
-    if (!fdptr)
+    void* x = bpf_map_lookup_elem(&tgidpid_to_fd, &tgidpid);
+    if (!x)
         return 0;
 
-    tsk = (struct task_struct *)PT_REGS_RET(ctx);
-    if (!tsk)
+    bpf_map_delete_elem(&tgidpid_to_fd, &tgidpid);
+
+    struct dentry* d = (struct dentry *)PT_REGS_PARM1(ctx);
+    struct inode* i;
+
+    KERNEL_READ_FAIL(&i, sizeof(struct inode *), &d->d_inode);
+    if (!i)
         return 0;
 
-    KERNEL_READ_FAIL(&fs, sizeof(struct files_struct *), &tsk->files);
-    if (!fs)
-        return 0;
-
-    KERNEL_READ_FAIL(&fdt, sizeof(struct fdtable *), &fs->fdt);
-    if (!fdt)
-        return 0;
-    
-    u32 max_fds = 0;
-    KERNEL_READ_FAIL(&max_fds, sizeof(u32), &fdt->max_fds);
-    if (*fdptr > max_fds)
-        return 0;
-
-    KERNEL_READ_FAIL(&fdarr, sizeof(void *), &fdt->fd);
-    if (!fdarr)
-        return 0;
-
-    KERNEL_READ_FAIL(&f, sizeof(struct file *), fdarr + (*fdptr * sizeof(struct file *)));
-    if (!f)
-        return 0;
-
-    if (!is_fd_socket(f))
-        return 0;
-
-    if (!fingerprint_tcp_inet_ops(f))
-        return 0;
-
-    KERNEL_READ_FAIL(&tgid, sizeof(u32), &tsk->tgid);
-    if (!tgid)
-        return 0;
-
-    map_sock_to_pid(f, tgid);
+    is_inode_socket(i);
 
     return 0;
 }
-
 
 /* The following hooks are used to track the lifecycle of the process */
 struct audit_context {
