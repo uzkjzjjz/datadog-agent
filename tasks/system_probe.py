@@ -45,7 +45,7 @@ arch_mapping = {
     "arm64": "arm64",  # darwin
 }
 CURRENT_ARCH = arch_mapping.get(platform.machine(), "x64")
-CLANG_VERSION = "14.0.5"
+CLANG_VERSION = "11.0.1"
 
 
 @task
