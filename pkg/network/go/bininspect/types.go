@@ -26,18 +26,11 @@ type Config struct {
 
 // Result is the result of the binary inspection process.
 type Result struct {
-	Arch                 GoArch
-	ABI                  GoABI
-	GoVersion            goversion.GoVersion
-	IncludesDebugSymbols bool
-	GoroutineIDMetadata  GoroutineIDMetadata
-	Functions            []FunctionMetadata
-	// If IncludesDebugSymbols is false, then this slice will be nil/empty
-	// (regardless of the struct offset configs).
-	StructOffsets []StructOffset
-	// If IncludesDebugSymbols is false, then this slice will be nil/empty
-	// (regardless of the static itab entry configs).
-	StaticItabEntries []StaticItabEntry
+	Arch                GoArch
+	ABI                 GoABI
+	GoVersion           goversion.GoVersion
+	GoroutineIDMetadata GoroutineIDMetadata
+	Functions           []FunctionMetadata
 }
 
 // GoArch only includes supported architectures,
@@ -119,33 +112,6 @@ type FunctionMetadata struct {
 	//   might get executed multiple times over the course of a single function call,
 	//   though I'm not sure under what circumstances this might be true)
 	EntryLocation uint64
-	// A list of parameter metadata structs
-	// used for extracting the function arguments in the eBPF probe.
-	//
-	// When optimizations are enabled, and depending on the Go version,
-	// it has been observed that these parameter locations are sometimes missing pieces
-	// (either due to them being eliminated on purpose
-	// (as in the case of an unused slice length/capacity/data) being omitted)
-	// or due to (spooky behavior in the compiler?))
-	// or missing entire parameters (again due to (spooky behavior in the compiler?)).
-	// This is unfortunate; I don't think there is a clean way to work around this
-	// (since the data is just missing).
-	// The best solution I have found is to:
-	// - manually handle cases where entire parameters are missing
-	//   if it's known that they only occur on a specific Go version
-	//   (Go 1.16.* is one that I have found to be troublesome)
-	//   and insert the appropriate parameter locations if known.
-	// - if all of the parameters are missing,
-	//   then I have found that manually re-implementing
-	//   the stack/register allocation algorithm for function arguments/returns
-	//   (depending on the ABI, and using the sizes of the values from the type metadata)
-	//   can work to still obtain the parameters at runtime.
-	//   This is probably much more brittle
-	//   than getting the locations directly from the debug information.
-	//
-	// If the outer result's IncludesDebugSymbols is false,
-	// then this slice always will be nil/empty.
-	Parameters []ParameterMetadata
 	// A list of locations for each return instruction in the compiled function machine code.
 	// Each element is the virtual address for the function's entrypoint for non-PIE's,
 	// or offset to the file load address for PIE's.

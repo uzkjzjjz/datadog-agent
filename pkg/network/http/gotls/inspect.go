@@ -103,19 +103,9 @@ func convertToAttachmentArgs(inspectionData *bininspect.Result) (*attachmentArgs
 		return nil, err
 	}
 
-	// Add struct offsets
-	if inspectionData.IncludesDebugSymbols {
-		args.loadStructOffsets(inspectionData.StructOffsets)
-	} else {
-		err = args.loadFallbackStructOffsets(inspectionData.GoVersion, string(inspectionData.Arch))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Add static itab entries
-	if inspectionData.IncludesDebugSymbols {
-		args.loadStaticItabEntries(inspectionData.StaticItabEntries)
+	err = args.loadLookupStructOffsets(inspectionData.GoVersion, string(inspectionData.Arch))
+	if err != nil {
+		return nil, err
 	}
 
 	return &args, nil
@@ -172,15 +162,10 @@ func (a *attachmentArgs) loadFunctions(inspectionData *bininspect.Result) error 
 func (a *attachmentArgs) loadConnWrite(function bininspect.FunctionMetadata, inspectionData *bininspect.Result) error {
 	a.writeAddress = function.EntryLocation
 
-	params := function.Parameters
-	//if !inspectionData.IncludesDebugSymbols {
-	// Fall back to the lookup table values
-	fallbackParams, err := lookup.GetWriteParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	params, err := lookup.GetWriteParams(inspectionData.GoVersion, string(inspectionData.Arch))
 	if err != nil {
 		return fmt.Errorf("error when using fallback lookup table for write params: %w", err)
 	}
-	params = fallbackParams
-	//}
 
 	// Unpack the parameters
 	if len(params) != 2 {
@@ -216,15 +201,10 @@ func (a *attachmentArgs) loadConnRead(function bininspect.FunctionMetadata, insp
 	a.readReturnAddresses = make([]uint64, len(function.ReturnLocations))
 	copy(a.readReturnAddresses, function.ReturnLocations)
 
-	params := function.Parameters
-	//if !inspectionData.IncludesDebugSymbols {
-	// Fall back to the lookup table values
-	fallbackParams, err := lookup.GetReadParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	params, err := lookup.GetReadParams(inspectionData.GoVersion, string(inspectionData.Arch))
 	if err != nil {
 		return fmt.Errorf("error when using fallback lookup table for read params: %w", err)
 	}
-	params = fallbackParams
-	//}
 
 	// Unpack the parameters
 	if len(params) != 2 {
@@ -339,15 +319,10 @@ func (a *attachmentArgs) loadConnRead(function bininspect.FunctionMetadata, insp
 func (a *attachmentArgs) loadConnClose(function bininspect.FunctionMetadata, inspectionData *bininspect.Result) error {
 	a.closeAddress = function.EntryLocation
 
-	params := function.Parameters
-	//if !inspectionData.IncludesDebugSymbols {
-	// Fall back to the lookup table values
-	fallbackParams, err := lookup.GetCloseParams(inspectionData.GoVersion, string(inspectionData.Arch))
+	params, err := lookup.GetCloseParams(inspectionData.GoVersion, string(inspectionData.Arch))
 	if err != nil {
 		return fmt.Errorf("error when using fallback lookup table for close params: %w", err)
 	}
-	params = fallbackParams
-	//}
 
 	// Unpack the parameters
 	if len(params) != 1 {
@@ -381,7 +356,7 @@ func (a *attachmentArgs) loadStructOffsets(structOffsets []bininspect.StructOffs
 	}
 }
 
-func (a *attachmentArgs) loadFallbackStructOffsets(goVersion goversion.GoVersion, arch string) error {
+func (a *attachmentArgs) loadLookupStructOffsets(goVersion goversion.GoVersion, arch string) error {
 	fallbackOffset, err := lookup.GetTLSConnInnerConnOffset(goVersion, arch)
 	if err != nil {
 		return fmt.Errorf("error when using fallback lookup table for Tls_conn_inner_conn_offset: %w", err)

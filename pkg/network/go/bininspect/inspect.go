@@ -21,7 +21,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/network/go/binversion"
 	"github.com/DataDog/datadog-agent/pkg/network/go/dwarfutils"
-	"github.com/DataDog/datadog-agent/pkg/network/go/dwarfutils/locexpr"
 	"github.com/DataDog/datadog-agent/pkg/network/go/goid"
 )
 
@@ -30,9 +29,6 @@ type inspectionState struct {
 	config  Config
 	symbols []elf.Symbol
 	arch    GoArch
-
-	// This field is only included if the binary has debug info attached
-	dwarfInspectionState *dwarfInspectionState
 
 	// The rest of the fields will be extracted
 	abi       GoABI
@@ -69,44 +65,11 @@ func Inspect(elfFile *elf.File, config Config) (*Result, error) {
 		symbols = nil
 	}
 
-	// Determine if the binary has debug symbols,
-	// and if it does, initialize the dwarf inspection state.
-	var dwarfInspection *dwarfInspectionState
-	if dwarfData, ok := HasDwarfInfo(elfFile); ok {
-		debugInfoBytes, err := godwarf.GetDebugSectionElf(elfFile, "info")
-		if err != nil {
-			return nil, err
-		}
-
-		compileUnits, err := dwarfutils.LoadCompileUnits(dwarfData, debugInfoBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		debugLocBytes, _ := godwarf.GetDebugSectionElf(elfFile, "loc")
-		loclist2 := loclist.NewDwarf2Reader(debugLocBytes, int(arch.PointerSize()))
-		debugLoclistBytes, _ := godwarf.GetDebugSectionElf(elfFile, "loclists")
-		loclist5 := loclist.NewDwarf5Reader(debugLoclistBytes)
-		debugAddrBytes, _ := godwarf.GetDebugSectionElf(elfFile, "addr")
-		debugAddr := godwarf.ParseAddr(debugAddrBytes)
-
-		dwarfInspection = &dwarfInspectionState{
-			dwarfData:      dwarfData,
-			debugInfoBytes: debugInfoBytes,
-			loclist2:       loclist2,
-			loclist5:       loclist5,
-			debugAddr:      debugAddr,
-			typeFinder:     dwarfutils.NewTypeFinder(dwarfData),
-			compileUnits:   compileUnits,
-		}
-	}
-
 	insp := &inspectionState{
-		elfFile:              elfFile,
-		symbols:              symbols,
-		config:               config,
-		dwarfInspectionState: dwarfInspection,
-		arch:                 arch,
+		elfFile: elfFile,
+		symbols: symbols,
+		config:  config,
+		arch:    arch,
 		// The rest of the fields will be extracted
 	}
 	result, err := insp.run()
@@ -152,24 +115,13 @@ func (i *inspectionState) run() (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	structOffsets, err := i.findStructOffsets()
-	if err != nil {
-		return nil, err
-	}
-	staticItabEntries, err := i.findStaticItabEntries()
-	if err != nil {
-		return nil, err
-	}
 
 	return &Result{
-		Arch:                 i.arch,
-		ABI:                  i.abi,
-		GoVersion:            i.goVersion,
-		IncludesDebugSymbols: i.dwarfInspectionState != nil,
-		GoroutineIDMetadata:  goroutineIDMetadata,
-		Functions:            functions,
-		StructOffsets:        structOffsets,
-		StaticItabEntries:    staticItabEntries,
+		Arch:                i.arch,
+		ABI:                 i.abi,
+		GoVersion:           i.goVersion,
+		GoroutineIDMetadata: goroutineIDMetadata,
+		Functions:           functions,
 	}, nil
 }
 
@@ -220,33 +172,6 @@ func (i *inspectionState) findGoVersionAndABI() (goversion.GoVersion, GoABI, err
 	}
 
 	return parsed, abi, nil
-}
-
-// findStaticItabEntries scans the ELF symbols in the binary
-// to find the desired itab index values for the given struct,interface pairs.
-// This is used at runtime by Go to identify `interface{}` values.
-func (i *inspectionState) findStaticItabEntries() ([]StaticItabEntry, error) {
-	if len(i.symbols) == 0 {
-		// The binary has no symbols; we won't be able to find any static itab entries.
-		return nil, nil
-	}
-
-	staticItabEntries := []StaticItabEntry{}
-
-	for _, config := range i.config.StaticItabEntries {
-		itabSymbol := i.getELFSymbol(fmt.Sprintf("go.itab.%s,%s", config.StructName, config.InterfaceName))
-		if itabSymbol == nil {
-			return nil, fmt.Errorf("could not find %q <> %q's itab ELF symbol", config.StructName, config.InterfaceName)
-		}
-
-		staticItabEntries = append(staticItabEntries, StaticItabEntry{
-			StructName:    config.StructName,
-			InterfaceName: config.InterfaceName,
-			EntryIndex:    itabSymbol.Value,
-		})
-	}
-
-	return staticItabEntries, nil
 }
 
 // getELFSymbol searches for a symbol in the binary with a matching name.
@@ -382,227 +307,7 @@ func (i *inspectionState) getRuntimeGAddrTLSOffset() (uint64, error) {
 }
 
 func (i *inspectionState) getGoroutineIDOffset() (uint64, error) {
-	if i.dwarfInspectionState == nil {
-		// The binary has been stripped; we won't be able to find the struct's offset.
-		// Fall back to a static lookup table
-		return goid.GetGoroutineIDOffset(i.goVersion, string(i.arch))
-	}
-
-	goroutineIDOffset, err := i.dwarfInspectionState.typeFinder.FindStructFieldOffset("runtime.g", "goid")
-	if err != nil {
-		return 0, err
-	}
-
-	return goroutineIDOffset, nil
-}
-
-func (i *inspectionState) findFunctions() ([]FunctionMetadata, error) {
-	// If the binary has debug symbols, we can traverse the debug info entries (DIEs)
-	// to look for the functions.
-	// Otherwise, fall-back to a go symbol table-based implementation
-	// (see https://pkg.go.dev/debug/gosym).
-
-	//if i.dwarfInspectionState != nil {
-	//	return i.findFunctionsUsingDWARF()
-	//}
-
-	return i.findFunctionsUsingGoSymTab()
-}
-
-func (i *inspectionState) findFunctionsUsingDWARF() ([]FunctionMetadata, error) {
-	// Find each function's dwarf entry
-	functionEntries, err := i.findFunctionDebugInfoEntries()
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert the configs to a map, keyed by the name
-	configsByNames := make(map[string]FunctionConfig, len(i.config.Functions))
-	for _, config := range i.config.Functions {
-		configsByNames[config.Name] = config
-	}
-
-	// Inspect each function individually
-	functions := []FunctionMetadata{}
-	for functionName, entry := range functionEntries {
-		if config, ok := configsByNames[functionName]; ok {
-			metadata, err := i.inspectFunctionUsingDWARF(entry, config)
-			if err != nil {
-				return nil, err
-			}
-
-			functions = append(functions, metadata)
-		}
-	}
-
-	return functions, nil
-}
-
-func (i *inspectionState) findFunctionDebugInfoEntries() (map[string]*dwarf.Entry, error) {
-	// Convert the function config slice to a set of names
-	searchFunctions := make(map[string]struct{}, len(i.config.Functions))
-	for _, config := range i.config.Functions {
-		searchFunctions[config.Name] = struct{}{}
-	}
-
-	functionEntries := make(map[string]*dwarf.Entry)
-	entryReader := i.dwarfInspectionState.dwarfData.Reader()
-	for entry, err := entryReader.Next(); entry != nil; entry, err = entryReader.Next() {
-		if err != nil {
-			return nil, err
-		}
-
-		// Check if this entry is a function
-		if entry.Tag != dwarf.TagSubprogram {
-			continue
-		}
-
-		funcName, _ := entry.Val(dwarf.AttrName).(string)
-
-		// See if the func name is one of the search functions
-		if _, ok := searchFunctions[funcName]; !ok {
-			continue
-		}
-
-		delete(searchFunctions, funcName)
-		functionEntries[funcName] = entry
-	}
-
-	return functionEntries, nil
-}
-
-func (i *inspectionState) inspectFunctionUsingDWARF(entry *dwarf.Entry, config FunctionConfig) (FunctionMetadata, error) {
-	lowPC, _ := entry.Val(dwarf.AttrLowpc).(uint64)
-
-	// Get all child leaf entries of the function entry
-	// that have the type "formal parameter".
-	// This includes parameters (both method receivers and normal arguments)
-	// and return values.
-	entryReader := i.dwarfInspectionState.dwarfData.Reader()
-	formalParameterEntries, err := dwarfutils.GetChildLeafEntries(entryReader, entry.Offset, dwarf.TagFormalParameter)
-	if err != nil {
-		return FunctionMetadata{}, fmt.Errorf("failed getting formal parameter children: %w", err)
-	}
-
-	// If enabled, find all return locations in the function's machine code.
-	var returnLocations []uint64
-	if config.IncludeReturnLocations {
-		highPC, _ := entry.Val(dwarf.AttrHighpc).(uint64)
-		locations, err := i.findReturnLocations(lowPC, highPC, 0)
-		if err != nil {
-			return FunctionMetadata{}, fmt.Errorf("could not find return locations for function %q: %w", config.Name, err)
-		}
-
-		returnLocations = locations
-	}
-
-	// Iterate through each formal parameter entry and classify/inspect them
-	params := []ParameterMetadata{}
-	for _, formalParamEntry := range formalParameterEntries {
-		isReturn, _ := formalParamEntry.Val(dwarf.AttrVarParam).(bool)
-		if isReturn {
-			// Return parameters have empty locations,
-			// so there is no point in trying to execute their location expressions.
-			continue
-		}
-
-		parameter, err := i.getParameterLocationAtPC(formalParamEntry, lowPC)
-		if err != nil {
-			paramName, _ := formalParamEntry.Val(dwarf.AttrName).(string)
-			return FunctionMetadata{}, fmt.Errorf("could not inspect param %q on function %q: %w", paramName, config.Name, err)
-		}
-
-		params = append(params, parameter)
-	}
-
-	return FunctionMetadata{
-		Name: config.Name,
-		// This should really probably be the location of the end of the prologue
-		// (which might help with parameter locations being half-spilled),
-		// but so far using the first PC position in the function has worked
-		// for the functions we're tracing.
-		// See:
-		// - https://github.com/go-delve/delve/pull/2704#issuecomment-944374511
-		//   (which implies that the instructions in the prologue
-		//   might get executed multiple times over the course of a single function call,
-		//   though I'm not sure under what circumstances this might be true)
-		EntryLocation:   lowPC,
-		Parameters:      params,
-		ReturnLocations: returnLocations,
-	}, nil
-}
-
-func (i *inspectionState) getParameterLocationAtPC(parameterDIE *dwarf.Entry, pc uint64) (ParameterMetadata, error) {
-	typeOffset, ok := parameterDIE.Val(dwarf.AttrType).(dwarf.Offset)
-	if !ok {
-		return ParameterMetadata{}, fmt.Errorf("no type offset attribute in parameter entry")
-	}
-
-	// Find the location field on the entry
-	locationField := parameterDIE.AttrField(dwarf.AttrLocation)
-	if locationField == nil {
-		return ParameterMetadata{}, fmt.Errorf("no location field in parameter entry")
-	}
-
-	typ, err := i.dwarfInspectionState.typeFinder.FindTypeByOffset(typeOffset)
-	if err != nil {
-		return ParameterMetadata{}, fmt.Errorf("could not find parameter type by offset: %w", err)
-	}
-
-	// The location field can be one of two things:
-	// (See DWARF v4 spec section 2.6)
-	// 1. Single location descriptions,
-	//    which specifies a location expression as the direct attribute value.
-	//    This has a DWARF class of `exprloc`,
-	//    and the value is a `[]byte` that can be directly interpreted.
-	// 2. Location lists, which gives an index into the loclists section.
-	//    This has a DWARF class of `loclistptr`,
-	//    which is used to index into the location list
-	//    and to get the location expression that corresponds to
-	//    the given program counter
-	//    (in this case, that is the entry of the function, where we will attach the uprobe).
-	var locationExpression []byte
-	switch locationField.Class {
-	case dwarf.ClassExprLoc:
-		if locationValAsBytes, ok := locationField.Val.([]byte); ok {
-			locationExpression = locationValAsBytes
-		} else {
-			return ParameterMetadata{}, fmt.Errorf("formal parameter entry contained invalid value for location attribute: locationField=%#v", locationField)
-		}
-	case dwarf.ClassLocListPtr:
-		locationAsLocListIndex, ok := locationField.Val.(int64)
-		if !ok {
-			return ParameterMetadata{}, fmt.Errorf("could not interpret location attribute in formal parameter entry as location list pointer: locationField=%#v", locationField)
-		}
-
-		loclistEntry, err := i.getLoclistEntry(locationAsLocListIndex, pc)
-		if err != nil {
-			return ParameterMetadata{}, fmt.Errorf("could not find loclist entry at %#x for PC %#x: %w", locationAsLocListIndex, pc, err)
-		}
-		locationExpression = loclistEntry.Instr
-	default:
-		return ParameterMetadata{}, fmt.Errorf("unexpected field class on formal parameter's location attribute: locationField=%#v", locationField)
-	}
-
-	totalSize := typ.Size()
-	pieces, err := locexpr.Exec(locationExpression, totalSize, int(i.arch.PointerSize()))
-	if err != nil {
-		return ParameterMetadata{}, fmt.Errorf("error executing location expression for parameter: %w", err)
-	}
-	inspectPieces := make([]ParameterPiece, len(pieces))
-	for i, piece := range pieces {
-		inspectPieces[i] = ParameterPiece{
-			Size:        piece.Size,
-			InReg:       piece.InReg,
-			StackOffset: piece.StackOffset,
-			Register:    piece.Register,
-		}
-	}
-	return ParameterMetadata{
-		TotalSize: totalSize,
-		Kind:      typ.Common().ReflectKind,
-		Pieces:    inspectPieces,
-	}, nil
+	return goid.GetGoroutineIDOffset(i.goVersion, string(i.arch))
 }
 
 // Note that this may not behave well with panics or defer statements.
@@ -675,7 +380,7 @@ func SymbolToOffset(f *elf.File, symbol string) (uint32, error) {
 	return 0, fmt.Errorf("symbol %s not found in file", symbol)
 }
 
-func (i *inspectionState) findFunctionsUsingGoSymTab() ([]FunctionMetadata, error) {
+func (i *inspectionState) findFunctions() ([]FunctionMetadata, error) {
 	var functionMetadata []FunctionMetadata
 	symbolTable, err := i.parseSymbolTable()
 	if err != nil {
@@ -711,7 +416,6 @@ func (i *inspectionState) findFunctionsUsingGoSymTab() ([]FunctionMetadata, erro
 		functionMetadata = append(functionMetadata, FunctionMetadata{
 			Name:            funcConfig.Name,
 			EntryLocation:   uint64(offset),
-			Parameters:      nil,
 			ReturnLocations: returnLocations,
 		})
 	}
@@ -752,64 +456,4 @@ func (i *inspectionState) parseSymbolTable() (*gosym.Table, error) {
 	}
 
 	return table, nil
-}
-
-func (i *inspectionState) findStructOffsets() ([]StructOffset, error) {
-	if i.dwarfInspectionState == nil {
-		// The binary has been stripped; we won't be able to find the struct offsets.
-		return nil, nil
-	}
-
-	structOffsets := []StructOffset{}
-
-	for _, config := range i.config.StructOffsets {
-		offset, err := i.dwarfInspectionState.typeFinder.FindStructFieldOffset(config.StructName, config.FieldName)
-		if err != nil {
-			return nil, fmt.Errorf("could not find offset of %q . %q: %w", config.StructName, config.FieldName, err)
-		}
-
-		structOffsets = append(structOffsets, StructOffset{
-			StructName: config.StructName,
-			FieldName:  config.FieldName,
-			Offset:     offset,
-		})
-	}
-
-	return structOffsets, nil
-}
-
-// getLoclistEntry returns the loclist entry in the loclist
-// starting at offset, for address pc.
-// Adapted from github.com/go-delve/delve/pkg/proc.(*BinaryInfo).loclistEntry
-func (i *inspectionState) getLoclistEntry(offset int64, pc uint64) (*loclist.Entry, error) {
-	var base uint64
-	compileUnit := i.dwarfInspectionState.compileUnits.FindCompileUnit(pc)
-	if compileUnit != nil {
-		base = compileUnit.LowPC
-	}
-
-	var loclist loclist.Reader = i.dwarfInspectionState.loclist2
-	var debugAddr *godwarf.DebugAddr
-	if compileUnit != nil && compileUnit.Version >= 5 && i.dwarfInspectionState.loclist5 != nil {
-		loclist = i.dwarfInspectionState.loclist5
-		if addrBase, ok := compileUnit.Entry.Val(dwarf.AttrAddrBase).(int64); ok {
-			debugAddr = i.dwarfInspectionState.debugAddr.GetSubsection(uint64(addrBase))
-		}
-	}
-
-	if loclist.Empty() {
-		return nil, fmt.Errorf("no loclist found for the given program counter")
-	}
-
-	// Use 0x0 as the static base
-	var staticBase uint64 = 0x0
-	e, err := loclist.Find(int(offset), staticBase, base, pc, debugAddr)
-	if err != nil {
-		return nil, fmt.Errorf("error reading loclist section: %w", err)
-	}
-	if e != nil {
-		return e, nil
-	}
-
-	return nil, fmt.Errorf("no loclist entry found")
 }
