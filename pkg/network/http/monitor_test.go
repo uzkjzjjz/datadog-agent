@@ -9,6 +9,7 @@
 package http
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"math/rand"
@@ -16,7 +17,6 @@ import (
 	nethttp "net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -121,27 +121,27 @@ func TestUnknownMethodRegression(t *testing.T) {
 }
 
 func TestMyStamTest(t *testing.T) {
+	srvDoneFn := testutil.HTTPServer(t, "127.0.0.1:8443", testutil.Options{
+		EnableTLS:        true,
+		EnableKeepAlives: true,
+	})
+	defer srvDoneFn()
+
+	err := os.Setenv("GO_TLS_TEST", fmt.Sprintf("/proc/%d/exe", os.Getpid()))
+	require.NoError(t, err)
+
 	monitor, err := NewMonitor(config.New(), nil, nil)
 	require.NoError(t, err)
 	err = monitor.Start()
 	require.NoError(t, err)
 	defer monitor.Stop()
 
-	srvDoneFn := testutil.HTTPServer(t, "127.0.0.1:443", testutil.Options{
-		EnableTLS:        true,
-		EnableKeepAlives: true,
-	})
-	defer srvDoneFn()
-
-	err = os.Setenv("GO_TLS_TEST", fmt.Sprintf("/proc/%d/exe", os.Getpid()))
-	require.NoError(t, err)
-
-	exec.Command("curl -k https://127.0.0.1:443/200/foobar").Run()
+	time.Sleep(5 * time.Second)
+	fReq := requestGenerator(t, "127.0.0.1:8443", true)
+	req := fReq()
 
 	stats := monitor.GetHTTPStats()
-	addr, err := url.Parse("https://127.0.0.1:443/200/foobar")
-	require.NoError(t, err)
-	includesRequest(t, stats, &nethttp.Request{URL: addr})
+	includesRequest(t, stats, req)
 }
 
 func TestRSTPacketRegression(t *testing.T) {
@@ -214,13 +214,16 @@ func testHTTPMonitor(t *testing.T, targetAddr, serverAddr string, numReqs int, o
 	}
 }
 
-func requestGenerator(t *testing.T, targetAddr string) func() *nethttp.Request {
+func requestGenerator(t *testing.T, targetAddr string, tlsFlag ...bool) func() *nethttp.Request {
+	tr := &nethttp.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	var (
 		methods     = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 		statusCodes = []int{200, 300, 400, 500}
 		random      = rand.New(rand.NewSource(time.Now().Unix()))
 		idx         = 0
-		client      = new(nethttp.Client)
+		client      = &nethttp.Client{Transport: tr}
 	)
 
 	return func() *nethttp.Request {
@@ -228,9 +231,12 @@ func requestGenerator(t *testing.T, targetAddr string) func() *nethttp.Request {
 		method := methods[random.Intn(len(methods))]
 		status := statusCodes[random.Intn(len(statusCodes))]
 		url := fmt.Sprintf("http://%s/%d/request-%d", targetAddr, status, idx)
+
+		if len(tlsFlag) > 0 && tlsFlag[0] {
+			url = fmt.Sprintf("https://%s/%d/request-%d", targetAddr, status, idx)
+		}
 		req, err := nethttp.NewRequest(method, url, nil)
 		require.NoError(t, err)
-
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		resp.Body.Close()

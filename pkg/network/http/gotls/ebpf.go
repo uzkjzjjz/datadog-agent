@@ -84,9 +84,9 @@ type goTLSBinaryProgram struct {
 }
 
 func NewGoTLSProgram(c *config.Config, sockFDMap *ebpf.Map) (*GoTLSProgram, error) {
-	if !c.EnableHTTPSMonitoring {
-		return nil, nil
-	}
+	//if !c.EnableHTTPSMonitoring {
+	//	return nil, nil
+	//}
 
 	var bytecode bytecode.AssetReader
 	var err error
