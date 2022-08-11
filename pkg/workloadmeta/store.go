@@ -539,10 +539,6 @@ func (s *store) unsubscribeAll() {
 }
 
 func notifyChannel(name string, ch chan EventBundle, events []Event, wait bool) {
-	if len(events) == 0 {
-		return
-	}
-
 	bundle := EventBundle{
 		Ch:     make(chan struct{}),
 		Events: events,
