@@ -293,3 +293,12 @@ func (rl *RateLimiter) SendGroupStats(group string) error {
 	}
 	return nil
 }
+
+func (rl *RateLimiter) Debug() {
+	for groupName, group := range rl.limiters {
+		fmt.Printf("Group: %s, %+v\n", groupName, rl.groupStats[groupName])
+		for limiterName, limiter := range group {
+			fmt.Printf("  - Limiter: %s %+v\n", limiterName, limiter)
+		}
+	}
+}
