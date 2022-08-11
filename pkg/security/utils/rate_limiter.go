@@ -108,7 +108,7 @@ func (rl *RateLimiter) AddNewLimiter(group string, id string, limit rate.Limit, 
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if burst < 1 {
+	if burst < 0 {
 		return fmt.Errorf("EINVAL")
 	}
 
@@ -169,7 +169,7 @@ func (rl *RateLimiter) UpdateLimit(group string, id string, newLimit rate.Limit,
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if newBurst < 1 {
+	if newBurst < 0 {
 		return fmt.Errorf("EINVAL")
 	}
 
@@ -189,7 +189,7 @@ func (rl *RateLimiter) UpdateGroupLimit(group string, newLimit rate.Limit, newBu
 	rl.RLock()
 	defer rl.RUnlock()
 
-	if newBurst < 1 {
+	if newBurst < 0 {
 		return fmt.Errorf("EINVAL")
 	}
 
@@ -204,22 +204,6 @@ func (rl *RateLimiter) UpdateGroupLimit(group string, newLimit rate.Limit, newBu
 	}
 
 	return nil
-}
-
-// GetLimit gets the limit of a given rate limiter
-func (rl *RateLimiter) GetLimit(group string, id string) (rate.Limit, int, error) {
-	rl.RLock()
-	defer rl.RUnlock()
-
-	limiter, ok := rl.limiters[group][id]
-	if !ok {
-		return 0, 0, fmt.Errorf("ENOENT")
-	}
-
-	limit := limiter.Limiter.Limit()
-	burst := limiter.Limiter.Burst()
-
-	return limit, burst, nil
 }
 
 // GetLimiterStats gives you the current stats of a given rate limiter, and allow you to reset them
@@ -259,12 +243,18 @@ func (rl *RateLimiter) GetGlobalGroupStats(group string, reset bool) (RateLimite
 
 // GetGroupStats returns a map indexed by IDs of a specified group
 // that describes the amount of allowed and dropped hits
-func (rl *RateLimiter) GetAllGroupStats(group string) map[string]RateLimiterStat {
+func (rl *RateLimiter) GetAllGroupStats(group string) (map[string]RateLimiterStat, error) {
 	rl.Lock()
 	defer rl.Unlock()
 
 	stats := make(map[string]RateLimiterStat)
-	for id, limiter := range rl.limiters[group] {
+
+	limiters, ok := rl.limiters[group]
+	if !ok {
+		return stats, fmt.Errorf("ENOENT")
+	}
+
+	for id, limiter := range limiters {
 		stats[id] = RateLimiterStat{
 			Dropped: limiter.dropped,
 			Allowed: limiter.allowed,
@@ -272,13 +262,17 @@ func (rl *RateLimiter) GetAllGroupStats(group string) map[string]RateLimiterStat
 		limiter.dropped = 0
 		limiter.allowed = 0
 	}
-	return stats
+	return stats, nil
 }
 
 // SendGroupStats sends statistics about the number of allowed and drops hits
 // for the given group of rate limiters
 func (rl *RateLimiter) SendGroupStats(group string) error {
-	for id, counts := range rl.GetAllGroupStats(group) {
+	stats, err := rl.GetAllGroupStats(group)
+	if err != nil {
+		return err
+	}
+	for id, counts := range stats {
 		tags := []string{fmt.Sprintf("%s:%s", group, id)}
 		if counts.Dropped > 0 {
 			if err := rl.statsdClient.Count(metrics.MetricRateLimiterDrop, counts.Dropped, tags, 1.0); err != nil {
@@ -294,6 +288,10 @@ func (rl *RateLimiter) SendGroupStats(group string) error {
 	return nil
 }
 
+//
+// DEBUG / FONCTIONAL TESTS FUNCS
+//
+
 func (rl *RateLimiter) Debug() {
 	for groupName, group := range rl.limiters {
 		fmt.Printf("Group: %s, %+v\n", groupName, rl.groupStats[groupName])
@@ -301,4 +299,50 @@ func (rl *RateLimiter) Debug() {
 			fmt.Printf("  - Limiter: %s %+v\n", limiterName, limiter)
 		}
 	}
+}
+
+// GetLimit gets the limit of a given rate limiter
+func (rl *RateLimiter) GetLimit(group string, id string) (rate.Limit, int, error) {
+	rl.RLock()
+	defer rl.RUnlock()
+
+	limiter, ok := rl.limiters[group][id]
+	if !ok {
+		return 0, 0, fmt.Errorf("ENOENT")
+	}
+
+	limit := limiter.Limiter.Limit()
+	burst := limiter.Limiter.Burst()
+
+	return limit, burst, nil
+}
+
+func (rl *RateLimiter) GetGroups() []string {
+	rl.RLock()
+	defer rl.RUnlock()
+
+	var groups []string
+	for group, _ := range rl.limiters {
+		groups = append(groups, group)
+	}
+	return groups
+}
+
+func (rl *RateLimiter) GetGroupIDs(group string) []string {
+	rl.RLock()
+	defer rl.RUnlock()
+
+	var ids []string
+	for id, _ := range rl.limiters[group] {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (rl *RateLimiter) GetLimiterOpts() LimiterOpts {
+	return rl.opts
+}
+
+func GetDefaultLimitBurst() (rate.Limit, int) {
+	return defaultLimit, defaultBurst
 }
