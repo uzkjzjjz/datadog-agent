@@ -164,7 +164,14 @@ func (k *KubeContainerConfigProvider) generateConfig(e workloadmeta.Entity) ([]i
 
 	switch entity := e.(type) {
 	case *workloadmeta.Container:
-		configs, errs = k.generateContainerConfig(entity)
+		// kubernetes containers need to be handled together with their
+		// pod, so they generate a single []integration.Config.
+		// otherwise, with container_collect_all, it's possible for a
+		// container that belongs to an AD-annotated pod to briefly
+		// have a container_collect_all when it shouldn't.
+		if !findKubernetesInLabels(entity.Labels) {
+			configs, errs = k.generateContainerConfig(entity)
+		}
 
 	case *workloadmeta.KubernetesPod:
 		containerIdentifiers := map[string]struct{}{}
@@ -176,13 +183,22 @@ func (k *KubeContainerConfigProvider) generateConfig(e workloadmeta.Entity) ([]i
 				continue
 			}
 
+			var (
+				c      []integration.Config
+				errors []error
+			)
+
+			c, errors = k.generateContainerConfig(container)
+			configs = append(configs, c...)
+			errs = append(errs, errors...)
+
 			adIdentifier := podContainer.Name
 			if customADID, found := utils.ExtractCheckIDFromPodAnnotations(entity.Annotations, podContainer.Name); found {
 				adIdentifier = customADID
 			}
 
 			containerEntity := containers.BuildEntityName(string(container.Runtime), container.ID)
-			c, errors := utils.ExtractTemplatesFromPodAnnotations(
+			c, errors = utils.ExtractTemplatesFromPodAnnotations(
 				containerEntity,
 				entity.Annotations,
 				adIdentifier,
@@ -201,7 +217,7 @@ func (k *KubeContainerConfigProvider) generateConfig(e workloadmeta.Entity) ([]i
 			containerNames[podContainer.Name] = struct{}{}
 
 			for idx := range c {
-				c[idx].Source = "kubelet:" + containerEntity
+				c[idx].Source = names.Container + ":" + containerEntity
 			}
 
 			configs = append(configs, c...)
@@ -236,16 +252,6 @@ func (k *KubeContainerConfigProvider) generateContainerConfig(container *workloa
 	containerEntityName := containers.BuildEntityName(string(container.Runtime), containerID)
 	configs, errs = utils.ExtractTemplatesFromContainerLabels(containerEntityName, container.Labels)
 
-	if findKubernetesInLabels(container.Labels) {
-		c, errors, err := k.generateKubeContainerConfig(containerID, containerEntityName)
-		if err != nil {
-			log.Debugf("error generating configs from kubernetes container: %s", err)
-		}
-
-		errs = append(errs, errors...)
-		configs = append(configs, c...)
-	}
-
 	// AddContainerCollectAllConfigs is only needed when handling
 	// the container event, even when the container belongs to a
 	// pod. Calling it when handling the KubernetesPod will always
@@ -258,30 +264,6 @@ func (k *KubeContainerConfigProvider) generateContainerConfig(container *workloa
 	}
 
 	return configs, errs
-}
-
-func (k *KubeContainerConfigProvider) generateKubeContainerConfig(containerID, containerEntity string) ([]integration.Config, []error, error) {
-	pod, err := k.workloadmetaStore.GetKubernetesPodForContainer(containerID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("container %q belongs to a pod but was not found: %s", containerID, err)
-	}
-
-	adIdentifier := findAdID(containerID, pod.Containers)
-	if adIdentifier == "" {
-		return nil, nil, fmt.Errorf("container %q belongs to a pod but was not found: container not found in pod.Containers", containerID)
-	}
-
-	if customADID, found := utils.ExtractCheckIDFromPodAnnotations(pod.Annotations, adIdentifier); found {
-		adIdentifier = customADID
-	}
-
-	c, errors := utils.ExtractTemplatesFromPodAnnotations(
-		containerEntity,
-		pod.Annotations,
-		adIdentifier,
-	)
-
-	return c, errors, nil
 }
 
 // GetConfigErrors returns a map of configuration errors for each namespace/pod
@@ -319,16 +301,6 @@ func findKubernetesInLabels(labels map[string]string) bool {
 		}
 	}
 	return false
-}
-
-func findAdID(containerID string, containers []workloadmeta.OrchestratorContainer) string {
-	for _, container := range containers {
-		if container.ID == containerID {
-			return container.Name
-		}
-	}
-
-	return ""
 }
 
 func init() {
