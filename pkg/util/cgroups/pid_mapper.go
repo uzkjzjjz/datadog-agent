@@ -9,14 +9,15 @@
 package cgroups
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/datadog-agent/pkg/util/system"
 
 	"github.com/karrick/godirwalk"
 )
@@ -94,9 +95,9 @@ func getPidMapper(procPath, cgroupRoot, baseController string, filter ReaderFilt
 	// In cgroupv2, checking if we run in host cgroup namespace.
 	// If not we cannot fill PIDs for containers and do PID<>CID mapping.
 	if baseController == "" {
-		cgroupInode, err := system.GetProcessNamespaceInode("/proc", "self", "cgroup")
+		cgroupInode, err := GetProcessNamespaceInode("/proc", "self", "cgroup")
 		if err == nil {
-			if isHostNs := system.IsProcessHostCgroupNamespace(procPath, cgroupInode); isHostNs != nil && !*isHostNs {
+			if isHostNs := IsProcessHostCgroupNamespace(procPath, cgroupInode); isHostNs != nil && !*isHostNs {
 				log.Warnf("Usage of cgroupv2 detected but the Agent does not seem to run in host cgroup namespace. Make sure to run with --cgroupns=host, some feature may not work otherwise")
 			}
 		} else {
@@ -105,6 +106,18 @@ func getPidMapper(procPath, cgroupRoot, baseController string, filter ReaderFilt
 	}
 
 	return pidMapper
+}
+
+// GetProcessNamespaceInode performs a stat() call on /proc/<pid>/ns/<namespace>
+func GetProcessNamespaceInode(procPath string, pid string, namespace string) (uint64, error) {
+	nsPath := filepath.Join(procPath, pid, "ns", namespace)
+	fi, err := os.Stat(nsPath)
+	if err != nil {
+		return 0, err
+	}
+
+	// We are on linux, casting in safe
+	return fi.Sys().(*syscall.Stat_t).Ino, nil
 }
 
 // Mapper used if we are running in host PID namespace, faster.
