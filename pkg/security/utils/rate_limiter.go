@@ -15,6 +15,7 @@ import (
 	"github.com/DataDog/datadog-go/v5/statsd"
 	"golang.org/x/time/rate"
 
+	seclog "github.com/DataDog/datadog-agent/pkg/security/log"
 	"github.com/DataDog/datadog-agent/pkg/security/metrics"
 )
 
@@ -281,6 +282,32 @@ func (rl *RateLimiter) SendGroupStats(group string) error {
 		}
 		if counts.Allowed > 0 {
 			if err := rl.statsdClient.Count(metrics.MetricRateLimiterAllow, counts.Allowed, tags, 1.0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// SendGlobalGroupsStats sends global stats of all groups
+func (rl *RateLimiter) SendGlobalGroupsStats(reset bool) error {
+	if rl.statsdClient == nil {
+		return fmt.Errorf("No statd client")
+	}
+	for group := range rl.groupStats {
+		stats, err := rl.GetGlobalGroupStats(group, reset)
+		if err != nil {
+			seclog.Errorf("GetGlobalGroupStats failed: %s\n", err.Error())
+			continue
+		}
+		tags := []string{fmt.Sprintf("%s", group)}
+		if stats.Allowed > 0 {
+			if err = rl.statsdClient.Count(metrics.MetricRateLimiterAllow, stats.Allowed, tags, 1.0); err != nil {
+				return err
+			}
+		}
+		if stats.Dropped > 0 {
+			if err = rl.statsdClient.Count(metrics.MetricRateLimiterDrop, stats.Dropped, tags, 1.0); err != nil {
 				return err
 			}
 		}

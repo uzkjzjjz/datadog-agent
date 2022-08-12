@@ -130,10 +130,10 @@ func (adm *ActivityDumpManager) resolveTags() {
 
 // rate limiter consts
 const (
-	rateLimiterGroupExec = "AD_Exec"
-	rateLimiterGroupOpen = "AD_Open"
-	rateLimiterGroupDNS  = "AD_DNS"
-	rateLimiterGroupBind = "AD_Bind"
+	rateLimiterGroupExec = "ActivityDumpRateLimiter_Exec"
+	rateLimiterGroupOpen = "ActivityDumpRateLimiter_Open"
+	rateLimiterGroupDNS  = "ActivityDumpRateLimiter_DNS"
+	rateLimiterGroupBind = "ActivityDumpRateLimiter_Bind"
 
 	defaultOpenLimit = 50
 	defaultDNSLimit  = 20
@@ -228,7 +228,7 @@ func NewActivityDumpManager(p *Probe) (*ActivityDumpManager, error) {
 		snapshotQueue:     make(chan *ActivityDump, 100),
 		storage:           storageManager,
 		loadController:    loadController,
-		RateLimiter:       utils.NewRateLimiter(nil, utils.LimiterOpts{Limits: make(map[string]map[string]utils.Limit)}), // TODO: pass the statdclient
+		RateLimiter:       utils.NewRateLimiter(p.statsdClient, utils.LimiterOpts{Limits: make(map[string]map[string]utils.Limit)}),
 	}
 
 	adm.prepareContextTags()
