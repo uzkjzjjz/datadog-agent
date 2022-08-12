@@ -14,7 +14,6 @@ import (
 
 	"github.com/containerd/cgroups"
 
-	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -81,7 +80,7 @@ func hostHierarchy(hierarchy cgroups.Hierarchy) cgroups.Hierarchy {
 }
 
 // NewMemoryController creates a new systemd cgroup based memory controller
-func NewMemoryController(kind string, monitors ...MemoryMonitor) (*MemoryController, error) {
+func NewMemoryController(kind string, containerized bool, monitors ...MemoryMonitor) (*MemoryController, error) {
 	path := cgroups.NestedPath("")
 
 	var cgroupHierarchy cgroups.Hierarchy
@@ -94,7 +93,7 @@ func NewMemoryController(kind string, monitors ...MemoryMonitor) (*MemoryControl
 		return nil, fmt.Errorf("unsupported cgroup hierarchy '%s'", kind)
 	}
 
-	if config.IsContainerized() {
+	if containerized {
 		cgroupHierarchy = hostHierarchy(cgroupHierarchy)
 	}
 
