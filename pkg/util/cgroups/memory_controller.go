@@ -139,7 +139,8 @@ func NewMemoryController(kind string, containerized bool, monitors ...MemoryMoni
 }
 
 type Logger interface {
-	Warnf(s string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
 }
 
 // Start listening for events
