@@ -134,23 +134,19 @@ const (
 	rateLimiterGroupOpen = "ActivityDumpRateLimiter_Open"
 	rateLimiterGroupDNS  = "ActivityDumpRateLimiter_DNS"
 	rateLimiterGroupBind = "ActivityDumpRateLimiter_Bind"
-
-	defaultOpenLimit = 50
-	defaultDNSLimit  = 20
-	defaultBindLimit = 20
 )
 
 func (adm *ActivityDumpManager) addNewActivityDumpRateLimiter(id string) error {
-	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupExec, id, rate.Inf, 1); err != nil {
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupExec, id, rate.Limit(adm.probe.config.ActivityDumpRateExec), adm.probe.config.ActivityDumpBurstExec); err != nil {
 		return err
 	}
-	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupOpen, id, defaultOpenLimit, defaultOpenLimit*2); err != nil {
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupOpen, id, rate.Limit(adm.probe.config.ActivityDumpRateOpen), adm.probe.config.ActivityDumpBurstOpen); err != nil {
 		return err
 	}
-	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupDNS, id, defaultDNSLimit, defaultDNSLimit*2); err != nil {
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupDNS, id, rate.Limit(adm.probe.config.ActivityDumpRateDNS), adm.probe.config.ActivityDumpBurstDNS); err != nil {
 		return err
 	}
-	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupBind, id, defaultBindLimit, defaultBindLimit*2); err != nil {
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupBind, id, rate.Limit(adm.probe.config.ActivityDumpRateBind), adm.probe.config.ActivityDumpBurstBind); err != nil {
 		return err
 	}
 	return nil
