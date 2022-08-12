@@ -10,7 +10,6 @@ package cgroups
 
 import (
 	"fmt"
-	"path/filepath"
 	"syscall"
 
 	"github.com/containerd/cgroups"
@@ -62,11 +61,6 @@ func MemoryPressureMonitor(cb func(), level string) MemoryMonitor {
 
 type hostSubsystem struct {
 	cgroups.Subsystem
-}
-
-func (h *hostSubsystem) Path(path string) string {
-	cgroupRoot := config.Datadog.GetString("container_cgroup_root")
-	return filepath.Join(cgroupRoot, string(h.Name()), path)
 }
 
 func hostHierarchy(hierarchy cgroups.Hierarchy) cgroups.Hierarchy {
