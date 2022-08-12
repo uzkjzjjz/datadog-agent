@@ -163,7 +163,9 @@ func NewActivityDump(adm *ActivityDumpManager, options ...WithDumpOption) *Activ
 	}
 
 	// Initialise the rate limiters
-	ad.adm.addNewActivityDumpRateLimiter(ad.DumpMetadata.Name)
+	if err := ad.adm.addNewActivityDumpRateLimiter(ad.DumpMetadata.Name); err != nil {
+		seclog.Errorf("addNewActivityDumpRateLimiter failed: %s\n", err.Error())
+	}
 	return &ad
 }
 
@@ -233,7 +235,9 @@ func NewActivityDumpFromMessage(msg *api.ActivityDumpMessage) (*ActivityDump, er
 	}
 
 	// Initialise the rate limiters
-	ad.adm.addNewActivityDumpRateLimiter(ad.DumpMetadata.Name)
+	if err := ad.adm.addNewActivityDumpRateLimiter(ad.DumpMetadata.Name); err != nil {
+		seclog.Errorf("addNewActivityDumpRateLimiter failed: %s\n", err.Error())
+	}
 	return &ad, nil
 }
 
@@ -323,7 +327,9 @@ func (ad *ActivityDump) Stop() {
 	ad.DumpMetadata.End = time.Now()
 
 	// Delete the rate limiters
-	ad.adm.removeActivityDumpRateLimiter(ad.DumpMetadata.Name)
+	if err := ad.adm.removeActivityDumpRateLimiter(ad.DumpMetadata.Name); err != nil {
+		seclog.Errorf("removeActivityDumpRateLimiter failed: %s\n", err.Error())
+	}
 
 	// remove comm from kernel space
 	if len(ad.DumpMetadata.Comm) > 0 {

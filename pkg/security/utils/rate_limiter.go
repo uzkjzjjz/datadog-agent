@@ -241,7 +241,7 @@ func (rl *RateLimiter) GetGlobalGroupStats(group string, reset bool) (RateLimite
 	return stats, nil
 }
 
-// GetGroupStats returns a map indexed by IDs of a specified group
+// GetAllGroupStats returns a map indexed by IDs of a specified group
 // that describes the amount of allowed and dropped hits
 func (rl *RateLimiter) GetAllGroupStats(group string) (map[string]RateLimiterStat, error) {
 	rl.Lock()
@@ -292,6 +292,7 @@ func (rl *RateLimiter) SendGroupStats(group string) error {
 // DEBUG / FONCTIONAL TESTS FUNCS
 //
 
+// Debug func to dump the content of a RateLimiter
 func (rl *RateLimiter) Debug() {
 	for groupName, group := range rl.limiters {
 		fmt.Printf("Group: %s, %+v\n", groupName, rl.groupStats[groupName])
@@ -317,32 +318,36 @@ func (rl *RateLimiter) GetLimit(group string, id string) (rate.Limit, int, error
 	return limit, burst, nil
 }
 
+// GetGroups return a list of existing groups
 func (rl *RateLimiter) GetGroups() []string {
 	rl.RLock()
 	defer rl.RUnlock()
 
 	var groups []string
-	for group, _ := range rl.limiters {
+	for group := range rl.limiters {
 		groups = append(groups, group)
 	}
 	return groups
 }
 
+// GetGroupIDs returns the group list of IDs
 func (rl *RateLimiter) GetGroupIDs(group string) []string {
 	rl.RLock()
 	defer rl.RUnlock()
 
 	var ids []string
-	for id, _ := range rl.limiters[group] {
+	for id := range rl.limiters[group] {
 		ids = append(ids, id)
 	}
 	return ids
 }
 
+// GetLimiterOpts returns the LimiterOpts of the RateLimiter
 func (rl *RateLimiter) GetLimiterOpts() LimiterOpts {
 	return rl.opts
 }
 
+// GetDefaultLimitBurst returns the default values for limits and bursts
 func GetDefaultLimitBurst() (rate.Limit, int) {
 	return defaultLimit, defaultBurst
 }

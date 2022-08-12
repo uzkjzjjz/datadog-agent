@@ -140,18 +140,36 @@ const (
 	defaultBindLimit = 20
 )
 
-func (adm *ActivityDumpManager) addNewActivityDumpRateLimiter(id string) {
-	adm.RateLimiter.AddNewLimiter(rateLimiterGroupExec, id, rate.Inf, 1)
-	adm.RateLimiter.AddNewLimiter(rateLimiterGroupOpen, id, defaultOpenLimit, defaultOpenLimit*2)
-	adm.RateLimiter.AddNewLimiter(rateLimiterGroupDNS, id, defaultDNSLimit, defaultDNSLimit*2)
-	adm.RateLimiter.AddNewLimiter(rateLimiterGroupBind, id, defaultBindLimit, defaultBindLimit*2)
+func (adm *ActivityDumpManager) addNewActivityDumpRateLimiter(id string) error {
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupExec, id, rate.Inf, 1); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupOpen, id, defaultOpenLimit, defaultOpenLimit*2); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupDNS, id, defaultDNSLimit, defaultDNSLimit*2); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.AddNewLimiter(rateLimiterGroupBind, id, defaultBindLimit, defaultBindLimit*2); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (adm *ActivityDumpManager) removeActivityDumpRateLimiter(id string) {
-	adm.RateLimiter.RemoveLimiter(rateLimiterGroupExec, id)
-	adm.RateLimiter.RemoveLimiter(rateLimiterGroupOpen, id)
-	adm.RateLimiter.RemoveLimiter(rateLimiterGroupDNS, id)
-	adm.RateLimiter.RemoveLimiter(rateLimiterGroupBind, id)
+func (adm *ActivityDumpManager) removeActivityDumpRateLimiter(id string) error {
+	if err := adm.RateLimiter.RemoveLimiter(rateLimiterGroupExec, id); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.RemoveLimiter(rateLimiterGroupOpen, id); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.RemoveLimiter(rateLimiterGroupDNS, id); err != nil {
+		return err
+	}
+	if err := adm.RateLimiter.RemoveLimiter(rateLimiterGroupBind, id); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (adm *ActivityDumpManager) testRateLimiter() {
