@@ -126,6 +126,12 @@ func run(_ *cobra.Command, _ []string) error {
 	return err
 }
 
+type logger struct{}
+
+func (l logger) Warnf(format string, args ...interface{}) {
+	log.Warnf(format, args...)
+}
+
 // StartSystemProbe Initializes the system-probe process
 func StartSystemProbe() error {
 	cfg, err := config.New(configPath)
@@ -162,7 +168,7 @@ func StartSystemProbe() error {
 		if err != nil {
 			log.Warnf("Can't set up memory controller: %v", err)
 		} else {
-			memoryMonitor.Start()
+			memoryMonitor.Start(logger{})
 		}
 	}
 

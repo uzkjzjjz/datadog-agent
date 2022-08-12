@@ -13,8 +13,6 @@ import (
 	"syscall"
 
 	"github.com/containerd/cgroups"
-
-	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
 const maxEpollEvents = 4
@@ -140,8 +138,12 @@ func NewMemoryController(kind string, containerized bool, monitors ...MemoryMoni
 	return mc, nil
 }
 
+type Logger interface {
+	Warnf(s string, args ...interface{})
+}
+
 // Start listening for events
-func (mc *MemoryController) Start() {
+func (mc *MemoryController) Start(l Logger) {
 	go func() {
 		var buf [256]byte
 		var events [maxEpollEvents]syscall.EpollEvent
@@ -150,7 +152,7 @@ func (mc *MemoryController) Start() {
 		for {
 			nevents, err := syscall.EpollWait(mc.efd, events[:], -1)
 			if err != nil {
-				log.Warnf("Error while waiting for memory controller events: %v", err)
+				l.Warnf("Error while waiting for memory controller events: %v", err)
 				break
 			}
 
@@ -158,7 +160,7 @@ func (mc *MemoryController) Start() {
 				fd := int(events[ev].Fd)
 
 				if _, err := syscall.Read(fd, buf[:]); err != nil {
-					log.Warnf("Error while reading memory controller event: %v", err)
+					l.Warnf("Error while reading memory controller event: %v", err)
 					continue EPOLLWAIT
 				}
 
